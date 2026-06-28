@@ -47,6 +47,7 @@ sbay-dev/ADG-Lang-dev
 | --- | --- |
 | `docs\ADG-Duali-Rules.md` | The single cleaned rule table that anchors the parser. |
 | `docs\Academic-Reading-Key.md` | Color/evidence key for academic review of the rule table. |
+| `docs\Mermaid-Rule-Maps.md` | Mermaid diagrams that apply the academic reading key visually. |
 | `docs\Language-Overview.md` | Public overview of ADG-Lang as a programming-language interface. |
 | `docs\Verification-Model.md` | How ADG moves from AST to verification and native-proof gates. |
 | `docs\Community-Roadmap.md` | Open development tracks for contributors. |

@@ -24,6 +24,8 @@ This table is the public, cleaned rule map for ADG-Lang. It consolidates the rul
 
 For stricter research usage, each rule also carries a proof degree: `Transmitted text`, `Attributed chapter`, `Direct inference`, `Notation`, `Modern ADG`, or `Not attributed / guardrail`.
 
+See `docs\Academic-Reading-Key.md` and `docs\Mermaid-Rule-Maps.md` for the visual Mermaid maps that make this color key inspectable.
+
 ## Unified Rule Table
 
 | ID | Color | Layer | Proof degree | Rule | Historical basis | ADG parser/compiler contract |
