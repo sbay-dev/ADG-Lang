@@ -1,0 +1,8 @@
+{
+  "name": "hello-adg",
+  "language": "ADG-Lang",
+  "languageVersion": "0.1.1",
+  "sourceKind": "typed-adg-ast",
+  "entrypoint": "src/main.adg.json",
+  "outputName": "hello-adg"
+}

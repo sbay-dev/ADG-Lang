@@ -10,6 +10,7 @@ ADG-Lang v0.1.0 is the first public, testable reference release.
 - Valid and invalid AST examples.
 - Verification model and diagnostics.
 - Release verification script.
+- Minimal application project model under `examples\apps\hello-adg`.
 
 ## Excluded
 
@@ -28,6 +29,21 @@ If LLVM `clang` is not available:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\Verify-AdgRelease.ps1 -SkipNative
+```
+
+## Minimal App
+
+The release includes a minimal application project:
+
+```text
+examples\apps\hello-adg
+```
+
+It can be verified and built with:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File examples\apps\hello-adg\scripts\verify.ps1
+powershell -ExecutionPolicy Bypass -File examples\apps\hello-adg\scripts\build.ps1 -SkipNative
 ```
 
 ## Expected Result

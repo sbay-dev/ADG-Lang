@@ -9,6 +9,12 @@ The examples are AST fixtures for language investigation.
 | `valid\proof-10-words.adg.json` | Demonstrates a verified ten-word verbal/Idafa sequence. |
 | `valid\causal-10-words.adg.json` | Demonstrates a verified connected causal sentence. |
 
+## Application Projects
+
+| Path | Purpose |
+| --- | --- |
+| `apps\hello-adg` | Minimal ADG-Lang application project with manifest, entrypoint, and scripts. |
+
 ## Invalid Examples
 
 | File | Expected diagnostic |

@@ -116,4 +116,7 @@ foreach ($example in $invalidExamples) {
     }
 }
 
+$helloProjectScript = Resolve-RepoPath "examples\apps\hello-adg\scripts\build.ps1"
+powershell -ExecutionPolicy Bypass -File $helloProjectScript -SkipNative | Out-Host
+
 Write-Host "[PASS] ADG-Lang public release verification completed." -ForegroundColor Green

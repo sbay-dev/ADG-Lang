@@ -44,6 +44,8 @@ This public repository is the official community-facing language repository for:
 | `docs\Academic-Reading-Key.md` | Color/evidence key for academic review of the rule table. |
 | `docs\Mermaid-Rule-Maps.md` | Mermaid diagrams that apply the academic reading key visually. |
 | `docs\Compiler-Components.md` | Components of the public reference compiler. |
+| `docs\Project-Model.md` | File extensions and ADG application project layout. |
+| `docs\Portability-and-Targets.md` | What "compiled" means across operating systems, native targets, and WebAssembly. |
 | `docs\Release-Testing.md` | How to verify and test the public release. |
 | `docs\Release-v0.1.0.md` | Release notes for the first public testable version. |
 | `docs\Repository-Policy.md` | What public releases include and exclude. |
@@ -73,6 +75,23 @@ If LLVM `clang` is unavailable:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\Verify-AdgRelease.ps1 -SkipNative
+```
+
+## Application File Extension
+
+Use `.adg.json` for current ADG-Lang applications. It is the stable v0.1.x executable typed AST format.
+
+The `.adg` extension is reserved for a future human-readable source syntax.
+
+Minimal app project:
+
+```text
+examples\apps\hello-adg
+  adg.project.json
+  src\main.adg.json
+  scripts\verify.ps1
+  scripts\build.ps1
+  scripts\run.ps1
 ```
 
 ## Current Rule Layers

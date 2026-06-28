@@ -1,0 +1,16 @@
+{
+  "kind": "connected",
+  "left": {
+    "kind": "verbal",
+    "verb": { "kind": "fil", "surface": "كتبَ" },
+    "fail": { "kind": "ism", "surface": "المبرمجُ", "case": "Raf" },
+    "maful": { "kind": "ism", "surface": "التطبيقَ", "case": "Nasb" }
+  },
+  "connector": { "surface": "ثم", "role": "Sequence" },
+  "right": {
+    "kind": "verbal",
+    "verb": { "kind": "fil", "surface": "شغّلَ" },
+    "fail": { "kind": "ism", "surface": "النظامُ", "case": "Raf" },
+    "maful": { "kind": "ism", "surface": "البرنامجَ", "case": "Nasb" }
+  }
+}

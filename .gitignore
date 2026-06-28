@@ -4,6 +4,7 @@
 **/obj/
 build/
 artifacts/
+examples/apps/**/artifacts/
 *.exe
 *.dll
 *.pdb
