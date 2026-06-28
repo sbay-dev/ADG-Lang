@@ -1,0 +1,12 @@
+.vs/
+.vscode/
+**/bin/
+**/obj/
+build/
+*.exe
+*.dll
+*.pdb
+*.obj
+*.o
+*.log
+*.tmp

@@ -1,0 +1,5 @@
+{
+  "kind": "governance",
+  "operator": { "surface": "في", "role": "Jarr" },
+  "operand": { "kind": "ism", "surface": "بيتُ", "case": "Raf" }
+}

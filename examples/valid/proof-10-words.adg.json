@@ -1,0 +1,27 @@
+{
+  "kind": "connected",
+  "left": {
+    "kind": "verbal",
+    "verb": { "kind": "fil", "surface": "كتبَ" },
+    "fail": { "kind": "ism", "surface": "الطالبُ", "case": "Raf" },
+    "maful": { "kind": "ism", "surface": "الدرسَ", "case": "Nasb" }
+  },
+  "connector": { "surface": "ثم", "role": "Sequence" },
+  "right": {
+    "kind": "verbal",
+    "verb": { "kind": "fil", "surface": "قرأَ" },
+    "fail": { "kind": "ism", "surface": "المعلمُ", "case": "Raf" },
+    "maful": { "kind": "ism", "surface": "الكتابَ", "case": "Nasb" },
+    "adjuncts": [
+      {
+        "kind": "governance",
+        "operator": { "surface": "في", "role": "Jarr" },
+        "operand": {
+          "kind": "idafa",
+          "mudaf": { "kind": "ism", "surface": "بيتِ", "case": "Jarr" },
+          "mudafIlayh": { "kind": "ism", "surface": "العلمِ", "case": "Jarr" }
+        }
+      }
+    ]
+  }
+}

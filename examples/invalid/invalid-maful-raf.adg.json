@@ -1,0 +1,6 @@
+{
+  "kind": "verbal",
+  "verb": { "kind": "fil", "surface": "كتبَ" },
+  "fail": { "kind": "ism", "surface": "الطالبُ", "case": "Raf" },
+  "maful": { "kind": "ism", "surface": "الدرسُ", "case": "Raf" }
+}

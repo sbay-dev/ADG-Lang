@@ -1,0 +1,9 @@
+{
+  "kind": "condition",
+  "operator": "إذا",
+  "condition": {
+    "kind": "verbal",
+    "verb": { "kind": "fil", "surface": "اجتهدَ" },
+    "fail": { "kind": "ism", "surface": "الطالبُ", "case": "Raf" }
+  }
+}
