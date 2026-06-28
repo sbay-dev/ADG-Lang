@@ -3,6 +3,7 @@
 **/bin/
 **/obj/
 build/
+artifacts/
 *.exe
 *.dll
 *.pdb

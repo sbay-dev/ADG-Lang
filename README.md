@@ -28,18 +28,13 @@ Invalid ADG AST
 
 ## Repository Purpose
 
-This public repository is the community-facing home for:
+This public repository is the official community-facing language repository for:
 
 1. The ADG-Lang rule model.
 2. Public AST examples.
-3. Parser and compiler design notes.
-4. Community verification and research tasks.
-
-Active native-proof implementation work is maintained separately in the private development repository:
-
-```text
-sbay-dev/ADG-Lang-dev
-```
+3. The public reference compiler release.
+4. Parser and compiler design notes.
+5. Community verification and research tasks.
 
 ## Start Here
 
@@ -48,11 +43,37 @@ sbay-dev/ADG-Lang-dev
 | `docs\ADG-Duali-Rules.md` | The single cleaned rule table that anchors the parser. |
 | `docs\Academic-Reading-Key.md` | Color/evidence key for academic review of the rule table. |
 | `docs\Mermaid-Rule-Maps.md` | Mermaid diagrams that apply the academic reading key visually. |
+| `docs\Compiler-Components.md` | Components of the public reference compiler. |
+| `docs\Release-Testing.md` | How to verify and test the public release. |
+| `docs\Release-v0.1.0.md` | Release notes for the first public testable version. |
+| `docs\Repository-Policy.md` | What public releases include and exclude. |
 | `docs\Language-Overview.md` | Public overview of ADG-Lang as a programming-language interface. |
 | `docs\Verification-Model.md` | How ADG moves from AST to verification and native-proof gates. |
 | `docs\Community-Roadmap.md` | Open development tracks for contributors. |
 | `examples\README.md` | Valid and invalid AST examples for investigation. |
 | `CONTRIBUTING.md` | How to propose rules, examples, diagnostics, and implementations. |
+
+## Public Reference Compiler
+
+The public release includes a testable reference compiler:
+
+```text
+src\Adg.Compiler
+```
+
+Run:
+
+```powershell
+dotnet run --project src\Adg.Compiler -- --self-test
+dotnet run --project src\Adg.Compiler -- test-matrix
+powershell -ExecutionPolicy Bypass -File scripts\Verify-AdgRelease.ps1
+```
+
+If LLVM `clang` is unavailable:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\Verify-AdgRelease.ps1 -SkipNative
+```
 
 ## Current Rule Layers
 
@@ -66,7 +87,7 @@ ADG-Lang separates historical attribution from modern compiler design:
 
 ## Development Status
 
-ADG-Lang Native Proof v0.1 passed its private engineering audit:
+ADG-Lang Native Proof v0.1 passed the release verification audit:
 
 ```text
 Total checks: 59

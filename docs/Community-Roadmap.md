@@ -25,7 +25,7 @@
 - Keep backend output downstream of verification.
 - Do not allow raw AST emission paths.
 
-## Track 5: Public Implementation
+## Track 5: Reference Implementation
 
-- Decide which compiler components should move from private proof work to public source.
 - Keep public code aligned with the rule table and examples.
+- Expand the reference compiler only through documented rules, diagnostics, and tests.

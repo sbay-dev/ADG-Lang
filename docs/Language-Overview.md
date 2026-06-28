@@ -33,4 +33,4 @@ Raw ADG AST
   -> Backend
 ```
 
-The public repository documents the language interface and examples. Implementation can evolve in public proposals and private/native-proof development tracks.
+The public repository documents the language interface, examples, and reference compiler. Implementation evolves through public proposals, tests, and release verification.
