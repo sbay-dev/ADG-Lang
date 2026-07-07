@@ -11,7 +11,7 @@ internal sealed record CompileOptions(
     {
         if (args.Length == 0)
         {
-            throw new CliException("compile requires an ADG JSON input file.");
+            throw new CliException("compile requires an ADG input file (.adg.json or .adg).");
         }
 
         var input = args[0];
@@ -55,4 +55,3 @@ internal sealed record CompileOptions(
         return args[index];
     }
 }
-

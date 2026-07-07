@@ -3,6 +3,9 @@ namespace Adg.Compiler;
 internal enum DiagnosticCode
 {
     Unknown = 0,
+    InvalidKeywordIrab,
+    MissingTextDirectionHeader,
+    NonRtlTextDirection,
     InvalidFaelCase,
     InvalidMafulCase,
     InvalidJarrOperand,
@@ -12,6 +15,14 @@ internal enum DiagnosticCode
     MissingNegationTarget,
     InvalidOperatorArity,
     UnresolvedHiddenReference,
-    InvalidSemanticFrame
+    InvalidSemanticFrame,
+    InvalidParameterType,
+    UndefinedFunctionParameter,
+    ConditionRequiresNumber,
+    MissingFunctionBody,
+    UndefinedFunctionCall,
+    FunctionArityMismatch,
+    FunctionArgumentKindMismatch,
+    DuplicateFunctionName,
+    EmptyFunctionProgram
 }
-

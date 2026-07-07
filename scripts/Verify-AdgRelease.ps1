@@ -119,4 +119,28 @@ foreach ($example in $invalidExamples) {
 $helloProjectScript = Resolve-RepoPath "examples\apps\hello-adg\scripts\build.ps1"
 powershell -ExecutionPolicy Bypass -File $helloProjectScript -SkipNative | Out-Host
 
+$functionInput = Resolve-RepoPath "examples\apps\hello-adg\src\abu-al-aswad-wikipedia-intro.adg"
+$functionLl = Join-Path $artifactDir "abu-al-aswad-wikipedia-intro.ll"
+$functionExe = Join-Path $artifactDir "abu-al-aswad-wikipedia-intro.exe"
+Invoke-Adg -AdgArgs @("verify", $functionInput) | Out-Null
+
+if ($SkipNative) {
+    Invoke-Adg -AdgArgs @("compile", $functionInput, "--emit-llvm", $functionLl) | Out-Null
+} else {
+    Invoke-Adg -AdgArgs @("compile", $functionInput, "--emit-llvm", $functionLl, "--native", $functionExe) | Out-Null
+    $functionOutput = & $functionExe
+    $functionOutput | Out-Host
+    if ($LASTEXITCODE -ne 0) {
+        throw "Native executable failed: $functionExe"
+    }
+    $functionText = $functionOutput -join "`n"
+    if ($functionText -notmatch "CC BY-SA" -or $functionText -notmatch "creativecommons.org/licenses/by-sa/4.0") {
+        throw "Wikipedia function output did not include the required CC BY-SA attribution and license URL."
+    }
+}
+
+if (-not (Test-Path $functionLl)) {
+    throw "Expected function LLVM IR was not emitted: $functionLl"
+}
+
 Write-Host "[PASS] ADG-Lang public release verification completed." -ForegroundColor Green

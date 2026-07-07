@@ -37,7 +37,17 @@ internal sealed class AdgTypeException : AdgDiagnosticException
     }
 }
 
-internal sealed class AdgParseException(string message) : AdgDiagnosticException(message);
+internal sealed class AdgParseException : AdgDiagnosticException
+{
+    public AdgParseException(string message)
+        : base(message)
+    {
+    }
+
+    public AdgParseException(DiagnosticCode code, string message)
+        : base(code, message)
+    {
+    }
+}
 
 internal sealed class CliException(string message) : Exception(message);
-

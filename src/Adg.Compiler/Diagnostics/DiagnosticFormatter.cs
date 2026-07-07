@@ -14,6 +14,9 @@ internal static class DiagnosticFormatter
 
     public static string Id(DiagnosticCode code) => code switch
     {
+        DiagnosticCode.InvalidKeywordIrab => "ADG-K001",
+        DiagnosticCode.MissingTextDirectionHeader => "ADG-K004",
+        DiagnosticCode.NonRtlTextDirection => "ADG-K005",
         DiagnosticCode.InvalidFaelCase => "ADG1001",
         DiagnosticCode.InvalidMafulCase => "ADG1002",
         DiagnosticCode.InvalidJarrOperand => "ADG1003",
@@ -24,11 +27,23 @@ internal static class DiagnosticFormatter
         DiagnosticCode.InvalidOperatorArity => "ADG1008",
         DiagnosticCode.UnresolvedHiddenReference => "ADG1009",
         DiagnosticCode.InvalidSemanticFrame => "ADG1010",
+        DiagnosticCode.InvalidParameterType => "ADG-F001",
+        DiagnosticCode.UndefinedFunctionParameter => "ADG-F002",
+        DiagnosticCode.ConditionRequiresNumber => "ADG-F003",
+        DiagnosticCode.MissingFunctionBody => "ADG-F004",
+        DiagnosticCode.UndefinedFunctionCall => "ADG-F005",
+        DiagnosticCode.FunctionArityMismatch => "ADG-F006",
+        DiagnosticCode.FunctionArgumentKindMismatch => "ADG-F007",
+        DiagnosticCode.DuplicateFunctionName => "ADG-F008",
+        DiagnosticCode.EmptyFunctionProgram => "ADG-F009",
         _ => "ADG0000"
     };
 
     public static string Name(DiagnosticCode code) => code switch
     {
+        DiagnosticCode.InvalidKeywordIrab => nameof(DiagnosticCode.InvalidKeywordIrab),
+        DiagnosticCode.MissingTextDirectionHeader => nameof(DiagnosticCode.MissingTextDirectionHeader),
+        DiagnosticCode.NonRtlTextDirection => nameof(DiagnosticCode.NonRtlTextDirection),
         DiagnosticCode.InvalidFaelCase => nameof(DiagnosticCode.InvalidFaelCase),
         DiagnosticCode.InvalidMafulCase => nameof(DiagnosticCode.InvalidMafulCase),
         DiagnosticCode.InvalidJarrOperand => nameof(DiagnosticCode.InvalidJarrOperand),
@@ -39,7 +54,15 @@ internal static class DiagnosticFormatter
         DiagnosticCode.InvalidOperatorArity => nameof(DiagnosticCode.InvalidOperatorArity),
         DiagnosticCode.UnresolvedHiddenReference => nameof(DiagnosticCode.UnresolvedHiddenReference),
         DiagnosticCode.InvalidSemanticFrame => nameof(DiagnosticCode.InvalidSemanticFrame),
+        DiagnosticCode.InvalidParameterType => nameof(DiagnosticCode.InvalidParameterType),
+        DiagnosticCode.UndefinedFunctionParameter => nameof(DiagnosticCode.UndefinedFunctionParameter),
+        DiagnosticCode.ConditionRequiresNumber => nameof(DiagnosticCode.ConditionRequiresNumber),
+        DiagnosticCode.MissingFunctionBody => nameof(DiagnosticCode.MissingFunctionBody),
+        DiagnosticCode.UndefinedFunctionCall => nameof(DiagnosticCode.UndefinedFunctionCall),
+        DiagnosticCode.FunctionArityMismatch => nameof(DiagnosticCode.FunctionArityMismatch),
+        DiagnosticCode.FunctionArgumentKindMismatch => nameof(DiagnosticCode.FunctionArgumentKindMismatch),
+        DiagnosticCode.DuplicateFunctionName => nameof(DiagnosticCode.DuplicateFunctionName),
+        DiagnosticCode.EmptyFunctionProgram => nameof(DiagnosticCode.EmptyFunctionProgram),
         _ => nameof(DiagnosticCode.Unknown)
     };
 }
-

@@ -1,13 +1,13 @@
 # ADG-Lang Project Model
 
-ADG-Lang v0.1.x can be used to build small applications through typed AST source files.
+ADG-Lang v0.1.x can be used to build small applications through typed AST source files and experimental executable-function sources.
 
 ## File Extensions
 
 | Extension / file | Status | Purpose |
 | --- | --- | --- |
 | `.adg.json` | Stable in v0.1.x | Executable typed ADG AST source. This is the correct extension for current applications. |
-| `.adg` | Reserved | Future human-readable surface syntax. Not implemented in v0.1.x. |
+| `.adg` | Experimental in v0.1.x | Human-readable executable-function syntax using the mandatory RTL header and Arabic keywords such as `دالةٌ` and `استدعاءٌ`. |
 | `adg.project.json` | Stable project manifest | Declares project name, language version, source kind, entrypoint, and output name. |
 | `.ll` | Generated artifact | LLVM IR emitted by the compiler. Do not commit as application source unless documenting a proof. |
 | `.exe` / native binary | Generated artifact | Host-native output for a specific OS/architecture. Do not commit. |
@@ -45,6 +45,6 @@ src\main.adg.json
 
 ## Can I build an app with ADG-Lang?
 
-Yes, with the current v0.1.x constraint: applications are authored as typed ADG AST files (`.adg.json`). The compiler can verify the AST, emit LLVM IR, and optionally produce a native executable through LLVM clang.
+Yes. Stable applications are authored as typed ADG AST files (`.adg.json`). The compiler can verify the AST, emit LLVM IR, and optionally produce a native executable through LLVM clang.
 
-The next language step is a human-readable `.adg` syntax that compiles to the same typed AST model.
+For executable functions, `.adg` source is available as an experimental human-readable path. Function programs must start with `اتجاهُ النصِّ: RTL`, use canonical keyword i'rab, and pass the function type-checker before LLVM IR is emitted.

@@ -2,13 +2,19 @@
 
 `hello-adg` is a minimal ADG-Lang application project.
 
-It demonstrates the current public source format:
+It demonstrates the stable public typed-AST source format:
 
 ```text
 src\main.adg.json
 ```
 
-The current stable extension for executable ADG source is `.adg.json` because ADG-Lang v0.1.x accepts typed JSON AST input. The `.adg` extension is reserved for a future human-readable surface syntax.
+The app also includes an experimental executable-function demo:
+
+```text
+src\abu-al-aswad-wikipedia-intro.adg
+```
+
+That function prints a shaped Arabic introduction based on the Arabic Wikipedia lead for Abu al-Aswad al-Du'ali, with explicit CC BY-SA attribution.
 
 ## Verify
 
@@ -27,4 +33,12 @@ powershell -ExecutionPolicy Bypass -File scripts\build.ps1 -SkipNative
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\build.ps1
 powershell -ExecutionPolicy Bypass -File scripts\run.ps1
+```
+
+## Verify the Wikipedia Function Demo
+
+```powershell
+dotnet run --project ..\..\..\src\Adg.Compiler -- verify src\abu-al-aswad-wikipedia-intro.adg
+dotnet run --project ..\..\..\src\Adg.Compiler -- compile src\abu-al-aswad-wikipedia-intro.adg --emit-llvm artifacts\abu-al-aswad-wikipedia-intro.ll --native artifacts\abu-al-aswad-wikipedia-intro.exe
+.\artifacts\abu-al-aswad-wikipedia-intro.exe
 ```

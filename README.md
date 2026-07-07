@@ -51,6 +51,8 @@ This public repository is the official community-facing language repository for:
 | `docs\Repository-Policy.md` | What public releases include and exclude. |
 | `docs\Language-Overview.md` | Public overview of ADG-Lang as a programming-language interface. |
 | `docs\Verification-Model.md` | How ADG moves from AST to verification and native-proof gates. |
+| `docs\ADG-Wikipedia-Intro-Function.md` | Wikipedia-attributed Abu al-Aswad executable-function demo. |
+| `docs\directives\ADG-WIKIPEDIA-INTRO-DIRECTIVES.md` | Code-linked implementation directives for the Wikipedia demo. |
 | `docs\Community-Roadmap.md` | Open development tracks for contributors. |
 | `examples\README.md` | Valid and invalid AST examples for investigation. |
 | `CONTRIBUTING.md` | How to propose rules, examples, diagnostics, and implementations. |
@@ -79,9 +81,9 @@ powershell -ExecutionPolicy Bypass -File scripts\Verify-AdgRelease.ps1 -SkipNati
 
 ## Application File Extension
 
-Use `.adg.json` for current ADG-Lang applications. It is the stable v0.1.x executable typed AST format.
+Use `.adg.json` for stable v0.1.x ADG-Lang applications. It is the executable typed AST format.
 
-The `.adg` extension is reserved for a future human-readable source syntax.
+The `.adg` extension is now supported experimentally for executable function programs that use the canonical RTL Arabic surface syntax (`دالةٌ` / `استدعاءٌ`).
 
 Minimal app project:
 
@@ -92,6 +94,12 @@ examples\apps\hello-adg
   scripts\verify.ps1
   scripts\build.ps1
   scripts\run.ps1
+```
+
+Function demo:
+
+```text
+examples\apps\hello-adg\src\abu-al-aswad-wikipedia-intro.adg
 ```
 
 ## Current Rule Layers

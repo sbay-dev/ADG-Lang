@@ -62,8 +62,8 @@ internal static class Program
         ADG Native Compiler
 
         Usage:
-          dotnet run --project src\Adg.Compiler -- verify <file.adg.json>
-          dotnet run --project src\Adg.Compiler -- compile <file.adg.json> [--emit-llvm <out.ll>] [--native <out.exe>] [--clang <clang.exe>] [--print]
+          dotnet run --project src\Adg.Compiler -- verify <file.adg.json|file.adg>
+          dotnet run --project src\Adg.Compiler -- compile <file.adg.json|file.adg> [--emit-llvm <out.ll>] [--native <out.exe>] [--clang <clang.exe>] [--print]
           dotnet run --project src\Adg.Compiler -- test-matrix
           dotnet run --project src\Adg.Compiler -- --self-test
 
@@ -76,6 +76,10 @@ internal static class Program
           Explanatory connectors require case agreement for object-to-object explanation
 
         Native output needs LLVM clang on PATH or passed through --clang.
+
+        A .adg file that defines functions (دالةٌ ... استدعاءٌ ...) compiles through
+        the executable-function pipeline to a native program. Function source must
+        start with the mandatory RTL header: اتجاهُ النصِّ: RTL.
         """);
     }
 }
