@@ -16,6 +16,6 @@ implementation requirements.
 
 ```powershell
 dotnet run --project src\Adg.Compiler -- verify examples\apps\hello-adg\src\abu-al-aswad-wikipedia-intro.adg
-dotnet run --project src\Adg.Compiler -- compile examples\apps\hello-adg\src\abu-al-aswad-wikipedia-intro.adg --emit-llvm build\abu-al-aswad-wikipedia-intro.ll --native build\abu-al-aswad-wikipedia-intro.exe
-.\build\abu-al-aswad-wikipedia-intro.exe
+dotnet run --project src\Adg.Compiler -- compile examples\apps\hello-adg\src\abu-al-aswad-wikipedia-intro.adg --emit-llvm artifacts\abu-al-aswad-wikipedia-intro.ll --native artifacts\abu-al-aswad-wikipedia-intro.exe
+.\artifacts\abu-al-aswad-wikipedia-intro.exe
 ```

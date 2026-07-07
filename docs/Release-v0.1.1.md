@@ -4,8 +4,8 @@ ADG-Lang v0.1.1 adds a minimal application project model to the public language 
 
 ## Highlights
 
-- Defines `.adg.json` as the current stable executable ADG source extension.
-- Reserves `.adg` for future human-readable syntax.
+- Establishes the Arabic-inflected `.adg` surface as the canonical way to author ADG-Lang programs (grammatical statements and `دالةٌ`/`استدعاءٌ` functions).
+- Keeps `.adg.json` as the equivalent low-level typed AST that the compiler builds from `.adg` source.
 - Adds `adg.project.json` as the project manifest.
 - Adds `examples\apps\hello-adg`.
 - Documents portability boundaries and target roadmap.

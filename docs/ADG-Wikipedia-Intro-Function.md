@@ -42,6 +42,15 @@ program "مقدمةُ-أبي-الأسودِ-ويكيبيديا"
 استدعاءٌ "مقدمةُ_أبي_الأسودِ_من_ويكيبيديا"
 ```
 
+This is the canonical ADG-Lang functional surface: functions are authored directly in
+Arabic with correct i'rab as `.adg` source, never as JSON. Each keyword carries its
+inflection and is checked at compile time:
+
+- `دالةٌ` (nominative) declares the function.
+- `متنٌ` (nominative) holds the fixed body text.
+- `مُخرَجٌ نصٌّ` (nominative) declares a text output.
+- `استدعاءٌ` (nominative) calls the function.
+
 This example intentionally uses a zero-argument function because the published
 text is a fixed attributed demonstration, not a generated biography from hidden
 data.
@@ -50,8 +59,8 @@ data.
 
 ```powershell
 dotnet run --project src\Adg.Compiler -- verify examples\apps\hello-adg\src\abu-al-aswad-wikipedia-intro.adg
-dotnet run --project src\Adg.Compiler -- compile examples\apps\hello-adg\src\abu-al-aswad-wikipedia-intro.adg --emit-llvm build\abu-al-aswad-wikipedia-intro.ll --native build\abu-al-aswad-wikipedia-intro.exe
-.\build\abu-al-aswad-wikipedia-intro.exe
+dotnet run --project src\Adg.Compiler -- compile examples\apps\hello-adg\src\abu-al-aswad-wikipedia-intro.adg --emit-llvm artifacts\abu-al-aswad-wikipedia-intro.ll --native artifacts\abu-al-aswad-wikipedia-intro.exe
+.\artifacts\abu-al-aswad-wikipedia-intro.exe
 ```
 
 ## Verification boundary

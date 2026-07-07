@@ -13,7 +13,7 @@ Portable source
 The portable layer is the ADG source and verified program model:
 
 ```text
-.adg.json
+.adg  (Arabic-inflected source)
   -> VerifiedAdgProgram
   -> backend target
 ```
