@@ -3,9 +3,11 @@
   Verifies the public ADG-Lang release repository.
 
 .DESCRIPTION
-  Runs the public reference compiler against valid and invalid AST examples.
-  The script proves that valid examples pass and invalid examples fail before
-  backend output. Native executable linking is optional and requires LLVM clang.
+  Runs the public reference compiler against valid and invalid examples. The script proves
+  that canonical Arabic-inflected `.adg` sources verify and emit LLVM IR (and render the same
+  text as their equivalent `.adg.json` typed AST), that valid AST examples pass, and that
+  invalid examples fail before backend output. Native executable linking is optional and
+  requires LLVM clang.
 #>
 
 param(
@@ -113,6 +115,40 @@ foreach ($example in $invalidExamples) {
     }
     if ($result.Output -notmatch [regex]::Escape($example.Diagnostic)) {
         throw "Expected diagnostic $($example.Diagnostic) was not found for $($example.Path). Output: $($result.Output)"
+    }
+}
+
+$surfaceExamples = @(
+    @{ Id = "proof-10-words"; Adg = "examples\valid\proof-10-words.adg"; Json = "examples\valid\proof-10-words.adg.json" },
+    @{ Id = "causal-10-words"; Adg = "examples\valid\causal-10-words.adg"; Json = "examples\valid\causal-10-words.adg.json" }
+)
+
+function Get-AdgRender {
+    param([string]$Output)
+    $line = $Output -split "`r?`n" | Where-Object {
+        $_ -and ($_ -notmatch '^(PASSED|FAILED|Relations=|LLVM IR:|Native)') -and ($_.Trim().Length -gt 0)
+    } | Select-Object -Last 1
+    return ([string]$line).Trim()
+}
+
+foreach ($example in $surfaceExamples) {
+    $adg = Resolve-RepoPath $example.Adg
+    $json = Resolve-RepoPath $example.Json
+    $adgLl = Join-Path $artifactDir "$($example.Id)-surface.ll"
+    $jsonLl = Join-Path $artifactDir "$($example.Id)-ast.ll"
+
+    Invoke-Adg -AdgArgs @("verify", $adg) | Out-Null
+    $adgOut = (Invoke-Adg -AdgArgs @("compile", $adg, "--emit-llvm", $adgLl, "--print")).Output
+    $jsonOut = (Invoke-Adg -AdgArgs @("compile", $json, "--emit-llvm", $jsonLl, "--print")).Output
+
+    if (-not (Test-Path $adgLl)) {
+        throw "Expected surface LLVM IR was not emitted: $adgLl"
+    }
+
+    $adgRender = Get-AdgRender $adgOut
+    $jsonRender = Get-AdgRender $jsonOut
+    if ([string]::IsNullOrWhiteSpace($adgRender) -or $adgRender -ne $jsonRender) {
+        throw "Arabic .adg render does not match .adg.json render for $($example.Id). adg='$adgRender' json='$jsonRender'"
     }
 }
 

@@ -53,8 +53,91 @@ internal static class SelfTest
 
         RunFunctionTests();
 
+        RunSurfaceTests();
+
         Console.WriteLine("ADG native compiler self-test passed.");
         return 0;
+    }
+
+    private static void RunSurfaceTests()
+    {
+        string[] canonical =
+        [
+            "اتجاهُ النصِّ: RTL",
+            "adg 0.1.1",
+            "program \"surface-self-test\"",
+            "جملةٌ فعليةٌ \"كتبَ\" فاعلُها \"الطالبُ\" مرفوعٌ مفعولُها \"الدرسَ\" منصوبٌ",
+            "رابطٌ \"ثم\" ترتيبٌ",
+            "جملةٌ فعليةٌ \"قرأَ\" فاعلُها \"المعلمُ\" مرفوعٌ مفعولُها \"الكتابَ\" منصوبٌ",
+            "جارٌّ ومجرورٌ \"في\" إضافةٌ \"بيتِ\" مجرورٌ \"العلمِ\" مجرورٌ"
+        ];
+
+        var root = ParseSurface(canonical);
+        var program = new AdgProgram(root);
+        AdgVerifier.Verify(program);
+        AssertEqual(
+            "كتبَ الطالبُ الدرسَ ثم قرأَ المعلمُ الكتابَ في بيتِ العلمِ",
+            program.RenderText(),
+            "surface-parsed proof text");
+
+        ExpectSurfaceDiagnostic(
+            [
+                "اتجاهُ النصِّ: RTL",
+                "مبتدأٌ \"زيدٌ\" مرفوعٌ"
+            ],
+            DiagnosticCode.UnknownArabicKeyword,
+            "an unknown Arabic keyword should be rejected");
+
+        ExpectSurfaceDiagnostic(
+            [
+                "اتجاهُ النصِّ: RTL",
+                "جملةٌ ism"
+            ],
+            DiagnosticCode.MixedSurfaceSyntax,
+            "mixing Arabic and technical keywords should be rejected");
+
+        ExpectSurfaceDiagnostic(
+            [
+                "جملةٌ فعليةٌ \"كتبَ\" فاعلُها \"الطالبُ\" مرفوعٌ مفعولُها \"الدرسَ\" منصوبٌ"
+            ],
+            DiagnosticCode.MissingTextDirectionHeader,
+            "a surface program without the RTL header should be rejected");
+    }
+
+    private static IAdgNode ParseSurface(string[] lines)
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"adg-surface-{Guid.NewGuid():N}.adg");
+        try
+        {
+            File.WriteAllLines(path, lines);
+            return AdgSurfaceParser.ParseFile(path);
+        }
+        finally
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+    }
+
+    private static void ExpectSurfaceDiagnostic(string[] lines, DiagnosticCode expected, string label)
+    {
+        try
+        {
+            ParseSurface(lines);
+        }
+        catch (AdgDiagnosticException ex)
+        {
+            if (ex.Code != expected)
+            {
+                throw new AdgTypeException($"{label}: expected {expected}, received {ex.Code} ({ex.Message}).");
+            }
+
+            return;
+        }
+
+        throw new AdgTypeException($"{label}: expected diagnostic {expected} but none was raised.");
     }
 
     private static void RunFunctionTests()

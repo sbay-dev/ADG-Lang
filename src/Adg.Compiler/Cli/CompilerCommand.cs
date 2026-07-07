@@ -90,6 +90,11 @@ internal static class CompilerCommand
 
     public static IAdgNode LoadRoot(string inputPath)
     {
+        if (Path.GetExtension(inputPath).Equals(".adg", StringComparison.OrdinalIgnoreCase))
+        {
+            return AdgSurfaceParser.ParseFile(inputPath);
+        }
+
         using var json = JsonDocument.Parse(File.ReadAllText(inputPath, Utf8NoBom), new JsonDocumentOptions
         {
             AllowTrailingCommas = true,

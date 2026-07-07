@@ -1,19 +1,25 @@
 # ADG-Lang Examples
 
-The examples are AST fixtures for language investigation.
+The examples show ADG-Lang programs for language investigation. Each grammatical example is
+provided in the canonical Arabic-inflected `.adg` source form and, where noted, in the
+equivalent low-level `.adg.json` typed AST that the compiler builds from it.
 
 ## Valid Examples
 
 | File | Purpose |
 | --- | --- |
-| `valid\proof-10-words.adg.json` | Demonstrates a verified ten-word verbal/Idafa sequence. |
-| `valid\causal-10-words.adg.json` | Demonstrates a verified connected causal sentence. |
+| `valid\proof-10-words.adg` | Canonical Arabic source: a verified ten-word verbal/Idafa sequence. |
+| `valid\causal-10-words.adg` | Canonical Arabic source: a verified connected causal sentence. |
+| `valid\proof-10-words.adg.json` | Equivalent low-level typed AST for `proof-10-words.adg`. |
+| `valid\causal-10-words.adg.json` | Equivalent low-level typed AST for `causal-10-words.adg`. |
+
+Both forms of each example render the same Arabic text and emit the same LLVM IR.
 
 ## Application Projects
 
 | Path | Purpose |
 | --- | --- |
-| `apps\hello-adg` | Minimal ADG-Lang application project with manifest, entrypoint, and scripts. |
+| `apps\hello-adg` | Minimal ADG-Lang application project with an Arabic-inflected `.adg` entrypoint, manifest, and scripts. |
 
 ## Invalid Examples
 

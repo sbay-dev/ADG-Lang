@@ -15,6 +15,8 @@ internal static class DiagnosticFormatter
     public static string Id(DiagnosticCode code) => code switch
     {
         DiagnosticCode.InvalidKeywordIrab => "ADG-K001",
+        DiagnosticCode.UnknownArabicKeyword => "ADG-K002",
+        DiagnosticCode.MixedSurfaceSyntax => "ADG-K003",
         DiagnosticCode.MissingTextDirectionHeader => "ADG-K004",
         DiagnosticCode.NonRtlTextDirection => "ADG-K005",
         DiagnosticCode.InvalidFaelCase => "ADG1001",
@@ -42,6 +44,8 @@ internal static class DiagnosticFormatter
     public static string Name(DiagnosticCode code) => code switch
     {
         DiagnosticCode.InvalidKeywordIrab => nameof(DiagnosticCode.InvalidKeywordIrab),
+        DiagnosticCode.UnknownArabicKeyword => nameof(DiagnosticCode.UnknownArabicKeyword),
+        DiagnosticCode.MixedSurfaceSyntax => nameof(DiagnosticCode.MixedSurfaceSyntax),
         DiagnosticCode.MissingTextDirectionHeader => nameof(DiagnosticCode.MissingTextDirectionHeader),
         DiagnosticCode.NonRtlTextDirection => nameof(DiagnosticCode.NonRtlTextDirection),
         DiagnosticCode.InvalidFaelCase => nameof(DiagnosticCode.InvalidFaelCase),

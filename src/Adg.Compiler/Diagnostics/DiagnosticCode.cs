@@ -4,6 +4,8 @@ internal enum DiagnosticCode
 {
     Unknown = 0,
     InvalidKeywordIrab,
+    UnknownArabicKeyword,
+    MixedSurfaceSyntax,
     MissingTextDirectionHeader,
     NonRtlTextDirection,
     InvalidFaelCase,

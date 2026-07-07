@@ -13,7 +13,7 @@ if (-not $CompilerProject) {
     $CompilerProject = Join-Path $RepoRoot "src\Adg.Compiler"
 }
 
-$Entry = Join-Path $ProjectRoot "src\main.adg.json"
+$Entry = Join-Path $ProjectRoot "src\main.adg"
 $Artifacts = Join-Path $ProjectRoot "artifacts"
 $Llvm = Join-Path $Artifacts "hello-adg.ll"
 $Exe = Join-Path $Artifacts "hello-adg.exe"

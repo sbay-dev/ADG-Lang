@@ -2,13 +2,31 @@
 
 `hello-adg` is a minimal ADG-Lang application project.
 
-It demonstrates the stable public typed-AST source format:
+It demonstrates the canonical ADG-Lang source surface: **Arabic-inflected (i'rab-typed) grammatical source**:
 
 ```text
-src\main.adg.json
+src\main.adg
 ```
 
-The app also includes an experimental executable-function demo:
+```adg
+اتجاهُ النصِّ: RTL
+adg 0.1.1
+program "hello-adg"
+
+جملةٌ فعليةٌ "كتبَ" فاعلُها "المبرمجُ" مرفوعٌ مفعولُها "التطبيقَ" منصوبٌ
+رابطٌ "ثم" ترتيبٌ
+جملةٌ فعليةٌ "شغّلَ" فاعلُها "النظامُ" مرفوعٌ مفعولُها "البرنامجَ" منصوبٌ
+```
+
+The grammar is enforced at compile time: a `فاعل` (subject) must be `مرفوع` (nominative)
+and a `مفعول` (object) must be `منصوب` (accusative). Violations are rejected before any
+LLVM IR is emitted.
+
+The same program is also available as the equivalent low-level typed AST in
+`src\main.adg.json`. That JSON form is the underlying representation the compiler builds
+from the Arabic source; it is not the language you are expected to author by hand.
+
+The app also includes an executable-function demo:
 
 ```text
 src\abu-al-aswad-wikipedia-intro.adg

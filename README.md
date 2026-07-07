@@ -5,7 +5,7 @@ ADG-Lang is a type-safe Arabic grammatical language inspired by the early gramma
 The project goal is to make Arabic grammatical logic inspectable, testable, and eventually executable:
 
 ```text
-Arabic grammatical rule
+Arabic-inflected .adg source (i'rab-typed)
   => typed ADG AST
   => grammatical contract
   => verifier
@@ -81,16 +81,35 @@ powershell -ExecutionPolicy Bypass -File scripts\Verify-AdgRelease.ps1 -SkipNati
 
 ## Application File Extension
 
-Use `.adg.json` for stable v0.1.x ADG-Lang applications. It is the executable typed AST format.
+Author ADG-Lang applications in **Arabic-inflected `.adg` source**. This is the canonical
+language surface: Arabic grammatical statements whose i'rab (case marking) is enforced as a
+compile-time contract before any LLVM IR is emitted.
 
-The `.adg` extension is now supported experimentally for executable function programs that use the canonical RTL Arabic surface syntax (`دالةٌ` / `استدعاءٌ`).
+```adg
+اتجاهُ النصِّ: RTL
+adg 0.1.1
+program "hello-adg"
+
+جملةٌ فعليةٌ "كتبَ" فاعلُها "المبرمجُ" مرفوعٌ مفعولُها "التطبيقَ" منصوبٌ
+رابطٌ "ثم" ترتيبٌ
+جملةٌ فعليةٌ "شغّلَ" فاعلُها "النظامُ" مرفوعٌ مفعولُها "البرنامجَ" منصوبٌ
+```
+
+A `فاعل` (subject) must be `مرفوع` (nominative) and a `مفعول` (object) must be `منصوب`
+(accusative); any violation is rejected as a compile-time diagnostic. Executable functions
+use the same Arabic `.adg` surface with `دالةٌ` / `استدعاءٌ`.
+
+`.adg.json` is the equivalent low-level typed AST that the compiler builds from the Arabic
+source. It stays available for tooling that emits or inspects the AST directly, but it is not
+the language you author by hand.
 
 Minimal app project:
 
 ```text
 examples\apps\hello-adg
   adg.project.json
-  src\main.adg.json
+  src\main.adg          # canonical Arabic-inflected source (entrypoint)
+  src\main.adg.json     # equivalent low-level typed AST
   scripts\verify.ps1
   scripts\build.ps1
   scripts\run.ps1

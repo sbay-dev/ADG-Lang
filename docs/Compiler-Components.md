@@ -13,7 +13,7 @@ This is the public release implementation. It excludes IDE files, build intermed
 | Component | Path | Responsibility |
 | --- | --- | --- |
 | CLI | `src\Adg.Compiler\Cli` | Provides `verify`, `compile`, `test-matrix`, and `--self-test`. |
-| Parser | `src\Adg.Compiler\Parser` | Reads ADG JSON AST and builds typed nodes. |
+| Parser | `src\Adg.Compiler\Parser` | Parses canonical Arabic-inflected `.adg` source (grammatical statements and `دالةٌ`/`استدعاءٌ` functions) into typed nodes, and also accepts the equivalent `.adg.json` typed AST. |
 | Type System | `src\Adg.Compiler\TypeSystem` | Defines `Ism`, `Fi'l`, `Harf`, cases, connectors, sentences, and phrases. |
 | Contracts | `src\Adg.Compiler\Contracts` | Enforces grammar contracts and produces `VerifiedAdgProgram`. |
 | Diagnostics | `src\Adg.Compiler\Diagnostics` | Provides stable ADG diagnostic codes. |
