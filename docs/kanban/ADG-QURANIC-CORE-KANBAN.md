@@ -43,7 +43,7 @@ No cards.
 
 | Card | Owner | Acceptance criteria | Evidence |
 | --- | --- | --- | --- |
-| QRC-046: Publish sanitized researcher handoff | Release engineer | A public pull request contains buildable source, immutable v4 evidence, claim boundaries, reproduction commands, reviewer forms, and automated disclosure checks without raw corpora or private review artifacts. | `docs\research\quranic-core-v1\INDEPENDENT-RESEARCHER-HANDOFF.md`; public CI and pull-request review pending. |
+| QRC-046: Publish sanitized researcher handoff | Release engineer | A public pull request contains buildable source, immutable v4 evidence, claim boundaries, reproduction commands, reviewer forms, and automated disclosure checks without raw corpora or private review artifacts. | Draft PR `sbay-dev/ADG-Lang#1`; Quranic reproduction/disclosure workflow and CodeQL pass; merge and independent reviewer acceptance remain pending. |
 
 ## Blocked
 
