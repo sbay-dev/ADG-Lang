@@ -57,6 +57,29 @@ This public repository is the official community-facing language repository for:
 | `examples\README.md` | Valid and invalid AST examples for investigation. |
 | `CONTRIBUTING.md` | How to propose rules, examples, diagnostics, and implementations. |
 
+## Quranic Parser Research Handoff
+
+The Quranic parser lane is published for independent inspection as an
+**ordinary deterministic Tool plus separate non-normative Data artifacts**.
+Its v4 software release is reproducible, but the Quranic research lane is
+**not approved**, and no CNS Model, CGN, or Genius claim is authorized.
+
+Start with:
+
+| Document | Purpose |
+| --- | --- |
+| `docs\research\quranic-core-v1\INDEPENDENT-RESEARCHER-HANDOFF.md` | Complete status, architecture, measurements, terminology, and unresolved gates. |
+| `docs\research\quranic-core-v1\REPRODUCTION-GUIDE.md` | Clean-clone checks with and without licensed external corpora. |
+| `docs\research\quranic-core-v1\CLAIM-BOUNDARIES.md` | Statements the evidence supports and statements it explicitly forbids. |
+| `docs\research\quranic-core-v1\KNOWN-LIMITATIONS.md` | Frozen historical labels, bounded coverage, and unresolved technical limitations. |
+| `docs\research\quranic-core-v1\INDEPENDENT-REVIEW-CHECKLIST.md` | Evidence form for an external evaluator. |
+| `docs\research\quranic-core-v1\APPROVAL-GATES.md` | Binding PASS, FAIL, and BLOCKED research gates. |
+| `docs\kanban\ADG-QURANIC-CORE-KANBAN.md` | Evidence-backed research board. |
+
+The repository does not redistribute raw Quranic Arabic Corpus or Universal
+Dependencies files. See `RESEARCH-EVALUATION-NOTICE.md` before using or
+redistributing any material.
+
 ## Public Reference Compiler
 
 The public release includes a testable reference compiler:

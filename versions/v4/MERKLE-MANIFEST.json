@@ -1,0 +1,441 @@
+{
+  "schemaVersion": 1,
+  "release": "ADG-Lang Quranic Parser v4",
+  "version": "v4",
+  "generatedAtUtc": "2026-08-05T16:00:23.4438121Z",
+  "hashAlgorithm": "SHA-256",
+  "contentNormalization": "UTF-8 text with LF line endings",
+  "leafDescriptor": "moduleId|version|path|contentSha256",
+  "oddLeafRule": "duplicate-last",
+  "artifactCount": 61,
+  "artifacts": [
+    {
+      "moduleId": "tools.t0-quranic-corpus-cli",
+      "version": "v4",
+      "path": "ADG-Lang.Native.slnx",
+      "contentSha256": "2e10549125a308690b700d0a55a76d94eabe7b91e097e15afb9352bb18a418ce",
+      "descriptorDigest": "b64b57cc5ddbc75291096778e963a863ee26f6f90fa52e9a67a5d60ec6a06534"
+    },
+    {
+      "moduleId": "tools.t1-release-manifest",
+      "version": "v4",
+      "path": "scripts/quranic-corpus/Write-QuranicGrammarV4Merkle.ps1",
+      "contentSha256": "8f834dac0c9ce61a300b52ebe4240d3f33fb6721185b84a5cfcda9f1c48d0e8c",
+      "descriptorDigest": "294026d13779d7c7dbe58b2df2b1a005f4ffdb2783be278120cec069ce67bf82"
+    },
+    {
+      "moduleId": "pipeline.pipe-quranic-core",
+      "version": "v4",
+      "path": "src/Adg.QuranicCore/Adg.QuranicCore.csproj",
+      "contentSha256": "3472fccce5613343d3b55f6c2bbc48cbfd3de01f9cf32fd8607b8ac3a7e26395",
+      "descriptorDigest": "f7624cd0f79147848f779a781727002d40071417120c522d6607defd70f985af"
+    },
+    {
+      "moduleId": "pipeline.pipe-quranic-core",
+      "version": "v4",
+      "path": "src/Adg.QuranicCore/Models.cs",
+      "contentSha256": "eb29e424ccd5b9db4aa50cf05aa9437e34d5372c9bc25c7a31c227d31f8cebbf",
+      "descriptorDigest": "e7660642de3fa8240f95b40387635c5d7cc68f42123cdbf85e0ad089040c62de"
+    },
+    {
+      "moduleId": "pipeline.pipe-quranic-core",
+      "version": "v4",
+      "path": "src/Adg.QuranicCore/QuranicCausalityAnalyzer.cs",
+      "contentSha256": "98129cf0a7efe6bb39275071e1aa1cff98ed8a1c495988eebbb900e7f1fb1621",
+      "descriptorDigest": "a8f1f55a31e6ad4eedf6ab92a3861b814e79590fef7a09c0d8b2f2e4c84998d0"
+    },
+    {
+      "moduleId": "pipeline.pipe-quranic-core",
+      "version": "v4",
+      "path": "src/Adg.QuranicCore/QuranicTextNormalizer.cs",
+      "contentSha256": "1a6c3aff7467714d5324974fc780b7108d55a8d5fa123824f4d214a4707e2109",
+      "descriptorDigest": "b1fa4e19cde323830f734d39c1c5b3e51e43cafa61d79e0933db4b4b5acd7820"
+    },
+    {
+      "moduleId": "pipeline.pipe-quranic-core",
+      "version": "v4",
+      "path": "src/Adg.QuranicCore/QuranicTokenizer.cs",
+      "contentSha256": "7455fef003c229705e0d71171153681efc2081524722df6c33cbaae7254fe0b1",
+      "descriptorDigest": "9b5addce35bd8857b0ac8dd12430337cea3a1d1f64fc774486d4db8608d1d81f"
+    },
+    {
+      "moduleId": "tools.t0-quranic-corpus-cli",
+      "version": "v4",
+      "path": "src/Adg.QuranicCorpus.Cli/Adg.QuranicCorpus.Cli.csproj",
+      "contentSha256": "7400c82767917e5ed5754842b8495186e2ae05d8d0caa795c20b357a385f4abe",
+      "descriptorDigest": "b877a03b7cb9f4713196ad51cfd9a775c468be9bf65fe82a0745df2ed917a005"
+    },
+    {
+      "moduleId": "tools.t0-quranic-corpus-cli",
+      "version": "v4",
+      "path": "src/Adg.QuranicCorpus.Cli/Program.cs",
+      "contentSha256": "285b9660851b7ffd8e696f2583a7e32ba099cdfba69df06773bad515d7a8f465",
+      "descriptorDigest": "86b26e7eb2a5a58ac66f6d061c4372c1ef0d4a1148b961bf956096df48d9d4c4"
+    },
+    {
+      "moduleId": "pipeline.pipe-qac-morphology",
+      "version": "v4",
+      "path": "src/Adg.QuranicCorpus/Adg.QuranicCorpus.csproj",
+      "contentSha256": "ee66f1d1e6e7387ac9da5cea8c8cb7d711d19ee32a9006547452022eacbd7904",
+      "descriptorDigest": "05747eda9179d30959653e70a584283c08e61ae170cc923662c6a7fbb7af0318"
+    },
+    {
+      "moduleId": "pipeline.pipe-qac-morphology",
+      "version": "v4",
+      "path": "src/Adg.QuranicCorpus/ExtendedBuckwalter.cs",
+      "contentSha256": "f23b90dbdd922e3c37bb80b5aa0b7bc9fbbb5bcbc6608188bca8fcc61abb879d",
+      "descriptorDigest": "b3e7ee2b7de69967d023028efd6b5f2bd13af320886263abaae05da69ebc9269"
+    },
+    {
+      "moduleId": "pipeline.pipe-qac-morphology",
+      "version": "v4",
+      "path": "src/Adg.QuranicCorpus/QacAttribution.cs",
+      "contentSha256": "b3b35d679865531ae3a98842881bae1ececcfa4455ab3facaa599d5cbed5f1d4",
+      "descriptorDigest": "ff4f6e0a917f5062df998c27331944509cdaf6b447d17e0956f8537fb81774a8"
+    },
+    {
+      "moduleId": "pipeline.pipe-qac-morphology",
+      "version": "v4",
+      "path": "src/Adg.QuranicCorpus/QacMerkle.cs",
+      "contentSha256": "2bf47b668fbed3cb4c88527ada3394a5e7d558c955cdd29cc0fba2490c4bfad7",
+      "descriptorDigest": "43496af42f30b5b35408438c51e5c8f891695dbb4e190b721f04e7a2c96eb080"
+    },
+    {
+      "moduleId": "pipeline.pipe-qac-morphology",
+      "version": "v4",
+      "path": "src/Adg.QuranicCorpus/QacModels.cs",
+      "contentSha256": "ebf64a0ed9d2af8afbbf9de6507fc8c03e8b7b43a1df86f983cab0e34f36d7d3",
+      "descriptorDigest": "64bb62a3bba0887428cc875b55fa6195b5f7812aa93fafe2fd2ace329d60ee33"
+    },
+    {
+      "moduleId": "pipeline.pipe-qac-morphology",
+      "version": "v4",
+      "path": "src/Adg.QuranicCorpus/QacMorphologyCatalog.cs",
+      "contentSha256": "a7da7f4d6dba72c5a9b34a3a8acc764559f1c98450e43304502b6c0844c475d2",
+      "descriptorDigest": "8d108e8915dcd8a79a522a8e758b599d6b4f3d5e9e9d1aaaf16c797d7997c51c"
+    },
+    {
+      "moduleId": "pipeline.pipe-qac-morphology",
+      "version": "v4",
+      "path": "src/Adg.QuranicCorpus/QacMorphologyImporter.cs",
+      "contentSha256": "e614bf998d85308dddc9c012e35c959007f6b8c4b81448d732986bda4458cb14",
+      "descriptorDigest": "12aa097b985ce41078f4b36c4d5c98539cef32023d70f6b36aefbe06b3b66d8a"
+    },
+    {
+      "moduleId": "pipeline.pipe-qac-morphology",
+      "version": "v4",
+      "path": "src/Adg.QuranicCorpus/QacMorphologyParser.cs",
+      "contentSha256": "7a5b10a802abc18a415494ccf48f2719ff127cbb7aa5d5819b5f06bbb87d1832",
+      "descriptorDigest": "f6c868afca2b7b692226f13e970b16db5987953031601028de293ca8bc7eb5ce"
+    },
+    {
+      "moduleId": "pipeline.pipe-qac-morphology",
+      "version": "v4",
+      "path": "src/Adg.QuranicCorpus/QacMorphologyResolver.cs",
+      "contentSha256": "6c1ef106e585a85d89e31f28505d0c9bf49a55b083021ef46d2a50bb217fdc73",
+      "descriptorDigest": "eeec2597da8804733cd040c65dd32f23c18bfa0273d468f3c832485dfdfc2bda"
+    },
+    {
+      "moduleId": "pipeline.pipe-qac-morphology",
+      "version": "v4",
+      "path": "src/Adg.QuranicCorpus/QacMorphologyVerifier.cs",
+      "contentSha256": "9965a453285f471500c64de42e756baca019f11d1981e5350a7154559e8e8497",
+      "descriptorDigest": "f4480c81cebd4ebf7e7490ef983bbc250f582dd905cd5bdbcad15153eb3ebdab"
+    },
+    {
+      "moduleId": "services.s0-deterministic-grammar",
+      "version": "v4",
+      "path": "src/Adg.QuranicGrammar/Adg.QuranicGrammar.csproj",
+      "contentSha256": "84800ef992637a0753b38e1d19a95788c88eb916c48b5c410cd3d7159c66ce06",
+      "descriptorDigest": "30dcfa118854d535c725718370da9cd44fe3cfd8b405d7bf06ef6d602b38ccce"
+    },
+    {
+      "moduleId": "services.s0-deterministic-grammar",
+      "version": "v4",
+      "path": "src/Adg.QuranicGrammar/QacDeterministicGrammarParser.cs",
+      "contentSha256": "d4e8457f4164a45227e9528ead33b1682177a4791a9276d4a38cec7b261f0b19",
+      "descriptorDigest": "ea02deb8cfb73d309486ccfef7743420af33ede09b5e1d28a15d9a5e554152ef"
+    },
+    {
+      "moduleId": "services.s0-deterministic-grammar",
+      "version": "v4",
+      "path": "src/Adg.QuranicGrammar/QacHeuristicMorphologyGuesser.cs",
+      "contentSha256": "744e03ab7bc9a928699c324ab6af24ba5a71b3f87b2027c4a47b59ad21e532b1",
+      "descriptorDigest": "d165c760ebfde0d1ccbe396d6ab12104a7fc7715590cdd914c5f4931ed059631"
+    },
+    {
+      "moduleId": "services.s0-deterministic-grammar",
+      "version": "v4",
+      "path": "src/Adg.QuranicGrammar/QacLexiconArtifactWriter.cs",
+      "contentSha256": "6cd31a4e6e2d5dfa0ae4f98d721d077b419e0c558f597595e5906d6643050111",
+      "descriptorDigest": "3b3318f92d821a9d28903b5bb541cdec5cee996e67036c2988c8eedfb80b33a0"
+    },
+    {
+      "moduleId": "services.s0-deterministic-grammar",
+      "version": "v4",
+      "path": "src/Adg.QuranicGrammar/QacMorphologyLexicon.cs",
+      "contentSha256": "71ce4f1ad206d629fa2032eae7d5c751ac4c195eaaa730513cd556482bb8b79f",
+      "descriptorDigest": "3f60307fb383b2944801dabc332afcdd5987db9635992ddec33089e20eac9892"
+    },
+    {
+      "moduleId": "services.s0-deterministic-grammar",
+      "version": "v4",
+      "path": "src/Adg.QuranicGrammar/QacMorphologySelectionScorePolicy.cs",
+      "contentSha256": "3d22ec96fb0e81a8af64176f3cac1ce6945a45d2b402b63b1ac6bdcbc8118d17",
+      "descriptorDigest": "89bfebcbc3c10ed720f789b1aef8e52dd33c629298ffdab39ff884ac7e4eaef2"
+    },
+    {
+      "moduleId": "services.s0-deterministic-grammar",
+      "version": "v4",
+      "path": "src/Adg.QuranicGrammar/QacMorphologyTextParser.cs",
+      "contentSha256": "245f4b66f69e51767f3402bc5d23947cb82bb57d1c906f8cbb992c7d46dc4e64",
+      "descriptorDigest": "879e0229e2dda12af7be4a40a003072c002813132e4e8fa771c6d82b0e0bf4a6"
+    },
+    {
+      "moduleId": "services.s0-deterministic-grammar",
+      "version": "v4",
+      "path": "src/Adg.QuranicGrammar/QacQuranGrammarEvaluator.cs",
+      "contentSha256": "e74a77a81dc57fb95a19f2bdda9724d7aab451eb03e3c52d1d3cc195ee4777d1",
+      "descriptorDigest": "eae909b04863306dedbf289bbf93f718878a8f8f212fa6a6b5e352bbe0a8fbc0"
+    },
+    {
+      "moduleId": "services.s0-deterministic-grammar",
+      "version": "v4",
+      "path": "src/Adg.QuranicGrammar/QacQuranMorphologyEvaluator.cs",
+      "contentSha256": "c097e430b1698138bba3c385dd7ccf9ee2ad7dcb7d8cb2f344511b7814d5d7db",
+      "descriptorDigest": "2633605dbe43a621964e854bc82a9e593b91df06562323240fd3e582ab536dec"
+    },
+    {
+      "moduleId": "services.s0-deterministic-grammar",
+      "version": "v4",
+      "path": "src/Adg.QuranicGrammar/QacSyntaxGoldEvaluator.cs",
+      "contentSha256": "2beb0bfbb742264517d06971c919a06de56b356c6435446d867114dcb7a6a2e6",
+      "descriptorDigest": "4d4a11f90dce5e27bf309bf6ac444804ae19165c11f3003b467bae8766e5de4a"
+    },
+    {
+      "moduleId": "services.s0-deterministic-grammar",
+      "version": "v4",
+      "path": "src/Adg.QuranicGrammar/QacSyntaxPropertyTests.cs",
+      "contentSha256": "20f01c084c10e2ac1f84782528a1d9796b80fcf23f0c5fb6709a33753f8a06ad",
+      "descriptorDigest": "ba66c7d0fbfdd6bdfb85c7e8cd35c5a75dbe16f7f5ab3b0fb18e1d2fed859f46"
+    },
+    {
+      "moduleId": "services.s0-deterministic-grammar",
+      "version": "v4",
+      "path": "src/Adg.QuranicGrammar/QacSyntaxSchema.cs",
+      "contentSha256": "2ac4cd289af18d8294c4c918be609fd965f9ef2b4ff9284b8b2aee1316406f0d",
+      "descriptorDigest": "67020ec88e51b98da954c204ea3d446672cad8dfde94ec79bae2e5788f11e209"
+    },
+    {
+      "moduleId": "services.s0-deterministic-grammar",
+      "version": "v4",
+      "path": "src/Adg.QuranicGrammar/QacSyntaxTreebank.cs",
+      "contentSha256": "6a5959bfeb795bbe5fe0d6e98bf209ce9a5900811fb1569bd5a2df83e2a52283",
+      "descriptorDigest": "1659a93ce8175e0b90e0cafa8c4e664b6bb7792ffea193291e84527852272bf2"
+    },
+    {
+      "moduleId": "services.s0-deterministic-grammar",
+      "version": "v4",
+      "path": "src/Adg.QuranicGrammar/QacVerseCorpus.cs",
+      "contentSha256": "3f0c45f2f849369a4bead00390e499f2d77f65e5af6c882f4a5034fbc8fbc0ad",
+      "descriptorDigest": "480dd4543bc126c3fb82c7fb0be7156a1e6da063b0fd0352785c8f4cd14b5c8f"
+    },
+    {
+      "moduleId": "services.s0-deterministic-grammar",
+      "version": "v4",
+      "path": "src/Adg.QuranicGrammar/QuranicDeterministicDiacritizer.cs",
+      "contentSha256": "0069cbb2724833deb6863a6735ba29d3a7970ac6d2f4588f7bc54733c0d862ee",
+      "descriptorDigest": "abb19ac7752afd36c92f85817dd76eb02776701daf3c00581997292054779153"
+    },
+    {
+      "moduleId": "services.s0-deterministic-grammar",
+      "version": "v4",
+      "path": "src/Adg.QuranicGrammar/QuranicDiacriticMutationEvaluator.cs",
+      "contentSha256": "150a3995ea13860eb1e53dd5b90da22e62ac3ee3521ea02946f9a9e53d3f26e9",
+      "descriptorDigest": "a0310e37dc0c1c529e08948565b1cadabaf963beec8cc0f2c4f25e6c921fe663"
+    },
+    {
+      "moduleId": "services.s0-deterministic-grammar",
+      "version": "v4",
+      "path": "src/Adg.QuranicGrammar/QuranicFunctionalDiacriticEvaluator.cs",
+      "contentSha256": "7037b4b0ea09a29e51f6fb7c7dd9d0a0e9d2395c2581279bbc2836be1a25ffcc",
+      "descriptorDigest": "64568afe6594c6691fd0d4e12649ab04138509e671386b3dbeba5dc42e9555bb"
+    },
+    {
+      "moduleId": "services.s0-deterministic-grammar",
+      "version": "v4",
+      "path": "src/Adg.QuranicGrammar/QuranicFunctionalDiacriticValidator.cs",
+      "contentSha256": "b84b3fd16eb9a08f2dab2deab187cfa96a9d2cbee2e582d2790a6be49ff4b4e5",
+      "descriptorDigest": "514d178eae4d722337131bd9cda8c755a0b89ae0f102ae1cad6369dc26de9080"
+    },
+    {
+      "moduleId": "services.s0-deterministic-grammar",
+      "version": "v4",
+      "path": "src/Adg.QuranicGrammar/QuranicGrammarRuleContracts.cs",
+      "contentSha256": "6b3f6968c5c3811c454863cf874bebe71d6fbf183efb009078f2eb1d6a666b39",
+      "descriptorDigest": "2c99517b1e8a924d77f033a05c6d30d48b4d894726c652def92677dad41ebbd2"
+    },
+    {
+      "moduleId": "services.s0-deterministic-grammar",
+      "version": "v4",
+      "path": "src/Adg.QuranicGrammar/QuranicGrammarRuleInventory.cs",
+      "contentSha256": "01d3e6791d0c2af4a567453e71e5e7f41884a7c738df3b5d7e860e9a6ba77fc6",
+      "descriptorDigest": "c3549f8c1533d2d4b19bcf3659882572d483e42117a2982ae4c7d0e63abbc08c"
+    },
+    {
+      "moduleId": "services.s0-deterministic-grammar",
+      "version": "v4",
+      "path": "src/Adg.QuranicGrammar/QuranicGrammarRuntime.cs",
+      "contentSha256": "cbc05f77851dc11d255e830dc575e9d9592acdcbd87f8e0a04543d10e8c27fca",
+      "descriptorDigest": "514ba13eaddb7b4aa5bc89b06ad23a6ce7edc236cf1709cfba493432214c8fb9"
+    },
+    {
+      "moduleId": "services.s0-deterministic-grammar",
+      "version": "v4",
+      "path": "src/Adg.QuranicGrammar/QuranicLexemeAllowlistAudit.cs",
+      "contentSha256": "238ec250d77ca4d168948138f37664f821efaa4c73136dc3b83ad2bfc224fdc7",
+      "descriptorDigest": "6dd6bf5ad1dd0f120f06dcdfe8b314ffd2e18178274daed158079b8b13757f5e"
+    },
+    {
+      "moduleId": "services.s0-deterministic-grammar",
+      "version": "v4",
+      "path": "src/Adg.QuranicGrammar/QuranicPhraseContractAudit.cs",
+      "contentSha256": "c116555dfd63c8128793f0fcd0466b84b331e15d521ec08f29a2ac6298e1c881",
+      "descriptorDigest": "595023af8ddf3b2ccfccfa1540bc757a45a7ca891d57869ddab10b96aa71b682"
+    },
+    {
+      "moduleId": "services.s0-deterministic-grammar",
+      "version": "v4",
+      "path": "src/Adg.QuranicGrammar/QuranicRelationContractAudit.cs",
+      "contentSha256": "07df155380a40db3296b9e00e5b33265a1324ef761a869841b9d2ba25a4153d2",
+      "descriptorDigest": "043c58646da962d47c1096718c91794baf11cda79777b7ccb074806a8414f680"
+    },
+    {
+      "moduleId": "services.s0-deterministic-grammar",
+      "version": "v4",
+      "path": "src/Adg.QuranicGrammar/UdArabicPadt.cs",
+      "contentSha256": "9e1838bc886bde6e016209a4031beae77698f2add12bbb0c7d48f84793ce142c",
+      "descriptorDigest": "a9fb2d4a3e0804338f0a971133c06a3d12c9f6d100109da6d4518710bd45392a"
+    },
+    {
+      "moduleId": "services.s1-grammar-corpus",
+      "version": "v4",
+      "path": "src/Adg.QuranicTraining/Adg.QuranicTraining.csproj",
+      "contentSha256": "e5917b1fd5f9d022adb9cb0f136a0081ea65ee3322d2e28175ff8f547e111c6b",
+      "descriptorDigest": "a8d22a9e99ecab8c96843d0a7a609cb28ff242d3799c4e869f8611a33621cb76"
+    },
+    {
+      "moduleId": "services.s1-grammar-corpus",
+      "version": "v4",
+      "path": "src/Adg.QuranicTraining/QuranicCorpusSplitManifest.cs",
+      "contentSha256": "c3f63692ea249991091d72ea75c7e7fbefca7d5dfa14be66029d3654d660932d",
+      "descriptorDigest": "9f5538166dcd66ebce7b1f233e06918d0b7b6a20f7a6066ed04af48656bc1f4a"
+    },
+    {
+      "moduleId": "services.s1-grammar-corpus",
+      "version": "v4",
+      "path": "src/Adg.QuranicTraining/QuranicGrammarCorpus.cs",
+      "contentSha256": "8d06a136185a6f2b27076ef26c38952c44e0445e8c4ecc446c97f3a14d7e8c22",
+      "descriptorDigest": "b8a57edc506ca13dbcc4b219e4a52343baac3322b300dd2b54739ed433cf933c"
+    },
+    {
+      "moduleId": "services.s1-grammar-corpus",
+      "version": "v4",
+      "path": "src/Adg.QuranicTraining/QuranicKnowledgeRootCatalog.cs",
+      "contentSha256": "15e0f395dd58741ec5e1b95b9a68b2c09dcd0b89a4d73ce08d3d6ca4ae3890d8",
+      "descriptorDigest": "9278674563c40db871614a7d61e552369c1e047982d82bba43144817e6dfb594"
+    },
+    {
+      "moduleId": "pipeline.pipe-qac-morphology",
+      "version": "v4",
+      "path": "THIRD_PARTY/quranic-arabic-corpus/ATTRIBUTION.md",
+      "contentSha256": "dc6ed67f20c29f293efdc3e3782b6d0f961574224c4db0cfd7e7d1589688cf23",
+      "descriptorDigest": "3a33c0bdbb80d365bce65fa7a6f26b7e9e045bbc9427ef5f479c05ffe4edc4ef"
+    },
+    {
+      "moduleId": "pipeline.pipe-qac-morphology",
+      "version": "v4",
+      "path": "THIRD_PARTY/quranic-arabic-corpus/LICENSE-DATA.txt",
+      "contentSha256": "ca5e3943c45e63b26790c6d939b14866f3d00dd2042178a42bc739c2604cc34c",
+      "descriptorDigest": "59ee2ac8cced883d973e9d97466e1abbcfc8a8e137c3966b067e7627176bb40b"
+    },
+    {
+      "moduleId": "pipeline.pipe-qac-morphology",
+      "version": "v4",
+      "path": "THIRD_PARTY/quranic-arabic-corpus/PROVENANCE.template.json",
+      "contentSha256": "ce91f866aa65ccee7c8f52a14e4130b4890d87c3eb838bea751dfccfdfe8b8d1",
+      "descriptorDigest": "1015dd95baa66a9082c840aa5fc557ca0739322fb6cbfd5930fd6f2865a6d116"
+    },
+    {
+      "moduleId": "pipeline.pipe-qac-morphology",
+      "version": "v4",
+      "path": "THIRD_PARTY/quranic-arabic-corpus/SYNTAX-PROVENANCE.template.json",
+      "contentSha256": "85ef6d7f6f7d07ffbe5dc57de14f639d0051d581936ad047d279dfc7db42bb67",
+      "descriptorDigest": "50542da2fc447601b2241aa65625875f8a611c61cc396117d3c75ce580bcd830"
+    },
+    {
+      "moduleId": "tools.t1-release-manifest",
+      "version": "v4",
+      "path": "versions/v4/evidence/quranic-grammar-v4-evidence.json",
+      "contentSha256": "fb1753453cb47bf3f73b81b510241199c947222ff1e14d0f1d2630364076a83c",
+      "descriptorDigest": "3c2479b46eb0efb7fd5d99733bcef22960440247c02a1fb30886971fd1d7ffa8"
+    },
+    {
+      "moduleId": "pipeline.pipe-qac-morphology",
+      "version": "v4",
+      "path": "versions/v4/pipeline/pipe-qac-morphology/v4/MODULE-DOSSIER.json",
+      "contentSha256": "637b7959404d19333ec9b7bb804d6d065d835d243da5082601cec5d6e7103c9c",
+      "descriptorDigest": "365211b09ac08c80646dd6b41eff264f6f3f7bb8de5763d86e622d53a06ab542"
+    },
+    {
+      "moduleId": "pipeline.pipe-quranic-core",
+      "version": "v4",
+      "path": "versions/v4/pipeline/pipe-quranic-core/v4/MODULE-DOSSIER.json",
+      "contentSha256": "7a518c1020207ca7c94af7c46cb689e799f1bb7398deefad2d4001620fba803b",
+      "descriptorDigest": "b4ee7da845cff15a7ec037c99bfa83ddf5ffd4ad648bbcea1369d7f2e464cc73"
+    },
+    {
+      "moduleId": "tools.t1-release-manifest",
+      "version": "v4",
+      "path": "versions/v4/RELEASE.md",
+      "contentSha256": "a4b4a640b00e45a1545f4c36194c7a864e016f16c76cada846761e9808236291",
+      "descriptorDigest": "2b2fb55e09e307b1b58ffaa6a350cbf585f30d00712d3700d53efb337657edb2"
+    },
+    {
+      "moduleId": "services.s0-deterministic-grammar",
+      "version": "v4",
+      "path": "versions/v4/services/s0-deterministic-grammar/v4/MODULE-DOSSIER.json",
+      "contentSha256": "097d6e9ea061c5bfe8e5943589a2c371609401cb782db76abc8a2ee20bb089e5",
+      "descriptorDigest": "076d877096fb5f17a3b5d53e87d6dde62a789535f1e296f288e9d7624083e844"
+    },
+    {
+      "moduleId": "services.s1-grammar-corpus",
+      "version": "v4",
+      "path": "versions/v4/services/s1-grammar-corpus/v4/MODULE-DOSSIER.json",
+      "contentSha256": "a40f2a7b6dbe3af2f1756b9f28698a0b8a1b262dac8d61ae4f082c87d4185f2e",
+      "descriptorDigest": "d39df970eaf6d8a3706edcde1c6edb10c33412c184115f0cf2a44c53c0944cd2"
+    },
+    {
+      "moduleId": "tools.t0-quranic-corpus-cli",
+      "version": "v4",
+      "path": "versions/v4/tools/t0-quranic-corpus-cli/v4/MODULE-DOSSIER.json",
+      "contentSha256": "fcbc2341af248fe626d1706840f17314467d8a74a793a35d1acd2de8803786ed",
+      "descriptorDigest": "b10e0b0c659ab1986963dc42d9c05d8ae4a18a674564f69410d015d53d2b6072"
+    },
+    {
+      "moduleId": "tools.t1-release-manifest",
+      "version": "v4",
+      "path": "versions/v4/tools/t1-release-manifest/v4/MODULE-DOSSIER.json",
+      "contentSha256": "45f3eb7c24c6f56cebf3406327edf858e701229ea74652c6b13549b8f1099572",
+      "descriptorDigest": "ca5087a7919299b501b9f6835449ec3e58b129cc9c6daf607d3e9d8c3dc10c59"
+    },
+    {
+      "moduleId": "tools.t1-release-manifest",
+      "version": "v4",
+      "path": "versions/v4/VERSION-MANIFEST.json",
+      "contentSha256": "92e93c36f4d5407ca160e06a03c666d212eb92e9c9f1a6860f00036061d75921",
+      "descriptorDigest": "7441f02ff2ff5b893c1a5da86a0ebd0789bec341961e1cfb0c3b11ac22d20aac"
+    }
+  ],
+  "releaseMerkleRoot": "5c4a24c81c9e5154f435c72f47e5dca7f8ebf60341b96105e5b3bec38b60c026"
+}

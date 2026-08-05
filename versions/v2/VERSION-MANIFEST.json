@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "project": "ADG-Lang Quranic Parser",
+  "version": "v2",
+  "releaseType": "ordinary-deterministic-software",
+  "status": "quranic-development-release",
+  "releasedAtUtc": "2026-08-01T01:53:51Z",
+  "sourceControl": {
+    "repositoryCommit": "f351039c4002fd7eb7994068ea9c1a381365807e",
+    "workingTreeState": "dirty-source-snapshot-bound-by-merkle",
+    "snapshotAuthority": "MERKLE-MANIFEST.json"
+  },
+  "entrypoint": {
+    "solution": "ADG-Lang.Native.slnx",
+    "project": "src/Adg.QuranicCorpus.Cli/Adg.QuranicCorpus.Cli.csproj",
+    "framework": "net10.0"
+  },
+  "modules": [
+    {
+      "moduleId": "pipeline.pipe-quranic-core",
+      "version": "v2",
+      "layer": "pipeline",
+      "status": "active",
+      "dossier": "versions/v2/pipeline/pipe-quranic-core/v2/MODULE-DOSSIER.json"
+    },
+    {
+      "moduleId": "pipeline.pipe-qac-morphology",
+      "version": "v2",
+      "layer": "pipeline",
+      "status": "active",
+      "dossier": "versions/v2/pipeline/pipe-qac-morphology/v2/MODULE-DOSSIER.json"
+    },
+    {
+      "moduleId": "services.s0-deterministic-grammar",
+      "version": "v2",
+      "layer": "services",
+      "status": "active",
+      "dossier": "versions/v2/services/s0-deterministic-grammar/v2/MODULE-DOSSIER.json"
+    },
+    {
+      "moduleId": "tools.t0-quranic-corpus-cli",
+      "version": "v2",
+      "layer": "tools",
+      "status": "active",
+      "dossier": "versions/v2/tools/t0-quranic-corpus-cli/v2/MODULE-DOSSIER.json"
+    },
+    {
+      "moduleId": "tools.t1-release-manifest",
+      "version": "v2",
+      "layer": "tools",
+      "status": "active",
+      "dossier": "versions/v2/tools/t1-release-manifest/v2/MODULE-DOSSIER.json"
+    }
+  ],
+  "sameVersionBinding": {
+    "required": true,
+    "activeModuleVersion": "v2",
+    "mixedActiveVersionsAllowed": false
+  },
+  "evidence": "versions/v2/evidence/quranic-grammar-v2-evidence.json",
+  "merkleManifest": "versions/v2/MERKLE-MANIFEST.json",
+  "claimBoundaries": {
+    "isCnsModel": false,
+    "isGenius": false,
+    "isCgn": false,
+    "isTransformerBased": false,
+    "usesDistillation": false,
+    "naturalArabicReady": false,
+    "quranicGoldDevelopmentThresholdReached": true,
+    "quranWideStructuralSafetyReached": true
+  }
+}

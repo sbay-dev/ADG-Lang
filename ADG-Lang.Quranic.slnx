@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Adg.QuranicCore.Cli/Adg.QuranicCore.Cli.csproj" />
+    <Project Path="src/Adg.QuranicCore/Adg.QuranicCore.csproj" />
+    <Project Path="src/Adg.QuranicCorpus.Cli/Adg.QuranicCorpus.Cli.csproj" />
+    <Project Path="src/Adg.QuranicCorpus/Adg.QuranicCorpus.csproj" />
+    <Project Path="src/Adg.QuranicGrammar/Adg.QuranicGrammar.csproj" />
+    <Project Path="src/Adg.QuranicTraining/Adg.QuranicTraining.csproj" />
+  </Folder>
+</Solution>

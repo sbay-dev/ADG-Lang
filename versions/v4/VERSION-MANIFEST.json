@@ -1,0 +1,101 @@
+{
+  "schemaVersion": 1,
+  "project": "ADG-Lang Quranic Parser",
+  "version": "v4",
+  "releaseType": "ordinary-deterministic-software",
+  "status": "quranic-contract-completion-development-release",
+  "releasedAtUtc": "2026-08-05T16:00:23.4438121Z",
+  "sourceControl": {
+    "repositoryCommit": "f351039c4002fd7eb7994068ea9c1a381365807e",
+    "workingTreeState": "dirty-source-snapshot-bound-by-merkle",
+    "snapshotAuthority": "MERKLE-MANIFEST.json"
+  },
+  "entrypoint": {
+    "solution": "ADG-Lang.Native.slnx",
+    "project": "src/Adg.QuranicCorpus.Cli/Adg.QuranicCorpus.Cli.csproj",
+    "framework": "net10.0"
+  },
+  "modules": [
+    {
+      "moduleId": "pipeline.pipe-quranic-core",
+      "version": "v4",
+      "layer": "pipeline",
+      "status": "active",
+      "dossier": "versions/v4/pipeline/pipe-quranic-core/v4/MODULE-DOSSIER.json"
+    },
+    {
+      "moduleId": "pipeline.pipe-qac-morphology",
+      "version": "v4",
+      "layer": "pipeline",
+      "status": "active",
+      "dossier": "versions/v4/pipeline/pipe-qac-morphology/v4/MODULE-DOSSIER.json"
+    },
+    {
+      "moduleId": "services.s0-deterministic-grammar",
+      "version": "v4",
+      "layer": "services",
+      "status": "active",
+      "dossier": "versions/v4/services/s0-deterministic-grammar/v4/MODULE-DOSSIER.json"
+    },
+    {
+      "moduleId": "services.s1-grammar-corpus",
+      "version": "v4",
+      "layer": "services",
+      "status": "active",
+      "dossier": "versions/v4/services/s1-grammar-corpus/v4/MODULE-DOSSIER.json"
+    },
+    {
+      "moduleId": "tools.t0-quranic-corpus-cli",
+      "version": "v4",
+      "layer": "tools",
+      "status": "active",
+      "dossier": "versions/v4/tools/t0-quranic-corpus-cli/v4/MODULE-DOSSIER.json"
+    },
+    {
+      "moduleId": "tools.t1-release-manifest",
+      "version": "v4",
+      "layer": "tools",
+      "status": "active",
+      "dossier": "versions/v4/tools/t1-release-manifest/v4/MODULE-DOSSIER.json"
+    }
+  ],
+  "sameVersionBinding": {
+    "required": true,
+    "activeModuleVersion": "v4",
+    "mixedActiveVersionsAllowed": false
+  },
+  "evidence": "versions/v4/evidence/quranic-grammar-v4-evidence.json",
+  "merkleManifest": "versions/v4/MERKLE-MANIFEST.json",
+  "excluded": [
+    "bin",
+    "obj",
+    ".vs",
+    "raw QAC and UD corpora",
+    "session-state reports",
+    "generated JSONL data artifacts",
+    "logs, caches, secrets, model weights, and publish outputs"
+  ],
+  "claimBoundaries": {
+    "isCnsModel": false,
+    "isGenius": false,
+    "isCgn": false,
+    "isTransformerBased": false,
+    "usesDistillation": false,
+    "naturalArabicReady": false,
+    "researchApproved": false,
+    "normativeCnsCorpus": false,
+    "lexemeAllowlistAudit": true,
+    "versionedScoringPolicy": true,
+    "naturalHeuristicDefaultEnabled": false,
+    "runtimeValidationApi": true,
+    "constraintDiscoveryApi": true,
+    "correctionRequestApi": true,
+    "cleanCloneReproduction": true,
+    "leakageSafeResearchGrouping": true,
+    "normativeSplitMaterialized": false,
+    "deterministicKnowledgeProjection": true,
+    "neuralEmbeddingVectors": false,
+    "boundedQuranicDiacritization": true,
+    "unsafeDiacritizationAcceptanceCount": 0
+  }
+}

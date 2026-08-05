@@ -1,0 +1,89 @@
+{
+  "project": "ADG-Lang",
+  "version": "v1",
+  "kind": "lego_visual_studio_release",
+  "classification": "ordinary_software_tool",
+  "status": "research_foundation",
+  "host": {
+    "solution": "ADG-Lang.Native.slnx",
+    "projects": [
+      "src\\Adg.QuranicCore\\Adg.QuranicCore.csproj",
+      "src\\Adg.QuranicCore.Cli\\Adg.QuranicCore.Cli.csproj"
+    ]
+  },
+  "modules": [
+    {
+      "id": "pipeline.pipe-quranic-text",
+      "version": "v1",
+      "kind": "pipeline",
+      "source_project": "src\\Adg.QuranicCore\\Adg.QuranicCore.csproj",
+      "source_files": [
+        "src\\Adg.QuranicCore\\QuranicTextNormalizer.cs",
+        "src\\Adg.QuranicCore\\QuranicTokenizer.cs",
+        "src\\Adg.QuranicCore\\Models.cs"
+      ],
+      "dossier": "versions\\v1\\modules\\pipeline\\pipe-quranic-text\\v1\\MODULE.md",
+      "dependencies": [],
+      "replaceability": "Replaceable behind QuranicTokenizer and the immutable token/span contracts."
+    },
+    {
+      "id": "services.s0-quranic-causality",
+      "version": "v1",
+      "kind": "service",
+      "source_project": "src\\Adg.QuranicCore\\Adg.QuranicCore.csproj",
+      "source_files": [
+        "src\\Adg.QuranicCore\\QuranicCausalityAnalyzer.cs",
+        "src\\Adg.QuranicCore\\Models.cs"
+      ],
+      "dossier": "versions\\v1\\modules\\services\\s0-quranic-causality\\v1\\MODULE.md",
+      "dependencies": [
+        "pipeline.pipe-quranic-text"
+      ],
+      "replaceability": "Replaceable while preserving QuranicAnalysis, directed causal markers, diagnostics, and source ranges."
+    },
+    {
+      "id": "tools.t0-quranic-cli",
+      "version": "v1",
+      "kind": "tool",
+      "source_project": "src\\Adg.QuranicCore.Cli\\Adg.QuranicCore.Cli.csproj",
+      "source_files": [
+        "src\\Adg.QuranicCore.Cli\\Program.cs",
+        "src\\Adg.QuranicCore.Cli\\QuranicCorpusVerifier.cs"
+      ],
+      "dossier": "versions\\v1\\modules\\tools\\t0-quranic-cli\\v1\\MODULE.md",
+      "dependencies": [
+        "pipeline.pipe-quranic-text",
+        "services.s0-quranic-causality"
+      ],
+      "replaceability": "The CLI may be replaced by another host that consumes the same public library contracts."
+    }
+  ],
+  "evidence": {
+    "gold_corpus": "tests\\quranic-core-v1\\causal-gold.json",
+    "report": "versions\\v1\\evidence\\quranic-core-v1-report.json",
+    "corpus_cases": 16,
+    "corpus_merkle_root": "e2cc6276fac0067cb6ef4244f87703bfb8e8a947110ee9d1e319fc51e959be56"
+  },
+  "excluded": [
+    ".git",
+    ".vs",
+    "bin",
+    "obj",
+    "build",
+    "artifacts",
+    "publish",
+    "logs",
+    "caches",
+    "secrets",
+    "release_key.txt",
+    "encrypted model weights"
+  ],
+  "validation": [
+    "dotnet restore ADG-Lang.Native.slnx",
+    "dotnet build ADG-Lang.Native.slnx -c Release",
+    "dotnet src\\Adg.QuranicCore.Cli\\bin\\Release\\net10.0\\Adg.QuranicCore.Cli.dll verify-corpus tests\\quranic-core-v1\\causal-gold.json --report versions\\v1\\evidence\\quranic-core-v1-report.json",
+    "dotnet src\\Adg.NativeCompiler\\bin\\Release\\net10.0\\Adg.NativeCompiler.dll --self-test",
+    "dotnet src\\Adg.NativeCompiler\\bin\\Release\\net10.0\\Adg.NativeCompiler.dll test-matrix"
+  ],
+  "claim_boundary": "ADG-Lang Quranic Core v1 is a deterministic bounded parser foundation. It is not CNS, not a Genius, not a complete Quranic parser, and not production-ready."
+}

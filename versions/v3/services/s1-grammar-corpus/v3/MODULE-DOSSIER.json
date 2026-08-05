@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "moduleId": "services.s1-grammar-corpus",
+  "version": "v3",
+  "layer": "services",
+  "purpose": "Derive deterministic non-normative grammar records and knowledge-root projections from typed contracts without embedding Quranic verse text.",
+  "sourceRef": {
+    "project": "src/Adg.QuranicTraining/Adg.QuranicTraining.csproj",
+    "paths": ["src/Adg.QuranicTraining"]
+  },
+  "sameVersionDependencies": ["services.s0-deterministic-grammar@v3"],
+  "invariants": [
+    "Every record binds the contract-set root and rule IDs.",
+    "Every current record uses split=research and normative=false.",
+    "No raw QAC row or Quranic verse text is emitted.",
+    "Generation is byte-identical for identical contracts.",
+    "Projection text, SHA-256 index keys, and shards are Data, not neural embeddings."
+  ],
+  "verification": [
+    "92 records",
+    "Artifact SHA-256 1ba9c2c8...5ae8",
+    "Corpus Merkle root 120e9526...1a9f",
+    "7,859 knowledge-root records across 1,235 morphology roots",
+    "Knowledge Merkle root b0a1c571...ae49 with 0 vectors",
+    "Byte-identical replay"
+  ],
+  "claimBoundary": "Derived Data artifact; not an authorized CNS training split."
+}

@@ -1,0 +1,25 @@
+{
+  "sources": [
+    {
+      "sourceRepository": "https://github.com/UniversalDependencies/UD_Arabic-PADT",
+      "sourceCommit": "dfb6b4c547f1fe10f1857b39e44de3f86c47a2fe",
+      "resource": "ar_padt-ud-test.conllu",
+      "resourceSha256": "793c87bf173d491af2092ef7f87b04a2cf6c596490e7347a2065058a053a6389",
+      "license": "CC BY-NC-SA 3.0",
+      "licenseFileSha256": "79e211ff70191c7f5cf0e33a8cf2bfa5799318d51ae7a5fd1a065abcb3e3ab05",
+      "readmeSha256": "ee3cdabcd72b433349bfb2b906f09dd068b5ed513d2e5abe528a957a7b1038ff",
+      "evaluationRole": "external-development-benchmark"
+    },
+    {
+      "sourceRepository": "https://github.com/UniversalDependencies/UD_Arabic-PUD",
+      "sourceCommit": "b5dbaa1fe386ae38d9b3c5f1de1b047d3cb31e0f",
+      "resource": "ar_pud-ud-test.conllu",
+      "resourceSha256": "befc6dd18b5b8803644ae8208e2e5f52c0957a36437627c05110914ec42281a3",
+      "license": "CC BY-SA 3.0",
+      "licenseFileSha256": "b278eb53fe50b8bb7fa0d90fb8536c35fdcaa80f9d63812cb51db539555d2a89",
+      "readmeSha256": "f7cf6304cd0f2e829558ec04dbcdfd3ce8c60a2b5df2b3d2dc42143e6f42fa9c",
+      "evaluationRole": "previously-consumed-final-holdout"
+    }
+  ],
+  "redistributed": false
+}

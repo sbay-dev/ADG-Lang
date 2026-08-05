@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "moduleId": "tools.t1-release-manifest",
+  "version": "v4",
+  "layer": "tools",
+  "purpose": "Bind the sanitized v4 source snapshot, module dossiers, release evidence, and claim boundaries into one deterministic Merkle manifest.",
+  "sourceRef": {
+    "paths": [
+      "scripts/quranic-corpus/Write-QuranicGrammarV4Merkle.ps1",
+      "versions/v4"
+    ]
+  },
+  "sameVersionDependencies": [
+    "pipeline.pipe-quranic-core@v4",
+    "pipeline.pipe-qac-morphology@v4",
+    "services.s0-deterministic-grammar@v4",
+    "services.s1-grammar-corpus@v4",
+    "tools.t0-quranic-corpus-cli@v4"
+  ],
+  "excludedMaterial": [
+    "bin",
+    "obj",
+    ".vs",
+    "raw QAC and UD corpora",
+    "session-state reports",
+    "generated JSONL artifacts",
+    "logs, caches, secrets, model weights, and publish outputs"
+  ],
+  "verification": [
+    "All active modules use v4",
+    "Every dossier identity matches its manifest entry",
+    "Two independent manifest generations produce the same release root",
+    "A temporary clean clone on S: reproduces the solution build, synchronized self-tests, property report, and release root"
+  ],
+  "claimBoundary": "Integrity tool only; it does not promote research approval or CNS claims."
+}

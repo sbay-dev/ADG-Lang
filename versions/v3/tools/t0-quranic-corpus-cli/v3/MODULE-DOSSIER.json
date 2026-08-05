@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "moduleId": "tools.t0-quranic-corpus-cli",
+  "version": "v3",
+  "layer": "tools",
+  "purpose": "Expose deterministic verification, evaluation, validation, mutation, diacritization, contract, and corpus commands.",
+  "sourceRef": {
+    "project": "src/Adg.QuranicCorpus.Cli/Adg.QuranicCorpus.Cli.csproj",
+    "paths": ["src/Adg.QuranicCorpus.Cli/Program.cs"]
+  },
+  "sameVersionDependencies": [
+    "pipeline.pipe-qac-morphology@v3",
+    "services.s0-deterministic-grammar@v3",
+    "services.s1-grammar-corpus@v3"
+  ],
+  "invariants": [
+    "Missing or invalid inputs produce explicit failure.",
+    "Evaluation gates return non-zero when their validity contract fails.",
+    "Validation output exposes selected morphology and graph evidence.",
+    "Identical source and input bytes produce byte-identical reports."
+  ],
+  "verification": [
+    "All synchronized v3 evidence commands completed",
+    "All report replay pairs matched"
+  ],
+  "claimBoundary": "Offline research and verification CLI; not a production service API."
+}

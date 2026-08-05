@@ -1,0 +1,51 @@
+name: Quranic research audit
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  reproduce:
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Install .NET 10
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Build release solutions
+        shell: pwsh
+        run: |
+          dotnet restore .\ADG-Lang.Native.slnx
+          dotnet build .\ADG-Lang.Native.slnx -c Release --no-restore --nologo
+          dotnet restore .\ADG-Lang.Quranic.slnx
+          dotnet build .\ADG-Lang.Quranic.slnx -c Release --no-restore --nologo
+
+      - name: Run public parser checks
+        shell: pwsh
+        run: |
+          dotnet run --project .\src\Adg.QuranicCore.Cli\Adg.QuranicCore.Cli.csproj -c Release --no-build -- verify-corpus .\tests\quranic-core-v1\causal-gold.json
+          dotnet run --project .\src\Adg.QuranicCorpus.Cli\Adg.QuranicCorpus.Cli.csproj -c Release --no-build -- self-test
+          dotnet run --project .\src\Adg.QuranicCorpus.Cli\Adg.QuranicCorpus.Cli.csproj -c Release --no-build -- syntax-self-test
+          dotnet run --project .\src\Adg.QuranicCorpus.Cli\Adg.QuranicCorpus.Cli.csproj -c Release --no-build -- syntax-property-test
+          dotnet run --project .\src\Adg.QuranicCorpus.Cli\Adg.QuranicCorpus.Cli.csproj -c Release --no-build -- quranic-score-policy
+
+      - name: Reproduce v4 Merkle manifest
+        shell: pwsh
+        run: |
+          .\scripts\quranic-corpus\Write-QuranicGrammarV4Merkle.ps1
+          git diff --exit-code -- .\versions\v4\MERKLE-MANIFEST.json
+
+      - name: Enforce public disclosure boundary
+        shell: pwsh
+        run: .\scripts\quranic-corpus\Test-PublicResearchHandoff.ps1

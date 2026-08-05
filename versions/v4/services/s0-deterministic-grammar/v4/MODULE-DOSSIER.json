@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "moduleId": "services.s0-deterministic-grammar",
+  "version": "v4",
+  "layer": "services",
+  "purpose": "Select Quranic morphology, build dependency and phrase graphs, enforce all observed relation and phrase contracts, validate typed grammar and diacritics, and perform bounded additive diacritization.",
+  "sourceRef": {
+    "project": "src/Adg.QuranicGrammar/Adg.QuranicGrammar.csproj",
+    "paths": ["src/Adg.QuranicGrammar"]
+  },
+  "sameVersionDependencies": [
+    "pipeline.pipe-quranic-core@v4",
+    "pipeline.pipe-qac-morphology@v4"
+  ],
+  "invariants": [
+    "Dependency direction is dependent to head.",
+    "All 45 dependency relations and six phrase families have executable non-normative contracts.",
+    "Unsupported generated edges remain Unverified and cannot establish verified core structure.",
+    "Phrase intervals must resolve, be unique, and remain laminar.",
+    "Runtime validation binds the contract-set ID and root and returns only Valid, Invalid, or Unverified.",
+    "Constraint discovery returns typed contracts by graph claim or rule ID under the same ID/root binding.",
+    "Correction requests never mutate the graph and remain fail closed when no approved correction policy exists.",
+    "NormativeCns mode cannot accept non-normative contracts.",
+    "All named lexeme allowlists are classified per entry as evidence-only or explicit natural-Arabic heuristic data.",
+    "Natural-Arabic heuristic fallback is disabled by default and any opt-in result remains Unverified.",
+    "Morphology selection factors, rationales, beam bound, and tie-breakers are bound by score policy v1.",
+    "Surface-incompatible canonical case evidence emits ADG-QC2004 and is unverified.",
+    "Diacritization is additive-only and preserves morphology, graph, and rule fingerprints."
+  ],
+  "verification": [
+    "325 / 325 generated property and mutation tests",
+    "19 lexeme collection fields and 352 entries audited; all 179 Quranic entries have 4,101 exact source matches and 173 natural entries have 0 verified Quranic acceptances",
+    "63 Quranic and opt-in natural score factors plus deterministic ScoreDescending/SignatureOrdinal tie-breakers replayed",
+    "45,023 / 45,087 source relation edges accepted with 64 explicit deferrals",
+    "11,574 / 11,574 source phrase nodes accepted",
+    "6,236 verses with 0 structural Invalid and 0 graph errors",
+    "24 / 24 target-scoped controlled diacritic mutations detected",
+    "77 / 77 accepted units exactly restored with 0 unsafe acceptances",
+    "Runtime validation, constraint discovery, correction request, wrong-root, and normative-fail-closed self-tests",
+    "Byte-identical replay for every report"
+  ],
+  "limitations": [
+    "528 verses remain structurally Unverified.",
+    "187 generated edges remain Unverified.",
+    "64 source relation edges remain explicitly deferred.",
+    "Natural-Arabic readiness and research approval are false."
+  ],
+  "claimBoundary": "Deterministic grammar Tool only; no neural training or Genius claim."
+}

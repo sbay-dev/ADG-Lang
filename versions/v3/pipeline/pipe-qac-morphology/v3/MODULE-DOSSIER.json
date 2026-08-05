@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "moduleId": "pipeline.pipe-qac-morphology",
+  "version": "v3",
+  "layer": "pipeline",
+  "purpose": "Verify, import, normalize, and Merkle-bind QAC v0.4 morphology without redistributing the licensed source corpus.",
+  "sourceRef": {
+    "project": "src/Adg.QuranicCorpus/Adg.QuranicCorpus.csproj",
+    "paths": ["src/Adg.QuranicCorpus"]
+  },
+  "sameVersionDependencies": ["pipeline.pipe-quranic-core@v3"],
+  "invariants": [
+    "All 128,219 source segments validate before use.",
+    "Dynamic lemma, root, and feature atoms remain fail closed.",
+    "Exact surfaces and normalized skeletons remain separately indexed."
+  ],
+  "verification": [
+    "QAC v0.4 structural verifier",
+    "Record Merkle root 3d85e230...72a67"
+  ],
+  "claimBoundary": "External evidence importer; the official email-gated source hash comparison remains open."
+}

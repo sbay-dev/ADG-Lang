@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Adg.QuranicCorpus</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\THIRD_PARTY\quranic-arabic-corpus\LICENSE-DATA.txt">
+      <LogicalName>Adg.QuranicCorpus.Licenses.QacV04.txt</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+</Project>

@@ -1,0 +1,15 @@
+{
+  "source": "https://corpus.quran.com/download/",
+  "resource": "Quranic Arabic Corpus morphology",
+  "version": "0.4",
+  "retrievalMethod": "official email-gated download form",
+  "rawFile": "quranic-corpus-morphology-0.4.txt",
+  "sha256": "<compute-after-official-download>",
+  "segmentCount": 128219,
+  "wordCount": 77429,
+  "verseCount": 6236,
+  "chapterCount": 114,
+  "upstreamChecksumPublished": false,
+  "licenseNotice": "LICENSE-DATA.txt",
+  "attribution": "Source: Quranic Arabic Corpus, https://corpus.quran.com; Quran text: Tanzil, https://tanzil.net"
+}

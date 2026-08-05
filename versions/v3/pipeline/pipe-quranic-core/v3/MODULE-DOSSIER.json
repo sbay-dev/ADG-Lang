@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "moduleId": "pipeline.pipe-quranic-core",
+  "version": "v3",
+  "layer": "pipeline",
+  "purpose": "Preserve Uthmani spans, tokenize Quranic text, normalize analysis forms separately, and expose the bounded Quranic causal foundation.",
+  "sourceRef": {
+    "project": "src/Adg.QuranicCore/Adg.QuranicCore.csproj",
+    "paths": ["src/Adg.QuranicCore"]
+  },
+  "sameVersionDependencies": [],
+  "invariants": [
+    "Observed text and analysis normalization remain separate.",
+    "Source ranges are preserved.",
+    "Unsupported causal claims fail closed."
+  ],
+  "verification": [
+    "Release solution build",
+    "Quranic core self-tests through the synchronized CLI"
+  ],
+  "claimBoundary": "Deterministic text pipeline; not a Model, Genius, or CGN."
+}

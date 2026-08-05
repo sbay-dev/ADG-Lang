@@ -1,0 +1,910 @@
+{
+  "Version": "v1",
+  "Passed": true,
+  "PassedCases": 16,
+  "TotalCases": 16,
+  "LeafHashes": [
+    "06dffc43b40f463debafeb97af0daf79a4980006dab5698c68a876832d30128d",
+    "3b0783769067adb74e74580e03323a65d2b49f65bdc566803d9df4dcd4ea1536",
+    "4bbcd93eaa7b8cd38695d6b923b83a05aca1ec36ac2652b993c2637ea2f39bcf",
+    "469afe791f430c9e06e6501d699ef7ef5caade9f2522456f08ec5440c2deb598",
+    "7605db037108509ff754b367401ff9df0c623e0d2c232e769ca1a16d6687dfd9",
+    "98542edab56375a3402383dff09ac1d7d758dfe40894d955d4346c8fffa4ff11",
+    "d1786b488c72c33a4903496bebb1fb78ed140dd78a9eb2733c19897e79d42cad",
+    "73476d01a5fc73048e8777cb46484a9e5507ad46860a37803939b5e83aef2e3a",
+    "3f2f80a5415d8bd59340297f88b3130e98f2e696fc4c171f2c229c92e2e6b5e2",
+    "262058f5ad0194c7417f57c30b908923cdff3bb8853cebe5032babcebf2b0626",
+    "94e49dc99c06553fc84095c7328fe7dc849ebe95b2ab92c45b46473a95559c8e",
+    "332c41693641c85dd47f65afdd3172ba81cee32042d394bec2246515d279a354",
+    "f6da242f3865792abdd92025dadccad34ac2cf2662ba83298477f889ec5c6b55",
+    "d4c2d70fb31a15772c108b07d625067ce69a4bed9707715a6ee722504fc682e2",
+    "74d9f2d912125273703cfd6aa036f54619f96ab0df7ec62610be19c6b70d242e",
+    "f54797a83d07b89a0bee18a9314c7cf27196d117762674dd62b2e0f8dba03e24"
+  ],
+  "MerkleRoot": "e2cc6276fac0067cb6ef4244f87703bfb8e8a947110ee9d1e319fc51e959be56",
+  "Cases": [
+    {
+      "Id": "q35_36_fa_sababiyya",
+      "VerseKey": "35:36",
+      "Passed": true,
+      "KindMatched": true,
+      "DirectionMatched": true,
+      "MoodMatched": true,
+      "TargetTokenExists": true,
+      "SpanIntegrity": true,
+      "SegmentSpanIntegrity": true,
+      "MarkerSpanIntegrity": true,
+      "CauseEffectSpanIntegrity": true,
+      "CauseTextMatched": true,
+      "EffectTextMatched": true,
+      "DiagnosticsMatched": true,
+      "Diagnostics": [],
+      "MatchedMarker": {
+        "Kind": "FaSababiyya",
+        "Direction": "LeftCauseToRightEffect",
+        "Mood": "Nasb",
+        "TokenIndex": 3,
+        "SourceToken": "فَيَمُوتُوا۟",
+        "MarkerSurface": "فَ",
+        "MarkerRange": {
+          "Start": 24,
+          "Length": 2,
+          "End": 26
+        },
+        "CauseRange": {
+          "Start": 0,
+          "Length": 23,
+          "End": 23
+        },
+        "EffectRange": {
+          "Start": 26,
+          "Length": 10,
+          "End": 36
+        },
+        "RuleId": "ADG-QC1-FA-SABABIYYA-NEGATION",
+        "Evidence": "A prefixed fa introduces an imperfect consequence after a nearby negation or prohibition."
+      },
+      "ObservedMarkers": [
+        {
+          "Kind": "FaSababiyya",
+          "Direction": "LeftCauseToRightEffect",
+          "Mood": "Nasb",
+          "TokenIndex": 3,
+          "SourceToken": "فَيَمُوتُوا۟",
+          "MarkerSurface": "فَ",
+          "MarkerRange": {
+            "Start": 24,
+            "Length": 2,
+            "End": 26
+          },
+          "CauseRange": {
+            "Start": 0,
+            "Length": 23,
+            "End": 23
+          },
+          "EffectRange": {
+            "Start": 26,
+            "Length": 10,
+            "End": 36
+          },
+          "RuleId": "ADG-QC1-FA-SABABIYYA-NEGATION",
+          "Evidence": "A prefixed fa introduces an imperfect consequence after a nearby negation or prohibition."
+        }
+      ]
+    },
+    {
+      "Id": "q20_61_fa_sababiyya",
+      "VerseKey": "20:61",
+      "Passed": true,
+      "KindMatched": true,
+      "DirectionMatched": true,
+      "MoodMatched": true,
+      "TargetTokenExists": true,
+      "SpanIntegrity": true,
+      "SegmentSpanIntegrity": true,
+      "MarkerSpanIntegrity": true,
+      "CauseEffectSpanIntegrity": true,
+      "CauseTextMatched": true,
+      "EffectTextMatched": true,
+      "DiagnosticsMatched": true,
+      "Diagnostics": [],
+      "MatchedMarker": {
+        "Kind": "FaSababiyya",
+        "Direction": "LeftCauseToRightEffect",
+        "Mood": "Nasb",
+        "TokenIndex": 5,
+        "SourceToken": "فَيُسْحِتَكُم",
+        "MarkerSurface": "فَ",
+        "MarkerRange": {
+          "Start": 39,
+          "Length": 2,
+          "End": 41
+        },
+        "CauseRange": {
+          "Start": 0,
+          "Length": 38,
+          "End": 38
+        },
+        "EffectRange": {
+          "Start": 41,
+          "Length": 22,
+          "End": 63
+        },
+        "RuleId": "ADG-QC1-FA-SABABIYYA-NEGATION",
+        "Evidence": "A prefixed fa introduces an imperfect consequence after a nearby negation or prohibition."
+      },
+      "ObservedMarkers": [
+        {
+          "Kind": "FaSababiyya",
+          "Direction": "LeftCauseToRightEffect",
+          "Mood": "Nasb",
+          "TokenIndex": 5,
+          "SourceToken": "فَيُسْحِتَكُم",
+          "MarkerSurface": "فَ",
+          "MarkerRange": {
+            "Start": 39,
+            "Length": 2,
+            "End": 41
+          },
+          "CauseRange": {
+            "Start": 0,
+            "Length": 38,
+            "End": 38
+          },
+          "EffectRange": {
+            "Start": 41,
+            "Length": 22,
+            "End": 63
+          },
+          "RuleId": "ADG-QC1-FA-SABABIYYA-NEGATION",
+          "Evidence": "A prefixed fa introduces an imperfect consequence after a nearby negation or prohibition."
+        }
+      ]
+    },
+    {
+      "Id": "q20_81_fa_sababiyya_holdout",
+      "VerseKey": "20:81",
+      "Passed": true,
+      "KindMatched": true,
+      "DirectionMatched": true,
+      "MoodMatched": true,
+      "TargetTokenExists": true,
+      "SpanIntegrity": true,
+      "SegmentSpanIntegrity": true,
+      "MarkerSpanIntegrity": true,
+      "CauseEffectSpanIntegrity": true,
+      "CauseTextMatched": true,
+      "EffectTextMatched": true,
+      "DiagnosticsMatched": true,
+      "Diagnostics": [],
+      "MatchedMarker": {
+        "Kind": "FaSababiyya",
+        "Direction": "LeftCauseToRightEffect",
+        "Mood": "Nasb",
+        "TokenIndex": 3,
+        "SourceToken": "فَيَحِلَّ",
+        "MarkerSurface": "فَ",
+        "MarkerRange": {
+          "Start": 23,
+          "Length": 2,
+          "End": 25
+        },
+        "CauseRange": {
+          "Start": 0,
+          "Length": 22,
+          "End": 22
+        },
+        "EffectRange": {
+          "Start": 25,
+          "Length": 26,
+          "End": 51
+        },
+        "RuleId": "ADG-QC1-FA-SABABIYYA-NEGATION",
+        "Evidence": "A prefixed fa introduces an imperfect consequence after a nearby negation or prohibition."
+      },
+      "ObservedMarkers": [
+        {
+          "Kind": "FaSababiyya",
+          "Direction": "LeftCauseToRightEffect",
+          "Mood": "Nasb",
+          "TokenIndex": 3,
+          "SourceToken": "فَيَحِلَّ",
+          "MarkerSurface": "فَ",
+          "MarkerRange": {
+            "Start": 23,
+            "Length": 2,
+            "End": 25
+          },
+          "CauseRange": {
+            "Start": 0,
+            "Length": 22,
+            "End": 22
+          },
+          "EffectRange": {
+            "Start": 25,
+            "Length": 26,
+            "End": 51
+          },
+          "RuleId": "ADG-QC1-FA-SABABIYYA-NEGATION",
+          "Evidence": "A prefixed fa introduces an imperfect consequence after a nearby negation or prohibition."
+        }
+      ]
+    },
+    {
+      "Id": "q20_81_fi_preposition_negative",
+      "VerseKey": "20:81",
+      "Passed": true,
+      "KindMatched": true,
+      "DirectionMatched": true,
+      "MoodMatched": true,
+      "TargetTokenExists": true,
+      "SpanIntegrity": true,
+      "SegmentSpanIntegrity": true,
+      "MarkerSpanIntegrity": true,
+      "CauseEffectSpanIntegrity": true,
+      "CauseTextMatched": true,
+      "EffectTextMatched": true,
+      "DiagnosticsMatched": true,
+      "Diagnostics": [],
+      "MatchedMarker": null,
+      "ObservedMarkers": []
+    },
+    {
+      "Id": "q28_15_fa_consequence",
+      "VerseKey": "28:15",
+      "Passed": true,
+      "KindMatched": true,
+      "DirectionMatched": true,
+      "MoodMatched": true,
+      "TargetTokenExists": true,
+      "SpanIntegrity": true,
+      "SegmentSpanIntegrity": true,
+      "MarkerSpanIntegrity": true,
+      "CauseEffectSpanIntegrity": true,
+      "CauseTextMatched": true,
+      "EffectTextMatched": true,
+      "DiagnosticsMatched": true,
+      "Diagnostics": [],
+      "MatchedMarker": {
+        "Kind": "FaConsequence",
+        "Direction": "LeftCauseToRightEffect",
+        "Mood": "Past",
+        "TokenIndex": 2,
+        "SourceToken": "فَقَضَىٰ",
+        "MarkerSurface": "فَ",
+        "MarkerRange": {
+          "Start": 20,
+          "Length": 2,
+          "End": 22
+        },
+        "CauseRange": {
+          "Start": 0,
+          "Length": 19,
+          "End": 19
+        },
+        "EffectRange": {
+          "Start": 22,
+          "Length": 15,
+          "End": 37
+        },
+        "RuleId": "ADG-QC1-FA-CONSEQUENCE-PAST-EVENT",
+        "Evidence": "A past event follows an established event through fa; the relation is emitted as a consequence edge."
+      },
+      "ObservedMarkers": [
+        {
+          "Kind": "FaConsequence",
+          "Direction": "LeftCauseToRightEffect",
+          "Mood": "Past",
+          "TokenIndex": 2,
+          "SourceToken": "فَقَضَىٰ",
+          "MarkerSurface": "فَ",
+          "MarkerRange": {
+            "Start": 20,
+            "Length": 2,
+            "End": 22
+          },
+          "CauseRange": {
+            "Start": 0,
+            "Length": 19,
+            "End": 19
+          },
+          "EffectRange": {
+            "Start": 22,
+            "Length": 15,
+            "End": 37
+          },
+          "RuleId": "ADG-QC1-FA-CONSEQUENCE-PAST-EVENT",
+          "Evidence": "A past event follows an established event through fa; the relation is emitted as a consequence edge."
+        }
+      ]
+    },
+    {
+      "Id": "q29_40_ba_sababiyya",
+      "VerseKey": "29:40",
+      "Passed": true,
+      "KindMatched": true,
+      "DirectionMatched": true,
+      "MoodMatched": true,
+      "TargetTokenExists": true,
+      "SpanIntegrity": true,
+      "SegmentSpanIntegrity": true,
+      "MarkerSpanIntegrity": true,
+      "CauseEffectSpanIntegrity": true,
+      "CauseTextMatched": true,
+      "EffectTextMatched": true,
+      "DiagnosticsMatched": true,
+      "Diagnostics": [],
+      "MatchedMarker": {
+        "Kind": "BaSababiyya",
+        "Direction": "RightCauseToLeftEffect",
+        "Mood": "Unknown",
+        "TokenIndex": 2,
+        "SourceToken": "بِذَنۢبِهِۦ",
+        "MarkerSurface": "بِ",
+        "MarkerRange": {
+          "Start": 19,
+          "Length": 2,
+          "End": 21
+        },
+        "CauseRange": {
+          "Start": 21,
+          "Length": 9,
+          "End": 30
+        },
+        "EffectRange": {
+          "Start": 0,
+          "Length": 18,
+          "End": 18
+        },
+        "RuleId": "ADG-QC1-BA-SABABIYYA-NOUN",
+        "Evidence": "The governed nominal head \u0027ذنب\u0027 belongs to the audited causal-noun seed."
+      },
+      "ObservedMarkers": [
+        {
+          "Kind": "BaSababiyya",
+          "Direction": "RightCauseToLeftEffect",
+          "Mood": "Unknown",
+          "TokenIndex": 2,
+          "SourceToken": "بِذَنۢبِهِۦ",
+          "MarkerSurface": "بِ",
+          "MarkerRange": {
+            "Start": 19,
+            "Length": 2,
+            "End": 21
+          },
+          "CauseRange": {
+            "Start": 21,
+            "Length": 9,
+            "End": 30
+          },
+          "EffectRange": {
+            "Start": 0,
+            "Length": 18,
+            "End": 18
+          },
+          "RuleId": "ADG-QC1-BA-SABABIYYA-NOUN",
+          "Evidence": "The governed nominal head \u0027ذنب\u0027 belongs to the audited causal-noun seed."
+        }
+      ]
+    },
+    {
+      "Id": "q42_30_ba_sababiyya",
+      "VerseKey": "42:30",
+      "Passed": true,
+      "KindMatched": true,
+      "DirectionMatched": true,
+      "MoodMatched": true,
+      "TargetTokenExists": true,
+      "SpanIntegrity": true,
+      "SegmentSpanIntegrity": true,
+      "MarkerSpanIntegrity": true,
+      "CauseEffectSpanIntegrity": true,
+      "CauseTextMatched": true,
+      "EffectTextMatched": true,
+      "DiagnosticsMatched": true,
+      "Diagnostics": [],
+      "MatchedMarker": {
+        "Kind": "BaSababiyya",
+        "Direction": "RightCauseToLeftEffect",
+        "Mood": "Unknown",
+        "TokenIndex": 4,
+        "SourceToken": "فَبِمَا",
+        "MarkerSurface": "بِ",
+        "MarkerRange": {
+          "Start": 38,
+          "Length": 2,
+          "End": 40
+        },
+        "CauseRange": {
+          "Start": 40,
+          "Length": 24,
+          "End": 64
+        },
+        "EffectRange": {
+          "Start": 0,
+          "Length": 35,
+          "End": 35
+        },
+        "RuleId": "ADG-QC1-BA-SABABIYYA-RELATIVE",
+        "Evidence": "Ba governs a relative ma clause that states the cause."
+      },
+      "ObservedMarkers": [
+        {
+          "Kind": "FaResumption",
+          "Direction": "None",
+          "Mood": "Unknown",
+          "TokenIndex": 4,
+          "SourceToken": "فَبِمَا",
+          "MarkerSurface": "فَ",
+          "MarkerRange": {
+            "Start": 36,
+            "Length": 2,
+            "End": 38
+          },
+          "CauseRange": null,
+          "EffectRange": null,
+          "RuleId": "ADG-QC1-FA-RESUMPTION-BEFORE-BA",
+          "Evidence": "The fa prefix resumes the statement before a governed ba phrase."
+        },
+        {
+          "Kind": "BaSababiyya",
+          "Direction": "RightCauseToLeftEffect",
+          "Mood": "Unknown",
+          "TokenIndex": 4,
+          "SourceToken": "فَبِمَا",
+          "MarkerSurface": "بِ",
+          "MarkerRange": {
+            "Start": 38,
+            "Length": 2,
+            "End": 40
+          },
+          "CauseRange": {
+            "Start": 40,
+            "Length": 24,
+            "End": 64
+          },
+          "EffectRange": {
+            "Start": 0,
+            "Length": 35,
+            "End": 35
+          },
+          "RuleId": "ADG-QC1-BA-SABABIYYA-RELATIVE",
+          "Evidence": "Ba governs a relative ma clause that states the cause."
+        }
+      ]
+    },
+    {
+      "Id": "q18_74_fa_resumption_negative",
+      "VerseKey": "18:74",
+      "Passed": true,
+      "KindMatched": true,
+      "DirectionMatched": true,
+      "MoodMatched": true,
+      "TargetTokenExists": true,
+      "SpanIntegrity": true,
+      "SegmentSpanIntegrity": true,
+      "MarkerSpanIntegrity": true,
+      "CauseEffectSpanIntegrity": true,
+      "CauseTextMatched": true,
+      "EffectTextMatched": true,
+      "DiagnosticsMatched": true,
+      "Diagnostics": [],
+      "MatchedMarker": {
+        "Kind": "FaResumption",
+        "Direction": "None",
+        "Mood": "Past",
+        "TokenIndex": 4,
+        "SourceToken": "فَقَتَلَهُۥ",
+        "MarkerSurface": "فَ",
+        "MarkerRange": {
+          "Start": 34,
+          "Length": 2,
+          "End": 36
+        },
+        "CauseRange": null,
+        "EffectRange": null,
+        "RuleId": "ADG-QC1-FA-RESUMPTION-HATTA-IDHA",
+        "Evidence": "The fa follows a hatta-idha narrative frame and is retained as sequence/resumption."
+      },
+      "ObservedMarkers": [
+        {
+          "Kind": "FaResumption",
+          "Direction": "None",
+          "Mood": "Past",
+          "TokenIndex": 4,
+          "SourceToken": "فَقَتَلَهُۥ",
+          "MarkerSurface": "فَ",
+          "MarkerRange": {
+            "Start": 34,
+            "Length": 2,
+            "End": 36
+          },
+          "CauseRange": null,
+          "EffectRange": null,
+          "RuleId": "ADG-QC1-FA-RESUMPTION-HATTA-IDHA",
+          "Evidence": "The fa follows a hatta-idha narrative frame and is retained as sequence/resumption."
+        }
+      ]
+    },
+    {
+      "Id": "q96_4_ba_instrument_negative",
+      "VerseKey": "96:4",
+      "Passed": true,
+      "KindMatched": true,
+      "DirectionMatched": true,
+      "MoodMatched": true,
+      "TargetTokenExists": true,
+      "SpanIntegrity": true,
+      "SegmentSpanIntegrity": true,
+      "MarkerSpanIntegrity": true,
+      "CauseEffectSpanIntegrity": true,
+      "CauseTextMatched": true,
+      "EffectTextMatched": true,
+      "DiagnosticsMatched": true,
+      "Diagnostics": [],
+      "MatchedMarker": {
+        "Kind": "BaInstrument",
+        "Direction": "None",
+        "Mood": "Unknown",
+        "TokenIndex": 2,
+        "SourceToken": "بِٱلْقَلَمِ",
+        "MarkerSurface": "بِ",
+        "MarkerRange": {
+          "Start": 16,
+          "Length": 2,
+          "End": 18
+        },
+        "CauseRange": null,
+        "EffectRange": null,
+        "RuleId": "ADG-QC1-BA-INSTRUMENT",
+        "Evidence": "The governed nominal head \u0027قلم\u0027 belongs to the audited instrument seed."
+      },
+      "ObservedMarkers": [
+        {
+          "Kind": "BaInstrument",
+          "Direction": "None",
+          "Mood": "Unknown",
+          "TokenIndex": 2,
+          "SourceToken": "بِٱلْقَلَمِ",
+          "MarkerSurface": "بِ",
+          "MarkerRange": {
+            "Start": 16,
+            "Length": 2,
+            "End": 18
+          },
+          "CauseRange": null,
+          "EffectRange": null,
+          "RuleId": "ADG-QC1-BA-INSTRUMENT",
+          "Evidence": "The governed nominal head \u0027قلم\u0027 belongs to the audited instrument seed."
+        }
+      ]
+    },
+    {
+      "Id": "natural_fa_sababiyya_holdout",
+      "VerseKey": "natural:1",
+      "Passed": true,
+      "KindMatched": true,
+      "DirectionMatched": true,
+      "MoodMatched": true,
+      "TargetTokenExists": true,
+      "SpanIntegrity": true,
+      "SegmentSpanIntegrity": true,
+      "MarkerSpanIntegrity": true,
+      "CauseEffectSpanIntegrity": true,
+      "CauseTextMatched": true,
+      "EffectTextMatched": true,
+      "DiagnosticsMatched": true,
+      "Diagnostics": [],
+      "MatchedMarker": {
+        "Kind": "FaSababiyya",
+        "Direction": "LeftCauseToRightEffect",
+        "Mood": "Nasb",
+        "TokenIndex": 2,
+        "SourceToken": "فَتَنْدَمَ",
+        "MarkerSurface": "فَ",
+        "MarkerRange": {
+          "Start": 13,
+          "Length": 2,
+          "End": 15
+        },
+        "CauseRange": {
+          "Start": 0,
+          "Length": 12,
+          "End": 12
+        },
+        "EffectRange": {
+          "Start": 15,
+          "Length": 8,
+          "End": 23
+        },
+        "RuleId": "ADG-QC1-FA-SABABIYYA-NEGATION",
+        "Evidence": "A prefixed fa introduces an imperfect consequence after a nearby negation or prohibition."
+      },
+      "ObservedMarkers": [
+        {
+          "Kind": "FaSababiyya",
+          "Direction": "LeftCauseToRightEffect",
+          "Mood": "Nasb",
+          "TokenIndex": 2,
+          "SourceToken": "فَتَنْدَمَ",
+          "MarkerSurface": "فَ",
+          "MarkerRange": {
+            "Start": 13,
+            "Length": 2,
+            "End": 15
+          },
+          "CauseRange": {
+            "Start": 0,
+            "Length": 12,
+            "End": 12
+          },
+          "EffectRange": {
+            "Start": 15,
+            "Length": 8,
+            "End": 23
+          },
+          "RuleId": "ADG-QC1-FA-SABABIYYA-NEGATION",
+          "Evidence": "A prefixed fa introduces an imperfect consequence after a nearby negation or prohibition."
+        }
+      ]
+    },
+    {
+      "Id": "natural_fa_sababiyya_invalid_mood",
+      "VerseKey": "natural:invalid-1",
+      "Passed": true,
+      "KindMatched": true,
+      "DirectionMatched": true,
+      "MoodMatched": true,
+      "TargetTokenExists": true,
+      "SpanIntegrity": true,
+      "SegmentSpanIntegrity": true,
+      "MarkerSpanIntegrity": true,
+      "CauseEffectSpanIntegrity": true,
+      "CauseTextMatched": true,
+      "EffectTextMatched": true,
+      "DiagnosticsMatched": true,
+      "Diagnostics": [
+        {
+          "Code": "ADG-QC1001",
+          "Message": "Fa sababiyya requires the following imperfect verb to be in Nasb.",
+          "Range": {
+            "Start": 15,
+            "Length": 8,
+            "End": 23
+          }
+        }
+      ],
+      "MatchedMarker": {
+        "Kind": "FaSababiyyaCandidate",
+        "Direction": "None",
+        "Mood": "Unknown",
+        "TokenIndex": 2,
+        "SourceToken": "فَتَنْدَمُ",
+        "MarkerSurface": "فَ",
+        "MarkerRange": {
+          "Start": 13,
+          "Length": 2,
+          "End": 15
+        },
+        "CauseRange": null,
+        "EffectRange": null,
+        "RuleId": "ADG-QC1-FA-SABABIYYA-MOOD-UNVERIFIED",
+        "Evidence": "The causal context is present, but the required Nasb mood was not verified."
+      },
+      "ObservedMarkers": [
+        {
+          "Kind": "FaSababiyyaCandidate",
+          "Direction": "None",
+          "Mood": "Unknown",
+          "TokenIndex": 2,
+          "SourceToken": "فَتَنْدَمُ",
+          "MarkerSurface": "فَ",
+          "MarkerRange": {
+            "Start": 13,
+            "Length": 2,
+            "End": 15
+          },
+          "CauseRange": null,
+          "EffectRange": null,
+          "RuleId": "ADG-QC1-FA-SABABIYYA-MOOD-UNVERIFIED",
+          "Evidence": "The causal context is present, but the required Nasb mood was not verified."
+        }
+      ]
+    },
+    {
+      "Id": "natural_clause_bounded_spans",
+      "VerseKey": "natural:boundary-1",
+      "Passed": true,
+      "KindMatched": true,
+      "DirectionMatched": true,
+      "MoodMatched": true,
+      "TargetTokenExists": true,
+      "SpanIntegrity": true,
+      "SegmentSpanIntegrity": true,
+      "MarkerSpanIntegrity": true,
+      "CauseEffectSpanIntegrity": true,
+      "CauseTextMatched": true,
+      "EffectTextMatched": true,
+      "DiagnosticsMatched": true,
+      "Diagnostics": [],
+      "MatchedMarker": {
+        "Kind": "FaSababiyya",
+        "Direction": "LeftCauseToRightEffect",
+        "Mood": "Nasb",
+        "TokenIndex": 2,
+        "SourceToken": "فَتَنْدَمَ",
+        "MarkerSurface": "فَ",
+        "MarkerRange": {
+          "Start": 13,
+          "Length": 2,
+          "End": 15
+        },
+        "CauseRange": {
+          "Start": 0,
+          "Length": 12,
+          "End": 12
+        },
+        "EffectRange": {
+          "Start": 15,
+          "Length": 8,
+          "End": 23
+        },
+        "RuleId": "ADG-QC1-FA-SABABIYYA-NEGATION",
+        "Evidence": "A prefixed fa introduces an imperfect consequence after a nearby negation or prohibition."
+      },
+      "ObservedMarkers": [
+        {
+          "Kind": "FaSababiyya",
+          "Direction": "LeftCauseToRightEffect",
+          "Mood": "Nasb",
+          "TokenIndex": 2,
+          "SourceToken": "فَتَنْدَمَ",
+          "MarkerSurface": "فَ",
+          "MarkerRange": {
+            "Start": 13,
+            "Length": 2,
+            "End": 15
+          },
+          "CauseRange": {
+            "Start": 0,
+            "Length": 12,
+            "End": 12
+          },
+          "EffectRange": {
+            "Start": 15,
+            "Length": 8,
+            "End": 23
+          },
+          "RuleId": "ADG-QC1-FA-SABABIYYA-NEGATION",
+          "Evidence": "A prefixed fa introduces an imperfect consequence after a nearby negation or prohibition."
+        }
+      ]
+    },
+    {
+      "Id": "natural_cross_clause_negation_negative",
+      "VerseKey": "natural:boundary-2",
+      "Passed": true,
+      "KindMatched": true,
+      "DirectionMatched": true,
+      "MoodMatched": true,
+      "TargetTokenExists": true,
+      "SpanIntegrity": true,
+      "SegmentSpanIntegrity": true,
+      "MarkerSpanIntegrity": true,
+      "CauseEffectSpanIntegrity": true,
+      "CauseTextMatched": true,
+      "EffectTextMatched": true,
+      "DiagnosticsMatched": true,
+      "Diagnostics": [],
+      "MatchedMarker": null,
+      "ObservedMarkers": []
+    },
+    {
+      "Id": "natural_cross_clause_hatta_consequence",
+      "VerseKey": "natural:boundary-3",
+      "Passed": true,
+      "KindMatched": true,
+      "DirectionMatched": true,
+      "MoodMatched": true,
+      "TargetTokenExists": true,
+      "SpanIntegrity": true,
+      "SegmentSpanIntegrity": true,
+      "MarkerSpanIntegrity": true,
+      "CauseEffectSpanIntegrity": true,
+      "CauseTextMatched": true,
+      "EffectTextMatched": true,
+      "DiagnosticsMatched": true,
+      "Diagnostics": [],
+      "MatchedMarker": {
+        "Kind": "FaConsequence",
+        "Direction": "LeftCauseToRightEffect",
+        "Mood": "Past",
+        "TokenIndex": 6,
+        "SourceToken": "فَقَتَلَهُ",
+        "MarkerSurface": "فَ",
+        "MarkerRange": {
+          "Start": 34,
+          "Length": 2,
+          "End": 36
+        },
+        "CauseRange": {
+          "Start": 21,
+          "Length": 12,
+          "End": 33
+        },
+        "EffectRange": {
+          "Start": 36,
+          "Length": 8,
+          "End": 44
+        },
+        "RuleId": "ADG-QC1-FA-CONSEQUENCE-PAST-EVENT",
+        "Evidence": "A past event follows an established event through fa; the relation is emitted as a consequence edge."
+      },
+      "ObservedMarkers": [
+        {
+          "Kind": "FaConsequence",
+          "Direction": "LeftCauseToRightEffect",
+          "Mood": "Past",
+          "TokenIndex": 6,
+          "SourceToken": "فَقَتَلَهُ",
+          "MarkerSurface": "فَ",
+          "MarkerRange": {
+            "Start": 34,
+            "Length": 2,
+            "End": 36
+          },
+          "CauseRange": {
+            "Start": 21,
+            "Length": 12,
+            "End": 33
+          },
+          "EffectRange": {
+            "Start": 36,
+            "Length": 8,
+            "End": 44
+          },
+          "RuleId": "ADG-QC1-FA-CONSEQUENCE-PAST-EVENT",
+          "Evidence": "A past event follows an established event through fa; the relation is emitted as a consequence edge."
+        }
+      ]
+    },
+    {
+      "Id": "natural_fa_root_negative",
+      "VerseKey": "natural:2",
+      "Passed": true,
+      "KindMatched": true,
+      "DirectionMatched": true,
+      "MoodMatched": true,
+      "TargetTokenExists": true,
+      "SpanIntegrity": true,
+      "SegmentSpanIntegrity": true,
+      "MarkerSpanIntegrity": true,
+      "CauseEffectSpanIntegrity": true,
+      "CauseTextMatched": true,
+      "EffectTextMatched": true,
+      "DiagnosticsMatched": true,
+      "Diagnostics": [],
+      "MatchedMarker": null,
+      "ObservedMarkers": []
+    },
+    {
+      "Id": "q3_162_bisa_lexeme_negative",
+      "VerseKey": "3:162",
+      "Passed": true,
+      "KindMatched": true,
+      "DirectionMatched": true,
+      "MoodMatched": true,
+      "TargetTokenExists": true,
+      "SpanIntegrity": true,
+      "SegmentSpanIntegrity": true,
+      "MarkerSpanIntegrity": true,
+      "CauseEffectSpanIntegrity": true,
+      "CauseTextMatched": true,
+      "EffectTextMatched": true,
+      "DiagnosticsMatched": true,
+      "Diagnostics": [],
+      "MatchedMarker": null,
+      "ObservedMarkers": []
+    }
+  ]
+}
