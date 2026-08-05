@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "moduleId": "services.s0-deterministic-grammar",
+  "version": "v3",
+  "layer": "services",
+  "purpose": "Select Quranic morphology, build dependency and phrase graphs, validate typed grammar and diacritics, and perform bounded additive diacritization.",
+  "sourceRef": {
+    "project": "src/Adg.QuranicGrammar/Adg.QuranicGrammar.csproj",
+    "paths": ["src/Adg.QuranicGrammar"]
+  },
+  "sameVersionDependencies": [
+    "pipeline.pipe-quranic-core@v3",
+    "pipeline.pipe-qac-morphology@v3"
+  ],
+  "invariants": [
+    "Dependency direction is dependent to head.",
+    "Surface-incompatible canonical case evidence emits ADG-QC2004 and is unverified.",
+    "Ordered mark multiplicity and mark order are preserved.",
+    "Diacritization is additive-only and requires valid input/output parser and functional states.",
+    "Accepted output preserves morphology, graph, and rule fingerprints."
+  ],
+  "verification": [
+    "177 / 177 generated property and mutation tests",
+    "6,236 verses with 0 structural Invalid and 0 graph errors",
+    "Functional gate with 0 invalid edges",
+    "24 / 24 target-scoped controlled diacritic mutations detected",
+    "77 / 77 accepted units exactly restored with 0 unsafe acceptances"
+  ],
+  "limitations": [
+    "373 verses remain structurally Unverified.",
+    "Only 15 of 45 dependency relations are canonical validator contracts.",
+    "All six phrase families remain incomplete.",
+    "Natural-Arabic readiness and research approval are false."
+  ],
+  "claimBoundary": "Deterministic grammar Tool only; no neural training or Genius claim."
+}

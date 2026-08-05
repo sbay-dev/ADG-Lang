@@ -1,0 +1,222 @@
+{
+  "version": "v1",
+  "cases": [
+    {
+      "id": "q35_36_fa_sababiyya",
+      "verseKey": "35:36",
+      "snippet": "لَا يُقْضَىٰ عَلَيْهِمْ فَيَمُوتُوا۟",
+      "markerToken": "فَيَمُوتُوا۟",
+      "expectedKind": "FaSababiyya",
+      "expectedDirection": "LeftCauseToRightEffect",
+      "expectedMood": "Nasb",
+      "sources": [
+        "https://api.quran.com/api/v4/verses/by_key/35:36",
+        "https://dorar.net/arabia/4230",
+        "https://corpus.quran.com/wordmorphology.jsp?location=(35:36:9)"
+      ]
+    },
+    {
+      "id": "q20_61_fa_sababiyya",
+      "verseKey": "20:61",
+      "snippet": "لَا تَفْتَرُوا۟ عَلَى ٱللَّهِ كَذِبًۭا فَيُسْحِتَكُم بِعَذَابٍۢ",
+      "markerToken": "فَيُسْحِتَكُم",
+      "expectedKind": "FaSababiyya",
+      "expectedDirection": "LeftCauseToRightEffect",
+      "expectedMood": "Nasb",
+      "sources": [
+        "https://api.quran.com/api/v4/verses/by_key/20:61",
+        "https://dorar.net/arabia/4230",
+        "https://corpus.quran.com/wordmorphology.jsp?location=(20:61:10)"
+      ]
+    },
+    {
+      "id": "q20_81_fa_sababiyya_holdout",
+      "verseKey": "20:81",
+      "snippet": "وَلَا تَطْغَوْا۟ فِيهِ فَيَحِلَّ عَلَيْكُمْ غَضَبِى",
+      "markerToken": "فَيَحِلَّ",
+      "expectedKind": "FaSababiyya",
+      "expectedDirection": "LeftCauseToRightEffect",
+      "expectedMood": "Nasb",
+      "sources": [
+        "https://api.quran.com/api/v4/verses/by_key/20:81",
+        "https://corpus.quran.com/wordmorphology.jsp?location=(20:81:9)"
+      ]
+    },
+    {
+      "id": "q20_81_fi_preposition_negative",
+      "verseKey": "20:81",
+      "snippet": "فِيهِ",
+      "markerToken": "فِيهِ",
+      "expectedKind": "FaResumption",
+      "expectedDirection": "None",
+      "expectedMood": "Unknown",
+      "expectedMarker": false,
+      "sources": [
+        "https://api.quran.com/api/v4/verses/by_key/20:81",
+        "https://corpus.quran.com/wordmorphology.jsp?location=(20:81:8)"
+      ]
+    },
+    {
+      "id": "q28_15_fa_consequence",
+      "verseKey": "28:15",
+      "snippet": "فَوَكَزَهُۥ مُوسَىٰ فَقَضَىٰ عَلَيْهِ",
+      "markerToken": "فَقَضَىٰ",
+      "expectedKind": "FaConsequence",
+      "expectedDirection": "LeftCauseToRightEffect",
+      "expectedMood": "Past",
+      "sources": [
+        "https://api.quran.com/api/v4/verses/by_key/28:15",
+        "https://dorar.net/arabia/4230",
+        "https://corpus.quran.com/wordmorphology.jsp?location=(28:15:28)"
+      ]
+    },
+    {
+      "id": "q29_40_ba_sababiyya",
+      "verseKey": "29:40",
+      "snippet": "فَكُلًّا أَخَذْنَا بِذَنۢبِهِۦ",
+      "markerToken": "بِذَنۢبِهِۦ",
+      "expectedKind": "BaSababiyya",
+      "expectedDirection": "RightCauseToLeftEffect",
+      "expectedMood": "Unknown",
+      "sources": [
+        "https://api.quran.com/api/v4/verses/by_key/29:40",
+        "https://dorar.net/arabia/4230",
+        "https://corpus.quran.com/wordmorphology.jsp?location=(29:40:3)"
+      ]
+    },
+    {
+      "id": "q42_30_ba_sababiyya",
+      "verseKey": "42:30",
+      "snippet": "وَمَآ أَصَـٰبَكُم مِّن مُّصِيبَةٍۢ فَبِمَا كَسَبَتْ أَيْدِيكُمْ",
+      "markerToken": "فَبِمَا",
+      "expectedKind": "BaSababiyya",
+      "expectedDirection": "RightCauseToLeftEffect",
+      "expectedMood": "Unknown",
+      "sources": [
+        "https://api.quran.com/api/v4/verses/by_key/42:30",
+        "https://dorar.net/arabia/4230",
+        "https://corpus.quran.com/wordmorphology.jsp?location=(42:30:5)"
+      ]
+    },
+    {
+      "id": "q18_74_fa_resumption_negative",
+      "verseKey": "18:74",
+      "snippet": "حَتَّىٰٓ إِذَا لَقِيَا غُلَـٰمًۭا فَقَتَلَهُۥ",
+      "markerToken": "فَقَتَلَهُۥ",
+      "expectedKind": "FaResumption",
+      "expectedDirection": "None",
+      "expectedMood": "Past",
+      "sources": [
+        "https://api.quran.com/api/v4/verses/by_key/18:74",
+        "https://corpus.quran.com/wordmorphology.jsp?location=(18:74:6)"
+      ]
+    },
+    {
+      "id": "q96_4_ba_instrument_negative",
+      "verseKey": "96:4",
+      "snippet": "ٱلَّذِى عَلَّمَ بِٱلْقَلَمِ",
+      "markerToken": "بِٱلْقَلَمِ",
+      "expectedKind": "BaInstrument",
+      "expectedDirection": "None",
+      "expectedMood": "Unknown",
+      "sources": [
+        "https://api.quran.com/api/v4/verses/by_key/96:4",
+        "https://corpus.quran.com/wordmorphology.jsp?location=(96:4:3)"
+      ]
+    },
+    {
+      "id": "natural_fa_sababiyya_holdout",
+      "verseKey": "natural:1",
+      "snippet": "لَا تُهْمِلْ فَتَنْدَمَ",
+      "markerToken": "فَتَنْدَمَ",
+      "expectedKind": "FaSababiyya",
+      "expectedDirection": "LeftCauseToRightEffect",
+      "expectedMood": "Nasb",
+      "sources": [
+        "https://dorar.net/arabia/4230"
+      ]
+    },
+    {
+      "id": "natural_fa_sababiyya_invalid_mood",
+      "verseKey": "natural:invalid-1",
+      "snippet": "لَا تُهْمِلْ فَتَنْدَمُ",
+      "markerToken": "فَتَنْدَمُ",
+      "expectedKind": "FaSababiyyaCandidate",
+      "expectedDirection": "None",
+      "expectedMood": "Unknown",
+      "expectedDiagnostics": [
+        "ADG-QC1001"
+      ],
+      "sources": [
+        "https://dorar.net/arabia/4230"
+      ]
+    },
+    {
+      "id": "natural_clause_bounded_spans",
+      "verseKey": "natural:boundary-1",
+      "snippet": "لَا تُهْمِلْ فَتَنْدَمَ، ثُمَّ تَعُودُ.",
+      "markerToken": "فَتَنْدَمَ",
+      "expectedKind": "FaSababiyya",
+      "expectedDirection": "LeftCauseToRightEffect",
+      "expectedMood": "Nasb",
+      "expectedCauseText": "لَا تُهْمِلْ",
+      "expectedEffectText": "تَنْدَمَ",
+      "sources": [
+        "https://dorar.net/arabia/4230"
+      ]
+    },
+    {
+      "id": "natural_cross_clause_negation_negative",
+      "verseKey": "natural:boundary-2",
+      "snippet": "لَا تَفْعَلْ. زَيْدٌ قَامَ فَيَذْهَبَ",
+      "markerToken": "فَيَذْهَبَ",
+      "expectedKind": "FaSababiyya",
+      "expectedDirection": "None",
+      "expectedMood": "Unknown",
+      "expectedMarker": false,
+      "sources": [
+        "https://dorar.net/arabia/4230"
+      ]
+    },
+    {
+      "id": "natural_cross_clause_hatta_consequence",
+      "verseKey": "natural:boundary-3",
+      "snippet": "حَتَّىٰ إِذَا كَذَا. زَيْدٌ قَامَ فَقَتَلَهُ",
+      "markerToken": "فَقَتَلَهُ",
+      "expectedKind": "FaConsequence",
+      "expectedDirection": "LeftCauseToRightEffect",
+      "expectedMood": "Past",
+      "expectedCauseText": "زَيْدٌ قَامَ",
+      "expectedEffectText": "قَتَلَهُ",
+      "sources": [
+        "https://dorar.net/arabia/4230"
+      ]
+    },
+    {
+      "id": "natural_fa_root_negative",
+      "verseKey": "natural:2",
+      "snippet": "فَتْنَةٌ",
+      "markerToken": "فَتْنَةٌ",
+      "expectedKind": "FaResumption",
+      "expectedDirection": "None",
+      "expectedMood": "Unknown",
+      "expectedMarker": false,
+      "sources": [
+        "https://dorar.net/arabia/4230"
+      ]
+    },
+    {
+      "id": "q3_162_bisa_lexeme_negative",
+      "verseKey": "3:162",
+      "snippet": "وَبِئْسَ ٱلْمَصِيرُ",
+      "markerToken": "وَبِئْسَ",
+      "expectedKind": "BaAmbiguous",
+      "expectedDirection": "None",
+      "expectedMood": "Unknown",
+      "expectedMarker": false,
+      "sources": [
+        "https://api.quran.com/api/v4/verses/by_key/3:162"
+      ]
+    }
+  ]
+}

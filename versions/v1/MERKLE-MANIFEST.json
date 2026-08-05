@@ -1,0 +1,111 @@
+{
+  "project": "ADG-Lang",
+  "version": "v1",
+  "algorithm": "sha256",
+  "leaf_domain": "ADG-QURANIC-CORE-V1-FILE",
+  "node_domain": "ADG-QURANIC-CORE-V1-NODE",
+  "root": "c72fc2321e72db13ac1b5cd5b7c467681658f1da2943ed6083799699a054b631",
+  "leaf_hashes": [
+    "e99d533b5cc83af18753f2ad72c1ab61797e60c7ed5bc51dbbd358276ad2d7b4",
+    "31486e4eacfaaaa5493b2aa19d46ebeb88c1de0131e2a7b8dff419d625f9b132",
+    "c48194d60db0a2f6415fec233777c5d6fccae0c19c1e1bfba7525bf38151d19c",
+    "2cb351704d18e709198375fcd01a74ac1e06dd7b80da387f2da958e595dc3b53",
+    "250d32fe25710ab02f5a39b8bc809ff95ab535dcfed42ae95610aac33cc86adf",
+    "8f85372a7213a6dedca01a65222255f2ad44e8581f8289a2d7cacb18d0121fd6",
+    "3b29f800058a8e5be1b6f76c58fa810408b93e925540fa14e986299168f6f649",
+    "6f773d0192ceb6473e333bddd0f91efe37c51a23fde66bac625abb4f1b7d1bcd",
+    "635e2c41679d7a450c8bd0c0693eeec5a42b131e20bf3387d241a911f6c7d177",
+    "3e9fc9628d8ba43141ed516bccdd7be26b97113b7b2bbb4665600797ff5f13eb",
+    "824417e51c9e42cb1121e34c908cb60fb434170100909175fee8facc7bdf5689",
+    "ea1fcf3829be0bcbd7b5a6284356c8cade8d0a562a4eab12c5f2ea9bc02f4e02",
+    "086d4f3f63050c8364125e0879fa409e42783e663e1a52dd8989bc335d8d5410",
+    "ee202e46d4da54bcc457ae6e79c7bf1369c412d9ddc077c812f8396f79a62f59",
+    "9b1ad6a1cb838aca183c5c04aec1c43adccac306a77eee46522daa276c0df4a5",
+    "a1d86d5a56924a102f87cc310f0cb83944b66e687c8c01654e64a2ff5b3e66c2",
+    "880ca01bd9b10886a82c22dd3157a8121d738b7d3005e7f55c126d3458e83b96"
+  ],
+  "files": [
+    {
+      "path": "ADG-Lang.Native.slnx",
+      "sha256": "bf2c8a34efb2717cce04ab31d5f15a0d4a2d4fcd709141ad101a78ab2065994b"
+    },
+    {
+      "path": "scripts\\quranic-core\\Write-QuranicCoreV1Merkle.ps1",
+      "sha256": "5a891b0c08fbbb28c28c00f42a92862c72e84619ef0b25a53d2da7c876aaa828"
+    },
+    {
+      "path": "src\\Adg.QuranicCore.Cli\\Adg.QuranicCore.Cli.csproj",
+      "sha256": "dc48f8fb8c71d333e611681f57caae619345e654a92b84377b24a1d5c5aa0a94"
+    },
+    {
+      "path": "src\\Adg.QuranicCore.Cli\\Program.cs",
+      "sha256": "b5cf408001275bf0a358816ed98e6a910f600e3e07e26e686d8a9c012be6bd9e"
+    },
+    {
+      "path": "src\\Adg.QuranicCore.Cli\\QuranicCorpusVerifier.cs",
+      "sha256": "d5cb54b689db4a59ca56768b3d638618c0ab3f1947b7aae9dd1ac2a36694fe6c"
+    },
+    {
+      "path": "src\\Adg.QuranicCore\\Adg.QuranicCore.csproj",
+      "sha256": "c5fc3eb64ae56fc55eaf04c20e143c231a8eafbfc5a6bd797f140931bf8e2dbf"
+    },
+    {
+      "path": "src\\Adg.QuranicCore\\Models.cs",
+      "sha256": "30f63c465cb24463033fe9befbb013acac2db24a8000b16807e28360b902225c"
+    },
+    {
+      "path": "src\\Adg.QuranicCore\\QuranicCausalityAnalyzer.cs",
+      "sha256": "7d218501d216c8ff5015e47ea360c44a8d172fc41650fad2bb9da643faff071b"
+    },
+    {
+      "path": "src\\Adg.QuranicCore\\QuranicTextNormalizer.cs",
+      "sha256": "cb4d2edb7853a0aca9a028bbbf1d85c46a0f85bfe2c4d9c94b6cfa0b5c6de1e5"
+    },
+    {
+      "path": "src\\Adg.QuranicCore\\QuranicTokenizer.cs",
+      "sha256": "eade51c7b35794725399852a29b10f133881442161a89ec543ec198bf1ef5872"
+    },
+    {
+      "path": "tests\\quranic-core-v1\\causal-gold.json",
+      "sha256": "dfc8e96298689c0f8b0a7635203ad6fa69c9fe28e00c09ea5bf9d72942b43bdf"
+    },
+    {
+      "path": "versions\\v1\\evidence\\quranic-core-v1-report.json",
+      "sha256": "612ffe780c55dafbd3634127e8450d5966338c47b6b4c0301f1cdbac8e341edf"
+    },
+    {
+      "path": "versions\\v1\\modules\\pipeline\\pipe-quranic-text\\v1\\MODULE.md",
+      "sha256": "a42cd6f3b81399509d423f4c1cc64c3c54f0f60ec6bdb75b289a9060ae20d849"
+    },
+    {
+      "path": "versions\\v1\\modules\\services\\s0-quranic-causality\\v1\\MODULE.md",
+      "sha256": "f1b5c68542a40d665cec2c3ef5f438924c3222235120f364113a38ffda57c6c6"
+    },
+    {
+      "path": "versions\\v1\\modules\\tools\\t0-quranic-cli\\v1\\MODULE.md",
+      "sha256": "ab4a593187b4a43d966793735d51c6127f3f0c5cae82b878eb972c5af90c6e4c"
+    },
+    {
+      "path": "versions\\v1\\RELEASE.md",
+      "sha256": "3081afe155e51c683378089bdaeb3053358954661d0e3e5e84fe29882e983a8a"
+    },
+    {
+      "path": "versions\\v1\\VERSION-MANIFEST.json",
+      "sha256": "120d33f1358e427aa4166d48c607a855b2599c3e304ccba72b0bdb955906c1e2"
+    }
+  ],
+  "excluded": [
+    ".git",
+    ".vs",
+    "bin",
+    "obj",
+    "build",
+    "artifacts",
+    "publish",
+    "logs",
+    "caches",
+    "secrets",
+    "release_key.txt",
+    "encrypted model weights"
+  ]
+}

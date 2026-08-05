@@ -1,0 +1,20 @@
+{
+  "profiles": {
+    "Trace correction": {
+      "commandName": "Project",
+      "commandLineArgs": "trace --text \"كتبَ الطالبَ الدرسُ\""
+    },
+    "Correct sentence": {
+      "commandName": "Project",
+      "commandLineArgs": "correct --text \"كتبَ الطالبَ الدرسُ\""
+    },
+    "Explain interpretation": {
+      "commandName": "Project",
+      "commandLineArgs": "explain --text \"رأيتُ ليثًا أي أسدٌ\""
+    },
+    "Rewrite unvoweled": {
+      "commandName": "Project",
+      "commandLineArgs": "rewrite --text \"كتب الطالب الدرس قرأ المعلم الكتاب\""
+    }
+  }
+}

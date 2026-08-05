@@ -1,0 +1,14 @@
+{
+  "sourceRepository": "https://github.com/kaisdukes/quranic-corpus-api",
+  "commit": "17a9062416eccc332111ef3e84f74072d709e187",
+  "syntaxResource": "src/main/resources/data/syntax.txt",
+  "syntaxSha256": "9a9037b23c2d8309838171af1b1d4d99528a4f07f8298e97a9d7fa04ce952491",
+  "compactMorphologyResource": "src/main/resources/data/morphology.txt",
+  "compactMorphologySha256": "f1d3417be9aac22d54fff9ddc34db0818d7f490d836471a0d9163b3a2c11c065",
+  "graphCount": 7373,
+  "nodeCount": 70967,
+  "edgeCount": 45087,
+  "relationCatalogCoverage": 45,
+  "phraseTagCatalogCoverage": 6,
+  "licenseStatus": "No repository license is declared upstream; do not redistribute raw resources without separate confirmation."
+}

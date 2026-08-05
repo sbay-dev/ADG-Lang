@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "moduleId": "services.s1-grammar-corpus",
+  "version": "v4",
+  "layer": "services",
+  "purpose": "Derive deterministic non-normative grammar records and evidence-aware knowledge-root projections from typed contracts without embedding Quranic verse text.",
+  "sourceRef": {
+    "project": "src/Adg.QuranicTraining/Adg.QuranicTraining.csproj",
+    "paths": ["src/Adg.QuranicTraining"]
+  },
+  "sameVersionDependencies": ["services.s0-deterministic-grammar@v4"],
+  "invariants": [
+    "Every record binds the contract-set root and rule IDs.",
+    "Every current record uses split=research and normative=false.",
+    "No raw QAC row or Quranic verse text is emitted.",
+    "Observed lexical associations are Positive only when their source edge passes its contract.",
+    "Controlled invalid mutations are Negative; contradictory source evidence remains Unverified.",
+    "Every positive state and its mutations share one deterministic leakage group.",
+    "Reserved normative buckets never change the current research split.",
+    "Projection text, SHA-256 index keys, and shards are Data, not neural embeddings."
+  ],
+  "verification": [
+    "184 corpus records: 51 Positive and 133 controlled Negative",
+    "Corpus Merkle root da8eea61...df14",
+    "51 leakage groups covering 184 records with zero cross-split leakage",
+    "Split manifest root c39aeda6...f14e with byte-identical replay",
+    "8,001 knowledge-root records across 1,235 morphology roots",
+    "Knowledge polarity: 7,791 Positive, 133 Negative, 77 Unverified",
+    "Knowledge Merkle root 59fb1088...6dbf with 0 vectors",
+    "Byte-identical replay"
+  ],
+  "claimBoundary": "Derived Data artifact; not an authorized CNS training split."
+}

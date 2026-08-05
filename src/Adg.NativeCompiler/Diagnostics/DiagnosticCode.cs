@@ -1,0 +1,37 @@
+namespace Adg.NativeCompiler;
+
+internal enum DiagnosticCode
+{
+    Unknown = 0,
+    InvalidKeywordIrab,
+    UnknownArabicKeyword,
+    MixedSurfaceSyntax,
+    MissingTextDirectionHeader,
+    NonRtlTextDirection,
+    InvalidFaelCase,
+    InvalidMafulCase,
+    InvalidJarrOperand,
+    MissingConditionalConsequence,
+    ExplanationCaseMismatch,
+    MissingInterrogativeTarget,
+    MissingNegationTarget,
+    InvalidOperatorArity,
+    UnresolvedHiddenReference,
+    InvalidSemanticFrame,
+    InvalidParameterType,
+    UndefinedFunctionParameter,
+    ConditionRequiresNumber,
+    MissingFunctionBody,
+    UndefinedFunctionCall,
+    FunctionArityMismatch,
+    FunctionArgumentKindMismatch,
+    DuplicateFunctionName,
+    EmptyFunctionProgram,
+    SkeletonConservationViolation,
+    DuplicateLexiconEntry,
+    EmptyRefiner,
+    UndefinedRefinerApplication,
+    InvalidNormalizationRule,
+    EmptyRefinerProgram,
+    MultipleRefinerApplications
+}

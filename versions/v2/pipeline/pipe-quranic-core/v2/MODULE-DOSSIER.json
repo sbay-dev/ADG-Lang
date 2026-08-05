@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "moduleId": "pipeline.pipe-quranic-core",
+  "version": "v2",
+  "layer": "pipeline",
+  "purpose": "Preserve Quranic source spans, normalize analysis forms separately, segment bounded clitic candidates, and expose typed causal markers without changing source text.",
+  "sourceRef": {
+    "project": "src/Adg.QuranicCore/Adg.QuranicCore.csproj",
+    "paths": [
+      "src/Adg.QuranicCore/Models.cs",
+      "src/Adg.QuranicCore/QuranicCausalityAnalyzer.cs",
+      "src/Adg.QuranicCore/QuranicTextNormalizer.cs",
+      "src/Adg.QuranicCore/QuranicTokenizer.cs"
+    ]
+  },
+  "prerequisites": [
+    ".NET 10 SDK"
+  ],
+  "sameVersionDependencies": [],
+  "inputs": [
+    "UTF-16 .NET strings containing Quranic or natural Arabic text"
+  ],
+  "outputs": [
+    "Source-preserving QuranicDocument values",
+    "Normalized analysis forms",
+    "Bounded token and clitic candidates",
+    "Typed causal-analysis results"
+  ],
+  "invariants": [
+    "Source text and source spans are preserved separately from normalized analysis.",
+    "Causal edges are emitted only after their typed lexical and mood contracts pass.",
+    "Unsupported forms remain explicit diagnostics rather than inferred success."
+  ],
+  "determinism": {
+    "randomness": "none",
+    "networkAccess": "none",
+    "replayContract": "Identical input text and source snapshot produce identical ordered outputs and diagnostics."
+  },
+  "errorModel": {
+    "policy": "fail-closed",
+    "surfaces": [
+      "Unsupported causal marker",
+      "Invalid governed mood",
+      "Ambiguous or unrecognized token boundary"
+    ]
+  },
+  "performanceContract": {
+    "scope": "In-process deterministic text analysis",
+    "guarantee": "No asymptotic or latency guarantee is claimed in v2."
+  },
+  "auditSurfaces": [
+    "Source spans",
+    "Normalized forms",
+    "Token boundaries",
+    "Causal diagnostics"
+  ],
+  "securityAndPrivacy": [
+    "No network calls",
+    "No secrets",
+    "No persistent user-text storage"
+  ],
+  "limitations": [
+    "This module is not a statistical language model.",
+    "Its causal inventory is bounded and does not establish general causal reasoning."
+  ],
+  "verification": [
+    "Release solution build",
+    "Generated mutation and deterministic replay tests"
+  ]
+}

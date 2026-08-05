@@ -12,3 +12,11 @@ examples/apps/**/artifacts/
 *.o
 *.log
 *.tmp
+.copilot/
+THIRD_PARTY/quranic-arabic-corpus/raw/
+THIRD_PARTY/quranic-arabic-corpus/derived/
+THIRD_PARTY/ud-arabic-padt/raw/
+THIRD_PARTY/ud-arabic-padt/derived/
+**/quranic-corpus-morphology-0.4.txt
+**/ar_padt-ud-*.conllu
+**/ar_pud-ud-*.conllu

@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "moduleId": "tools.t1-release-manifest",
+  "version": "v2",
+  "layer": "tools",
+  "purpose": "Hash the active v2 source snapshot, module dossiers, release metadata, and sanitized evidence into a reproducible Merkle manifest.",
+  "sourceRef": {
+    "paths": [
+      "scripts/quranic-corpus/Write-QuranicGrammarV2Merkle.ps1"
+    ]
+  },
+  "prerequisites": [
+    "PowerShell 7 or later",
+    ".NET SHA-256 implementation"
+  ],
+  "sameVersionDependencies": [
+    "pipeline.pipe-quranic-core@v2",
+    "pipeline.pipe-qac-morphology@v2",
+    "services.s0-deterministic-grammar@v2",
+    "tools.t0-quranic-corpus-cli@v2"
+  ],
+  "inputs": [
+    "Active v2 source files",
+    "VERSION-MANIFEST.json",
+    "RELEASE.md",
+    "Module dossiers",
+    "Sanitized evidence summary"
+  ],
+  "outputs": [
+    "versions/v2/MERKLE-MANIFEST.json"
+  ],
+  "invariants": [
+    "MERKLE-MANIFEST.json is excluded from its own leaf set.",
+    "Line endings are normalized before content hashing.",
+    "All active module dossiers must declare version v2.",
+    "Artifact ordering is ordinal and stable."
+  ],
+  "determinism": {
+    "randomness": "none",
+    "networkAccess": "none",
+    "replayContract": "Unchanged source and release files reproduce the same artifact hashes and release Merkle root."
+  },
+  "errorModel": {
+    "policy": "fail-closed",
+    "surfaces": [
+      "Missing source path",
+      "Missing dossier",
+      "Mixed module version",
+      "Duplicate artifact path"
+    ]
+  },
+  "performanceContract": {
+    "scope": "Small source-release snapshot",
+    "guarantee": "No latency guarantee is claimed."
+  },
+  "auditSurfaces": [
+    "Per-artifact normalized SHA-256",
+    "Per-artifact descriptor digest",
+    "Release Merkle root"
+  ],
+  "securityAndPrivacy": [
+    "No network calls",
+    "No raw corpus files included",
+    "Only repository source and sanitized release evidence are hashed"
+  ],
+  "limitations": [
+    "The manifest binds the working-tree snapshot, not a clean signed Git commit."
+  ],
+  "verification": [
+    "Two consecutive generations must produce the same release Merkle root."
+  ]
+}

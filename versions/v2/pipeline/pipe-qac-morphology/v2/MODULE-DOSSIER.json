@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "moduleId": "pipeline.pipe-qac-morphology",
+  "version": "v2",
+  "layer": "pipeline",
+  "purpose": "Import, validate, normalize, resolve, and Merkle-bind Quranic Arabic Corpus v0.4 morphology without redistributing the corpus.",
+  "sourceRef": {
+    "project": "src/Adg.QuranicCorpus/Adg.QuranicCorpus.csproj",
+    "paths": [
+      "src/Adg.QuranicCorpus/ExtendedBuckwalter.cs",
+      "src/Adg.QuranicCorpus/QacAttribution.cs",
+      "src/Adg.QuranicCorpus/QacMerkle.cs",
+      "src/Adg.QuranicCorpus/QacModels.cs",
+      "src/Adg.QuranicCorpus/QacMorphologyCatalog.cs",
+      "src/Adg.QuranicCorpus/QacMorphologyImporter.cs",
+      "src/Adg.QuranicCorpus/QacMorphologyParser.cs",
+      "src/Adg.QuranicCorpus/QacMorphologyResolver.cs",
+      "src/Adg.QuranicCorpus/QacMorphologyVerifier.cs"
+    ]
+  },
+  "prerequisites": [
+    ".NET 10 SDK",
+    "A separately acquired QAC v0.4 morphology file",
+    "Compliance with THIRD_PARTY/quranic-arabic-corpus/LICENSE-DATA.txt"
+  ],
+  "sameVersionDependencies": [],
+  "inputs": [
+    "QAC v0.4 tabular morphology",
+    "Pinned catalog and feature contracts"
+  ],
+  "outputs": [
+    "Validated morphology records",
+    "Deterministically ordered normalized JSONL",
+    "Structural diagnostics",
+    "Record Merkle root"
+  ],
+  "invariants": [
+    "All observed tags and closed feature atoms must be recognized.",
+    "Location keys and segment ordering must be structurally valid.",
+    "Unknown closed features fail verification.",
+    "Dynamic lemma, root, and person values remain data rather than closed enums."
+  ],
+  "determinism": {
+    "randomness": "none",
+    "networkAccess": "none",
+    "replayContract": "Identical input bytes and module snapshot produce identical ordered records and Merkle root."
+  },
+  "errorModel": {
+    "policy": "fail-closed",
+    "surfaces": [
+      "Malformed row",
+      "Unknown tag or closed feature",
+      "Invalid location ordering",
+      "Input hash mismatch"
+    ]
+  },
+  "performanceContract": {
+    "verifiedScale": "128,219 segments, 77,429 words, 6,236 verses",
+    "guarantee": "Scale evidence is recorded; no latency guarantee is claimed."
+  },
+  "auditSurfaces": [
+    "Input SHA-256",
+    "Per-record normalized representation",
+    "Tag and feature counts",
+    "Record Merkle root"
+  ],
+  "securityAndPrivacy": [
+    "No network calls",
+    "No credentials",
+    "Raw licensed corpus data is not packaged in versions/v2"
+  ],
+  "limitations": [
+    "The current morphology input is a local mirror.",
+    "Hash comparison with the official email-gated QAC v0.4 acquisition remains open."
+  ],
+  "verification": [
+    "128,219 / 128,219 valid segments",
+    "Zero structural errors",
+    "Record Merkle root recorded in release evidence"
+  ]
+}

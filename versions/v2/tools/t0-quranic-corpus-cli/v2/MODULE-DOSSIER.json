@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "moduleId": "tools.t0-quranic-corpus-cli",
+  "version": "v2",
+  "layer": "tools",
+  "purpose": "Provide deterministic command-line entrypoints for morphology verification, syntax verification, Quran-wide evaluation, gold evaluation, property tests, natural-Arabic development evaluation, and artifact generation.",
+  "sourceRef": {
+    "project": "src/Adg.QuranicCorpus.Cli/Adg.QuranicCorpus.Cli.csproj",
+    "paths": [
+      "src/Adg.QuranicCorpus.Cli/Program.cs"
+    ]
+  },
+  "prerequisites": [
+    ".NET 10 SDK",
+    "Required external corpus files for the selected command"
+  ],
+  "sameVersionDependencies": [
+    "pipeline.pipe-qac-morphology@v2",
+    "services.s0-deterministic-grammar@v2"
+  ],
+  "inputs": [
+    "Command and explicit file paths",
+    "Optional report output path"
+  ],
+  "outputs": [
+    "Human-readable console summary",
+    "Deterministic JSON evidence report",
+    "Non-zero exit code when a commanded readiness or validity gate fails"
+  ],
+  "invariants": [
+    "Commands do not silently replace missing inputs.",
+    "Pinned verification commands reject hash mismatches.",
+    "A failed natural-Arabic readiness gate remains a failing evaluation even when structural safety passes."
+  ],
+  "determinism": {
+    "randomness": "none",
+    "networkAccess": "none",
+    "replayContract": "CLI output reports are deterministic for identical input bytes and source snapshot."
+  },
+  "errorModel": {
+    "policy": "explicit diagnostics and non-zero process exit",
+    "surfaces": [
+      "Missing file",
+      "Invalid option",
+      "Verification failure",
+      "Evaluation gate failure"
+    ]
+  },
+  "performanceContract": {
+    "scope": "Offline corpus evaluation and verification",
+    "guarantee": "No interactive latency guarantee is claimed."
+  },
+  "auditSurfaces": [
+    "Command arguments",
+    "Exit code",
+    "Report SHA-256",
+    "Report Merkle root"
+  ],
+  "securityAndPrivacy": [
+    "No network calls",
+    "No credential handling",
+    "Caller controls all input and output paths"
+  ],
+  "limitations": [
+    "The CLI is a research and verification interface, not a production service API."
+  ],
+  "verification": [
+    "Release solution build",
+    "All synchronized v2 evidence commands completed and persisted reports"
+  ]
+}

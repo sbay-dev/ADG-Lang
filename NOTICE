@@ -1,0 +1,34 @@
+Optional Quranic morphology and syntax data
+===========================================
+
+ADG-Lang can consume the Quranic Arabic Corpus morphology release v0.4.
+Source: https://corpus.quran.com
+
+The underlying Quran text is based on Tanzil Uthmani text v1.0.2.
+Source: https://tanzil.net
+
+The raw data is not bundled by default. Distributions that include it or a
+substantial derived artifact must also include:
+THIRD_PARTY\quranic-arabic-corpus\LICENSE-DATA.txt
+
+ADG-Lang can also verify the syntax resources published in the
+author-maintained Quranic Corpus API repository:
+https://github.com/kaisdukes/quranic-corpus-api
+
+That repository does not declare a repository license. Its raw syntax and
+compact morphology resources are not bundled or redistributed by ADG-Lang.
+
+Optional external natural-Arabic holdout
+========================================
+
+ADG-Lang can evaluate against pinned Universal Dependencies Arabic corpora:
+
+- Arabic-PADT development benchmark:
+  dfb6b4c547f1fe10f1857b39e44de3f86c47a2fe
+  License: CC BY-NC-SA 3.0
+- Arabic-PUD final holdout:
+  b5dbaa1fe386ae38d9b3c5f1de1b047d3cb31e0f
+  License: CC BY-SA 3.0
+
+The raw CoNLL-U corpora are not bundled. See:
+THIRD_PARTY\ud-arabic-padt\ATTRIBUTION.md

@@ -1,0 +1,80 @@
+name: Quranic parser independent research review
+description: Submit a sanitized reproduction or claim-boundary assessment.
+title: "[Quranic review]: "
+labels:
+  - research
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Read the independent handoff, reproduction guide, claim matrix, and review checklist first.
+        Do not upload raw corpora, credentials, private review material, local paths, or generated verse-level reports.
+
+  - type: input
+    id: commit
+    attributes:
+      label: Evaluated commit
+      description: Full Git commit SHA.
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Operating system, .NET SDK, PowerShell version, and relevant tool versions.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: executed
+    attributes:
+      label: Executed checks
+      options:
+        - label: Both release solutions built successfully.
+        - label: The 16-case causal corpus passed.
+        - label: The 325-case property suite passed.
+        - label: The v4 Merkle manifest reproduced without a diff.
+        - label: The public disclosure audit passed.
+        - label: Licensed external evidence was acquired directly from upstream.
+
+  - type: dropdown
+    id: tool_verdict
+    attributes:
+      label: Ordinary Tool/Data release assessment
+      options:
+        - PASS
+        - FAIL
+        - NOT RUN
+    validations:
+      required: true
+
+  - type: dropdown
+    id: research_verdict
+    attributes:
+      label: Quranic research approval assessment
+      options:
+        - NOT APPROVED
+        - APPROVED
+    validations:
+      required: true
+
+  - type: textarea
+    id: findings
+    attributes:
+      label: Findings and deviations
+      description: Provide minimal sanitized reproduction details for every mismatch or falsifying observation.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: boundaries
+    attributes:
+      label: Claim-boundary confirmation
+      options:
+        - label: I kept Valid, Invalid, and Unverified distinct.
+          required: true
+        - label: I did not interpret inventory completeness as complete Quranic grammar.
+          required: true
+        - label: I did not infer CNS Model, CGN, Genius, or normative-training authorization.
+          required: true

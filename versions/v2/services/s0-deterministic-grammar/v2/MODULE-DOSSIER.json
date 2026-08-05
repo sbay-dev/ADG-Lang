@@ -1,0 +1,100 @@
+{
+  "schemaVersion": 1,
+  "moduleId": "services.s0-deterministic-grammar",
+  "version": "v2",
+  "layer": "services",
+  "purpose": "Select bounded morphology candidates, construct deterministic dependency and phrase graphs, validate QAC-aligned contracts, and expose explicit Valid, Unverified, or Invalid evidence states.",
+  "sourceRef": {
+    "project": "src/Adg.QuranicGrammar/Adg.QuranicGrammar.csproj",
+    "paths": [
+      "src/Adg.QuranicGrammar/QacDeterministicGrammarParser.cs",
+      "src/Adg.QuranicGrammar/QacHeuristicMorphologyGuesser.cs",
+      "src/Adg.QuranicGrammar/QacLexiconArtifactWriter.cs",
+      "src/Adg.QuranicGrammar/QacMorphologyLexicon.cs",
+      "src/Adg.QuranicGrammar/QacMorphologyTextParser.cs",
+      "src/Adg.QuranicGrammar/QacQuranGrammarEvaluator.cs",
+      "src/Adg.QuranicGrammar/QacQuranMorphologyEvaluator.cs",
+      "src/Adg.QuranicGrammar/QacSyntaxGoldEvaluator.cs",
+      "src/Adg.QuranicGrammar/QacSyntaxPropertyTests.cs",
+      "src/Adg.QuranicGrammar/QacSyntaxSchema.cs",
+      "src/Adg.QuranicGrammar/QacSyntaxTreebank.cs",
+      "src/Adg.QuranicGrammar/QacVerseCorpus.cs",
+      "src/Adg.QuranicGrammar/UdArabicPadt.cs"
+    ]
+  },
+  "prerequisites": [
+    ".NET 10 SDK",
+    "Pinned QAC morphology and syntax inputs for corpus evaluations"
+  ],
+  "sameVersionDependencies": [
+    "pipeline.pipe-quranic-core@v2",
+    "pipeline.pipe-qac-morphology@v2"
+  ],
+  "inputs": [
+    "Quranic or natural Arabic text",
+    "QAC morphology lexicon",
+    "Optional QAC syntax or UD evaluation corpus"
+  ],
+  "outputs": [
+    "Deterministic dependency graph",
+    "Phrase intervals",
+    "Morphology selections with provenance",
+    "Validation diagnostics and evidence state",
+    "Evaluation metrics and Merkle roots"
+  ],
+  "invariants": [
+    "Dependency direction is dependent to head.",
+    "A dependent has at most one head.",
+    "Self edges, missing nodes, duplicate nodes, cycles, and invalid phrase intervals are rejected.",
+    "Heuristic morphology never becomes corpus-backed evidence.",
+    "Unsupported syntax remains Unverified or Invalid instead of being promoted to Valid."
+  ],
+  "determinism": {
+    "randomness": "none",
+    "networkAccess": "none",
+    "replayContract": "Identical text, corpora, and source snapshot produce identical ordered graphs, diagnostics, metrics, and Merkle roots."
+  },
+  "errorModel": {
+    "policy": "fail-closed at graph and evidence boundaries",
+    "surfaces": [
+      "Morphology ambiguity",
+      "Unknown lexical unit",
+      "Graph contract violation",
+      "Unproved core relation",
+      "Pinned-source mismatch"
+    ]
+  },
+  "performanceContract": {
+    "verifiedScale": "6,236 Quranic verses and 680 PADT development sentences",
+    "guarantee": "Corpus-scale completion is evidenced; no production latency or memory guarantee is claimed."
+  },
+  "auditSurfaces": [
+    "Selected morphology source",
+    "Ordered dependency edges",
+    "Phrase boundaries",
+    "Relation-level metrics",
+    "Diagnostic samples",
+    "Evaluation Merkle roots"
+  ],
+  "securityAndPrivacy": [
+    "No network calls",
+    "No secret material",
+    "No training or model-weight ingestion",
+    "External licensed corpora remain outside the release package"
+  ],
+  "limitations": [
+    "Conditional phrase generation is dependency-driven and high precision but remains low recall at F1 0.373333333.",
+    "Broader sentence, clause, nominal, and verbal spans remain incomplete.",
+    "364 Quranic verses remain explicitly Unverified.",
+    "PADT is development data and the natural-Arabic readiness gate fails.",
+    "The parser must not be bound to a Genius or CGN transition at this quality level."
+  ],
+  "verification": [
+    "160 / 160 generated property and mutation tests",
+    "Quran-wide 0 Invalid and 0 graph errors",
+    "Official comparable exact edge F1 0.904897904",
+    "Official comparable phrase F1 0.651096452",
+    "Conditional phrase precision 1.0 across 14 generated comparable spans",
+    "PADT development mapped dependency F1 0.408917501"
+  ]
+}

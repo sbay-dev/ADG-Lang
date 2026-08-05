@@ -27,3 +27,15 @@ Negative example, if applicable:
 ## Guardrail
 
 Do not attribute later detailed grammar to Abu al-Aswad unless the evidence level is clearly documented. Modern ADG compiler rules must be marked as operational inference or modern ADG design.
+
+## Quranic Research Reviews
+
+Quranic parser reviews must begin with
+`docs\research\quranic-core-v1\INDEPENDENT-RESEARCHER-HANDOFF.md` and use
+`INDEPENDENT-REVIEW-CHECKLIST.md`. A review must preserve `Valid`,
+`Invalid`, and `Unverified` as distinct states and must not convert complete
+inventory coverage into a claim of complete or approved Quranic grammar.
+
+Do not attach raw QAC or UD files, generated verse-level reports, private
+review transcripts, local paths, credentials, or model/runtime identifiers to
+issues or pull requests.

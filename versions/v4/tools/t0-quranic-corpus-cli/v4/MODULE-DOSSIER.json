@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "moduleId": "tools.t0-quranic-corpus-cli",
+  "version": "v4",
+  "layer": "tools",
+  "purpose": "Expose deterministic verification, relation, phrase, lexeme, and score-policy audits, evaluation, mutation, diacritization, contract, corpus, split-grouping, and knowledge-root commands.",
+  "sourceRef": {
+    "project": "src/Adg.QuranicCorpus.Cli/Adg.QuranicCorpus.Cli.csproj",
+    "paths": ["src/Adg.QuranicCorpus.Cli/Program.cs"]
+  },
+  "sameVersionDependencies": [
+    "pipeline.pipe-qac-morphology@v4",
+    "services.s0-deterministic-grammar@v4",
+    "services.s1-grammar-corpus@v4"
+  ],
+  "invariants": [
+    "Missing or invalid inputs produce explicit failure.",
+    "Evaluation gates return non-zero when their validity contract fails.",
+    "Audit output separates accepted and deferred evidence.",
+    "Lexeme audits fail when a registered parser collection lacks provenance policy.",
+    "Score-policy output binds every selection constant, rationale, beam bound, and tie-breaker.",
+    "Identical source and input bytes produce byte-identical reports."
+  ],
+  "verification": [
+    "All synchronized v4 evidence commands completed",
+    "All report and generated-artifact replay pairs matched"
+  ],
+  "claimBoundary": "Offline research and verification CLI; not a production service API."
+}
