@@ -220,6 +220,90 @@ h3 {
   margin: 1.7rem 0;
 }
 
+.share-control {
+  position: relative;
+}
+
+.share-control > summary {
+  list-style: none;
+}
+
+.share-control > summary::-webkit-details-marker {
+  display: none;
+}
+
+.share-control > summary::after {
+  content: "⌄";
+  font-size: 1rem;
+}
+
+.share-control[open] > summary::after {
+  transform: rotate(180deg);
+}
+
+.share-options {
+  position: absolute;
+  z-index: 20;
+  inset-block-start: calc(100% + .65rem);
+  inset-inline-start: 0;
+  display: grid;
+  width: min(340px, calc(100vw - 2rem));
+  gap: .5rem;
+  padding: 1rem;
+  border: 1px solid #d8e2dc;
+  border-radius: .9rem;
+  color: var(--green-950);
+  background: white;
+  box-shadow: 0 18px 45px rgba(6, 28, 20, .28);
+}
+
+.share-options::before {
+  content: "";
+  position: absolute;
+  inset-block-start: -.45rem;
+  inset-inline-start: 1.4rem;
+  width: .8rem;
+  height: .8rem;
+  border-top: 1px solid #d8e2dc;
+  border-left: 1px solid #d8e2dc;
+  background: white;
+  transform: rotate(45deg);
+}
+
+.share-options p {
+  margin-bottom: .2rem;
+  color: var(--muted-ink);
+  font-size: .84rem;
+}
+
+.share-options a,
+.share-options button {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  padding: .55rem .8rem;
+  border: 1px solid var(--line);
+  border-radius: .65rem;
+  color: var(--green-800);
+  background: #f7faf8;
+  text-decoration: none;
+  font-weight: 750;
+}
+
+.share-options a:hover,
+.share-options button:hover {
+  border-color: var(--green-650);
+  background: var(--green-100);
+}
+
+.share-options output {
+  min-height: 1.2rem;
+  color: var(--green-650);
+  font-size: .78rem;
+  text-align: center;
+}
+
 .button {
   display: inline-flex;
   min-height: 48px;
@@ -641,6 +725,45 @@ h3 {
 
 .form-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.social-accounts {
+  margin: 1.2rem 0 0;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  background: #f8fbf9;
+}
+
+.social-accounts legend {
+  padding: 0 .45rem;
+  color: var(--green-800);
+  font-size: 1.02rem;
+  font-weight: 800;
+}
+
+.social-accounts > p {
+  max-width: 850px;
+  margin-bottom: 1rem;
+  color: var(--muted-ink);
+  font-size: .86rem;
+}
+
+.social-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .8rem;
+}
+
+.social-grid label {
+  display: grid;
+  gap: .35rem;
+  font-size: .86rem;
+  font-weight: 700;
+}
+
+.social-grid input {
+  min-width: 0;
 }
 
 .form-grid label,
@@ -1137,8 +1260,19 @@ footer {
   .criteria-grid,
   .timeline,
   .form-grid,
+  .social-grid,
   .sentence-flags {
     grid-template-columns: 1fr;
+  }
+
+  .share-control,
+  .share-control > summary {
+    width: 100%;
+  }
+
+  .share-options {
+    inset-inline-start: auto;
+    inset-inline-end: 0;
   }
 
   .steps {

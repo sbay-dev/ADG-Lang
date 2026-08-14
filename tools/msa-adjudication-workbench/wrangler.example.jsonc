@@ -3,7 +3,8 @@
   "name": "adg-msa-adjudication",
   "main": "src/index.js",
   "compatibility_date": "2026-08-14",
-  "workers_dev": true,
+  "workers_dev": false,
+  "preview_urls": false,
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",
@@ -18,8 +19,18 @@
       "migrations_dir": "migrations"
     }
   ],
+  "routes": [
+    {
+      "pattern": "adg.sbay.sa",
+      "custom_domain": true
+    },
+    {
+      "pattern": "ads.sbay.sa",
+      "custom_domain": true
+    }
+  ],
   "vars": {
-    "ALLOWED_ORIGIN": "https://your-domain.example",
+    "ALLOWED_ORIGIN": "https://adg.sbay.sa",
     "SUBMISSION_ENABLED": "false",
     "MAX_SUBMISSION_BYTES": "900000",
     "TURNSTILE_SITE_KEY": "",

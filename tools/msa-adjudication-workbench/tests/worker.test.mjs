@@ -6,12 +6,13 @@ import worker, {
   base64UrlToBytes,
   calculateDraftProgress,
   decryptEntityCryptForTest,
-  encryptEntityCrypt
+  encryptEntityCrypt,
+  validateAccountProfile
 } from "../src/index.js";
 
 test("config exposes no server secrets", async () => {
   const response = await worker.fetch(
-    new Request("https://ads.sbay.sa/api/config"),
+    new Request("https://adg.sbay.sa/api/config"),
     {
       SUBMISSION_ENABLED: "false",
       MAX_SUBMISSION_BYTES: "900000",
@@ -65,8 +66,61 @@ test("draft progress follows the enabled linguistic controls", () => {
 
 test("admin callback uses the registered Microsoft redirect path", () => {
   assert.equal(
-    adminCallbackUri({ ALLOWED_ORIGIN: "https://ads.sbay.sa" }),
-    "https://ads.sbay.sa/signin-microsoft"
+    adminCallbackUri({ ALLOWED_ORIGIN: "https://adg.sbay.sa" }),
+    "https://adg.sbay.sa/signin-microsoft"
+  );
+});
+
+test("legacy ADS links redirect to the canonical ADG domain", async () => {
+  const response = await worker.fetch(
+    new Request("https://ads.sbay.sa/admin/?from=old"),
+    { ALLOWED_ORIGIN: "https://adg.sbay.sa" }
+  );
+  assert.equal(response.status, 308);
+  assert.equal(
+    response.headers.get("location"),
+    "https://adg.sbay.sa/admin/?from=old"
+  );
+});
+
+test("social usernames are normalized without collecting a phone number", () => {
+  assert.deepEqual(
+    validateAccountProfile({
+      fullName: "محكّم تجريبي",
+      email: "JUDGE@example.test",
+      experienceYears: 12,
+      specialization: "grammar",
+      affiliation: null,
+      socialAccounts: {
+        whatsapp: "@judge_2026",
+        x: "@ArabicJudge",
+        otherPlatform: "منصة علمية",
+        otherUsername: "@judge"
+      }
+    }),
+    {
+      fullName: "محكّم تجريبي",
+      email: "judge@example.test",
+      experienceYears: 12,
+      specialization: "grammar",
+      affiliation: null,
+      socialAccounts: {
+        whatsapp: "judge_2026",
+        x: "ArabicJudge",
+        otherUsername: "judge",
+        otherPlatform: "منصة علمية"
+      }
+    }
+  );
+  assert.throws(
+    () => validateAccountProfile({
+      fullName: "محكّم تجريبي",
+      email: "judge@example.test",
+      experienceYears: 12,
+      specialization: "grammar",
+      socialAccounts: { whatsapp: "123456" }
+    }),
+    /واتساب/
   );
 });
 
@@ -79,7 +133,7 @@ test("WebAuthn base64url values round-trip without padding", () => {
 
 test("admin identity is anonymous without an admin cookie", async () => {
   const response = await worker.fetch(
-    new Request("https://ads.sbay.sa/api/admin/auth/me"),
+    new Request("https://adg.sbay.sa/api/admin/auth/me"),
     {
       DB: {},
       ENTRA_TENANT_ID: "tenant",
@@ -96,7 +150,7 @@ test("admin identity is anonymous without an admin cookie", async () => {
 
 test("admin progress fails closed without an admin cookie", async () => {
   const response = await worker.fetch(
-    new Request("https://ads.sbay.sa/api/admin/progress"),
+    new Request("https://adg.sbay.sa/api/admin/progress"),
     {
       DB: {},
       ENTRA_TENANT_ID: "tenant",
@@ -109,7 +163,7 @@ test("admin progress fails closed without an admin cookie", async () => {
 
 test("foreign origins are rejected before processing", async () => {
   const response = await worker.fetch(
-    new Request("https://ads.sbay.sa/api/submissions", {
+    new Request("https://adg.sbay.sa/api/submissions", {
       method: "POST",
       headers: {
         origin: "https://evil.example",
@@ -118,7 +172,7 @@ test("foreign origins are rejected before processing", async () => {
       body: "{}"
     }),
     {
-      ALLOWED_ORIGIN: "https://ads.sbay.sa",
+      ALLOWED_ORIGIN: "https://adg.sbay.sa",
       SUBMISSION_ENABLED: "true"
     }
   );
@@ -127,7 +181,7 @@ test("foreign origins are rejected before processing", async () => {
 
 test("static responses receive restrictive headers", async () => {
   const response = await worker.fetch(
-    new Request("https://ads.sbay.sa/"),
+    new Request("https://adg.sbay.sa/"),
     {
       ASSETS: {
         fetch: async () => new Response("<h1>ok</h1>", {
@@ -147,7 +201,8 @@ test("static responses receive restrictive headers", async () => {
 test("EntityCrypt Matryoshka profile encrypts identities with AES-GCM", async () => {
   const plainText = JSON.stringify({
     fullName: "محكّم تجريبي",
-    email: "judge@example.test"
+    email: "judge@example.test",
+    socialAccounts: { whatsapp: "judge_2026" }
   });
   const masterKey = "test-master-key-with-sufficient-entropy";
   const first = await encryptEntityCrypt(plainText, masterKey);

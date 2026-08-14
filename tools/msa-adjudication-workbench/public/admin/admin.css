@@ -206,6 +206,24 @@
   font-size: .83rem;
 }
 
+.social-handles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .25rem .4rem;
+  margin-top: .4rem;
+}
+
+.participant-name .social-handles a,
+.participant-name .social-handles span {
+  display: inline-flex;
+  padding: .15rem .4rem;
+  border-radius: .45rem;
+  color: var(--green-800);
+  background: var(--green-100);
+  font-size: .72rem;
+  text-decoration: none;
+}
+
 .participant-name span,
 .assignment small,
 .muted {

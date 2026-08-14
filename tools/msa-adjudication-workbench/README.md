@@ -1,8 +1,12 @@
 # Arabic Adjudication Studio (ADS)
 
-`ads.sbay.sa` is the Arabic-first human adjudication portal for ADG-Lang. It is
+`adg.sbay.sa` is the Arabic-first human adjudication portal for ADG-Lang. It is
 designed for experienced Arabic teachers who should not need GitHub, JSON, or
 command-line knowledge.
+
+The previous `ads.sbay.sa` address redirects to the canonical domain so old
+invitations remain usable. The public page includes ready-made WhatsApp and
+X/Twitter invitation actions.
 
 ## User workflow
 
@@ -26,6 +30,8 @@ organization member has authoritative Global Administrator proof.
 - Parser predictions are never displayed.
 - Packet and submission roots are recomputed in the browser and in .NET.
 - Azure stores identity separately from linguistic evidence.
+- Optional social usernames, including the WhatsApp username rather than a
+  phone number, remain encrypted with the private identity record.
 - GitHub receives only a pseudonymous, HMAC-signed envelope.
 - Cloudflare Turnstile and same-origin checks protect the public endpoint.
 - D1 stores opaque account identifiers, Passkey public keys and counters,

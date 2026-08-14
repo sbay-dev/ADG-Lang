@@ -46,6 +46,23 @@
             <a class="button secondary"
                href="https://github.com/sbay-dev/ADG-Lang"
                target="_blank" rel="noreferrer">صفحة المشروع</a>
+            <details class="share-control">
+              <summary class="button secondary">شارك الدعوة</summary>
+              <div class="share-options">
+                <p>
+                  أرسل دعوة جاهزة إلى معلم لغة عربية أو خبير تثق
+                  بخبرته.
+                </p>
+                <a id="share-whatsapp" href="#" target="_blank"
+                   rel="noopener noreferrer">مشاركة عبر واتساب</a>
+                <a id="share-x" href="#" target="_blank"
+                   rel="noopener noreferrer">مشاركة عبر X / تويتر</a>
+                <button id="copy-invitation" type="button">
+                  نسخ نص الدعوة
+                </button>
+                <output id="share-status" aria-live="polite"></output>
+              </div>
+            </details>
           </div>
           <ul class="trust-list" aria-label="ضمانات المنصة">
             <li>تحكيم أعمى بلا توقعات مسبقة</li>
@@ -152,7 +169,8 @@
             <summary>ما الذي لا يدخل التقييم؟</summary>
             <p>
               لا تُعرض نتائج البارسر، ولا تستخدم PADT أو PUD كعينة نهائية،
-              ولا يُنشر اسم المحكّم أو بريده أو هاتفه في المستودع.
+              ولا يُنشر اسم المحكّم أو بريده أو حساباته التواصلية في
+              المستودع.
             </p>
           </details>
         </div>
@@ -243,12 +261,6 @@
                          autocomplete="email" maxlength="160" required>
                 </label>
                 <label>
-                  رقم الهاتف مع رمز الدولة
-                  <input id="phone" name="phone" type="tel"
-                         autocomplete="tel" maxlength="32"
-                         placeholder="+966…" required>
-                </label>
-                <label>
                   سنوات الخبرة في تعليم العربية
                   <input id="experience-years" name="experienceYears"
                          type="number" min="0" max="80" required>
@@ -270,12 +282,100 @@
                   <input id="affiliation" name="affiliation" maxlength="160">
                 </label>
               </div>
+              <fieldset class="social-accounts">
+                <legend>حسابات التواصل الاجتماعي <small>(اختيارية)</small></legend>
+                <p>
+                  اكتب اسم المستخدم من دون علامة @. لا نطلب رقم هاتف؛
+                  وفي واتساب نستخدم خاصية اسم المستخدم الجديدة فقط.
+                  اترك أي منصة لا تستخدمها فارغة.
+                </p>
+                <div class="social-grid">
+                  <label>
+                    اسم مستخدم واتساب
+                    <input id="social-whatsapp" maxlength="35" dir="ltr"
+                           autocomplete="off" autocapitalize="none"
+                           spellcheck="false" placeholder="username">
+                  </label>
+                  <label>
+                    X / تويتر
+                    <input id="social-x" maxlength="80" dir="ltr"
+                           autocomplete="off" autocapitalize="none"
+                           spellcheck="false" placeholder="username">
+                  </label>
+                  <label>
+                    TikTok
+                    <input id="social-tiktok" maxlength="80" dir="ltr"
+                           autocomplete="off" autocapitalize="none"
+                           spellcheck="false" placeholder="username">
+                  </label>
+                  <label>
+                    Instagram
+                    <input id="social-instagram" maxlength="80" dir="ltr"
+                           autocomplete="off" autocapitalize="none"
+                           spellcheck="false" placeholder="username">
+                  </label>
+                  <label>
+                    Threads
+                    <input id="social-threads" maxlength="80" dir="ltr"
+                           autocomplete="off" autocapitalize="none"
+                           spellcheck="false" placeholder="username">
+                  </label>
+                  <label>
+                    Telegram
+                    <input id="social-telegram" maxlength="80" dir="ltr"
+                           autocomplete="off" autocapitalize="none"
+                           spellcheck="false" placeholder="username">
+                  </label>
+                  <label>
+                    Snapchat
+                    <input id="social-snapchat" maxlength="80" dir="ltr"
+                           autocomplete="off" autocapitalize="none"
+                           spellcheck="false" placeholder="username">
+                  </label>
+                  <label>
+                    Facebook
+                    <input id="social-facebook" maxlength="80" dir="ltr"
+                           autocomplete="off" autocapitalize="none"
+                           spellcheck="false" placeholder="username">
+                  </label>
+                  <label>
+                    LinkedIn
+                    <input id="social-linkedin" maxlength="80" dir="ltr"
+                           autocomplete="off" autocapitalize="none"
+                           spellcheck="false" placeholder="username">
+                  </label>
+                  <label>
+                    YouTube
+                    <input id="social-youtube" maxlength="80" dir="ltr"
+                           autocomplete="off" autocapitalize="none"
+                           spellcheck="false" placeholder="username">
+                  </label>
+                  <label>
+                    Bluesky
+                    <input id="social-bluesky" maxlength="80" dir="ltr"
+                           autocomplete="off" autocapitalize="none"
+                           spellcheck="false" placeholder="username.bsky.social">
+                  </label>
+                  <label>
+                    منصة أخرى
+                    <input id="social-other-platform" maxlength="40"
+                           autocomplete="off" placeholder="اسم المنصة">
+                  </label>
+                  <label>
+                    اسم المستخدم في المنصة الأخرى
+                    <input id="social-other-username" maxlength="80" dir="ltr"
+                           autocomplete="off" autocapitalize="none"
+                           spellcheck="false" placeholder="username">
+                  </label>
+                </div>
+              </fieldset>
               <div class="consent-box">
                 <label class="check-row">
                   <input id="privacy-consent" type="checkbox" required>
                   <span>
                     أوافق على حفظ بيانات التواصل في مخزن خاص لغرض توثيق
-                    المشاركة والتواصل بشأن هذا التقييم.
+                    المشاركة والتواصل بشأن هذا التقييم، بما فيها أسماء
+                    المستخدم التي أختار إضافتها.
                   </span>
                 </label>
                 <label class="check-row">
@@ -284,7 +384,7 @@
                 </label>
                 <p>
                   تُحفظ الهوية منفصلة عن النتيجة، ويصل إلى GitHub معرف
-                  عشوائي لا يكشف اسمك أو بريدك أو هاتفك.
+                  عشوائي لا يكشف اسمك أو بريدك أو حساباتك التواصلية.
                 </p>
               </div>
             </section>

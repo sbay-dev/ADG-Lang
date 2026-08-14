@@ -41,14 +41,16 @@ This public repository is the official community-facing language repository for:
 Arabic teachers and linguists can evaluate the parser without GitHub or
 command-line knowledge at:
 
-**https://ads.sbay.sa**
+**https://adg.sbay.sa**
 
 The Arabic-first portal explains every criterion, hides parser predictions,
 keeps participant identity encrypted outside GitHub, and is designed to import
 only signed, pseudonymous linguistic evidence through a review pull request.
-Passkey accounts and encrypted draft resumption are live; central submission
-remains disabled until the import workflow is merged and revalidated. Its
-source and security model are under `tools\msa-adjudication-workbench`.
+Passkey accounts, encrypted draft resumption, optional private social
+usernames, and central submission are live. Ready-made WhatsApp and X/Twitter
+buttons help invite other experts. Every submitted artifact still enters the
+repository through an automated validation and review pull request. Its source
+and security model are under `tools\msa-adjudication-workbench`.
 
 ## Start Here
 
