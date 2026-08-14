@@ -1,0 +1,151 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: adg-postgres-default-deny
+  namespace: adg-data-plane
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: adg-postgres-ingress
+  namespace: adg-data-plane
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: adg-cpoly-postgres
+      app.kubernetes.io/component: database
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchExpressions:
+              - key: cpoly.sbay.sa/network-client
+                operator: In
+                values: [portal-backup, walg-backup, migration]
+      ports:
+        - protocol: TCP
+          port: 5432
+    - from:
+        - ipBlock: { cidr: 173.245.48.0/20 }
+        - ipBlock: { cidr: 103.21.244.0/22 }
+        - ipBlock: { cidr: 103.22.200.0/22 }
+        - ipBlock: { cidr: 103.31.4.0/22 }
+        - ipBlock: { cidr: 141.101.64.0/18 }
+        - ipBlock: { cidr: 108.162.192.0/18 }
+        - ipBlock: { cidr: 190.93.240.0/20 }
+        - ipBlock: { cidr: 188.114.96.0/20 }
+        - ipBlock: { cidr: 197.234.240.0/22 }
+        - ipBlock: { cidr: 198.41.128.0/17 }
+        - ipBlock: { cidr: 162.158.0.0/15 }
+        - ipBlock: { cidr: 104.16.0.0/13 }
+        - ipBlock: { cidr: 104.24.0.0/14 }
+        - ipBlock: { cidr: 172.64.0.0/13 }
+        - ipBlock: { cidr: 131.0.72.0/22 }
+        - ipBlock: { cidr: 2400:cb00::/32 }
+        - ipBlock: { cidr: 2606:4700::/32 }
+        - ipBlock: { cidr: 2803:f800::/32 }
+        - ipBlock: { cidr: 2405:b500::/32 }
+        - ipBlock: { cidr: 2405:8100::/32 }
+        - ipBlock: { cidr: 2a06:98c0::/29 }
+        - ipBlock: { cidr: 2c0f:f248::/32 }
+      ports:
+        - protocol: TCP
+          port: 5432
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: adg-postgres-operations-egress
+  namespace: adg-data-plane
+spec:
+  podSelector:
+    matchExpressions:
+      - key: cpoly.sbay.sa/network-client
+        operator: In
+        values: [portal-backup, walg-backup, migration]
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: adg-cpoly-postgres
+              app.kubernetes.io/component: database
+      ports:
+        - protocol: TCP
+          port: 5432
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: adg-postgres-portal-backup-https
+  namespace: adg-data-plane
+spec:
+  podSelector:
+    matchLabels:
+      cpoly.sbay.sa/network-client: portal-backup
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock: { cidr: 173.245.48.0/20 }
+        - ipBlock: { cidr: 103.21.244.0/22 }
+        - ipBlock: { cidr: 103.22.200.0/22 }
+        - ipBlock: { cidr: 103.31.4.0/22 }
+        - ipBlock: { cidr: 141.101.64.0/18 }
+        - ipBlock: { cidr: 108.162.192.0/18 }
+        - ipBlock: { cidr: 190.93.240.0/20 }
+        - ipBlock: { cidr: 188.114.96.0/20 }
+        - ipBlock: { cidr: 197.234.240.0/22 }
+        - ipBlock: { cidr: 198.41.128.0/17 }
+        - ipBlock: { cidr: 162.158.0.0/15 }
+        - ipBlock: { cidr: 104.16.0.0/13 }
+        - ipBlock: { cidr: 104.24.0.0/14 }
+        - ipBlock: { cidr: 172.64.0.0/13 }
+        - ipBlock: { cidr: 131.0.72.0/22 }
+        - ipBlock: { cidr: 2400:cb00::/32 }
+        - ipBlock: { cidr: 2606:4700::/32 }
+        - ipBlock: { cidr: 2803:f800::/32 }
+        - ipBlock: { cidr: 2405:b500::/32 }
+        - ipBlock: { cidr: 2405:8100::/32 }
+        - ipBlock: { cidr: 2a06:98c0::/29 }
+        - ipBlock: { cidr: 2c0f:f248::/32 }
+      ports:
+        - protocol: TCP
+          port: 443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: adg-postgres-optional-walg-https
+  namespace: adg-data-plane
+spec:
+  podSelector:
+    matchLabels:
+      cpoly.sbay.sa/network-client: walg-backup
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+        - ipBlock:
+            cidr: ::/0
+      ports:
+        - protocol: TCP
+          port: 443

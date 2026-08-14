@@ -1,0 +1,62 @@
+{
+  "$schema": "./cpoly-adg-postgres.schema.json",
+  "schema": "cpoly.adg.postgres.v1",
+  "id": "adg-msa-adjudication-postgres",
+  "selectedProductionVariant": "cloudflare-container",
+  "derivedFrom": {
+    "standard": "cpoly.package.standard.v1",
+    "kubernetes": "cpoly.package.kubernetes.v1",
+    "referencePackage": "CpolyServerPackages/packages/postgres"
+  },
+  "productionBoundary": {
+    "publicApplication": "cloudflare-workers",
+    "databaseAccess": "hyperdrive-direct-postgresql-tls",
+    "mailPath": "cloudflare-workers-graph",
+    "forbidden": [
+      "workstation-production-runtime",
+      "local-api",
+      "local-storage",
+      "local-mail",
+      "local-scheduler",
+      "local-database",
+      "postgresserver-rest-grpc-sql-proxy"
+    ]
+  },
+  "origin": {
+    "engine": "postgresql",
+    "majorVersion": 16,
+    "image": "postgres:16-bookworm@sha256:60f4761b9035e0b8d5218f701a8c3382f641bf12b1604822574cf5be3baeb537",
+    "transport": "postgresql-wire-protocol",
+    "tlsMode": "verify-full"
+  },
+  "variants": {
+    "standard": {
+      "contract": "../standard/package.cpoly.json",
+      "dataPlane": "remote-container-host",
+      "alwaysOn": true,
+      "localProductionEligible": false,
+      "productionSelected": false
+    },
+    "kubernetes": {
+      "contract": "../kubernetes/package.kubernetes.cpoly.json",
+      "dataPlane": "external-kubernetes-cluster",
+      "alwaysOn": true,
+      "localProductionEligible": false,
+      "productionSelected": false
+    },
+    "cloudflare": {
+      "contract": "../cloudflare/package.cloudflare.cpoly.json",
+      "dataPlane": "cloudflare-container",
+      "alwaysOn": true,
+      "localProductionEligible": false,
+      "productionSelected": true
+    }
+  },
+  "claims": {
+    "availability": "single-primary-not-ha",
+    "durability": "worker-kv-d1-recovery-backed-ephemeral-pgdata",
+    "backup": "worker-kv-signed-pg-dump-custom-primary-with-optional-gpg-and-wal-g",
+    "pitr": "not-claimed",
+    "cloudflareContainer": "selected-production-ephemeral-postgres-runtime"
+  }
+}

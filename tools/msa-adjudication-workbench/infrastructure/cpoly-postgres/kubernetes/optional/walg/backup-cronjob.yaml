@@ -1,0 +1,109 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: adg-postgres-walg-backup
+  namespace: adg-data-plane
+  labels:
+    app.kubernetes.io/name: adg-cpoly-postgres
+    app.kubernetes.io/component: backup
+    cpoly.sbay.sa/backup-destination: optional-s3
+spec:
+  schedule: "47 3 * * *"
+  timeZone: Etc/UTC
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 1800
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 14400
+      ttlSecondsAfterFinished: 604800
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: adg-cpoly-postgres
+            app.kubernetes.io/component: backup
+            cpoly.sbay.sa/network-client: walg-backup
+            cpoly.sbay.sa/backup-destination: optional-s3
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 999
+            runAsGroup: 999
+            fsGroup: 999
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: wal-g
+              image: chekkan/wal-g:v3.0.7@sha256:a0bb7869eb7777aded6f5e51f22a4730a9f481485ee7225a3b75fa39f5d15c4b
+              imagePullPolicy: IfNotPresent
+              command:
+                - /bin/sh
+                - /opt/cpoly/scripts/walg-backup.sh
+              envFrom:
+                - configMapRef:
+                    name: adg-postgres-walg-settings
+              env:
+                - name: PGHOST
+                  value: adg-postgres-headless.adg-data-plane.svc.cluster.local
+                - name: PGPORT
+                  value: "5432"
+                - name: PGDATABASE
+                  value: postgres
+                - name: PGUSER
+                  value: adg_backup
+                - name: PGSSLMODE
+                  value: verify-full
+                - name: PGSSLROOTCERT
+                  value: /run/secrets/tls/postgres-ca.crt
+              resources:
+                requests:
+                  cpu: 250m
+                  memory: 256Mi
+                limits:
+                  cpu: "1"
+                  memory: 1Gi
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: [ALL]
+              volumeMounts:
+                - name: scripts
+                  mountPath: /opt/cpoly/scripts
+                  readOnly: true
+                - name: role-secrets
+                  mountPath: /run/secrets/roles
+                  readOnly: true
+                - name: tls-secrets
+                  mountPath: /run/secrets/tls
+                  readOnly: true
+                - name: backup-secrets
+                  mountPath: /run/secrets/backup
+                  readOnly: true
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: scripts
+              configMap:
+                name: adg-postgres-scripts
+                defaultMode: 0555
+            - name: role-secrets
+              secret:
+                secretName: adg-postgres-role-secrets
+                defaultMode: 0440
+            - name: tls-secrets
+              secret:
+                secretName: adg-postgres-server-tls
+                defaultMode: 0440
+            - name: backup-secrets
+              secret:
+                secretName: adg-postgres-backup-secrets
+                defaultMode: 0440
+            - name: tmp
+              emptyDir:
+                medium: Memory
+                sizeLimit: 64Mi
+

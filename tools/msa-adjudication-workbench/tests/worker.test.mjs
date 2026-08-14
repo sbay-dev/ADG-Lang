@@ -7,6 +7,7 @@ import worker, {
   calculateDraftProgress,
   decryptEntityCryptForTest,
   encryptEntityCrypt,
+  validateAccountConsent,
   validateAccountProfile
 } from "../src/index.js";
 
@@ -17,7 +18,13 @@ test("config exposes no server secrets", async () => {
       SUBMISSION_ENABLED: "false",
       MAX_SUBMISSION_BYTES: "900000",
       TURNSTILE_SITE_KEY: "public-site-key",
-      GITHUB_REPOSITORY: "sbay-dev/ADG-Lang"
+      GITHUB_REPOSITORY: "sbay-dev/ADG-Lang",
+      CPOLY_BACKUP_BASE_URL: "https://adg.sbay.sa",
+      ADG_MIGRATOR_PASSWORD: "migrator-secret",
+      ADG_RUNTIME_PASSWORD: "runtime-secret",
+      ADG_BACKUP_PASSWORD: "backup-secret",
+      POSTGRES_SUPERUSER_PASSWORD: "superuser-secret",
+      CPOLY_POSTGRES_INTERNAL_TOKEN: "container-secret"
     }
   );
   assert.equal(response.status, 200);
@@ -27,9 +34,56 @@ test("config exposes no server secrets", async () => {
     maxSubmissionBytes: 900000,
     turnstileSiteKey: "public-site-key",
     repository: "sbay-dev/ADG-Lang",
-    accountEnabled: false
+    accountEnabled: false,
+    emailVerificationEnabled: false
   });
   assert.equal(JSON.stringify(value).includes("SECRET"), false);
+  assert.equal(JSON.stringify(value).includes("migrator-secret"), false);
+  assert.equal(JSON.stringify(value).includes("runtime-secret"), false);
+  assert.equal(JSON.stringify(value).includes("backup-secret"), false);
+  assert.equal(JSON.stringify(value).includes("superuser-secret"), false);
+  assert.equal(JSON.stringify(value).includes("container-secret"), false);
+});
+
+test("config enables email verification with the complete Azure rollback path", async () => {
+  const response = await worker.fetch(
+    new Request("https://adg.sbay.sa/api/config"),
+    {
+      DB: {},
+      EMAIL_VERIFICATION_ENABLED: "true",
+      ACS_EMAIL_ENDPOINT: "https://example.communication.azure.com",
+      ACS_EMAIL_SENDER_ADDRESS: "notifications@adg.sbay.sa",
+      AZURE_TENANT_ID: "tenant",
+      AZURE_CLIENT_ID: "client",
+      AZURE_CLIENT_SECRET: "server-secret",
+      AZURE_KEY_VAULT_URL: "https://vault.example",
+      EMAIL_VERIFICATION_HMAC_SECRET_NAME: "email-hmac"
+    }
+  );
+  const value = await response.json();
+  assert.equal(value.accountEnabled, true);
+  assert.equal(value.emailVerificationEnabled, true);
+  assert.equal(JSON.stringify(value).includes("server-secret"), false);
+});
+
+test("config enables email verification with Graph mail and direct Worker secrets", async () => {
+  const response = await worker.fetch(
+    new Request("https://adg.sbay.sa/api/config"),
+    {
+      DB: {},
+      EMAIL_VERIFICATION_ENABLED: "true",
+      EMAIL_VERIFICATION_HMAC_SECRET_NAME: "email-hmac",
+      EMAIL_VERIFICATION_HMAC_KEY: "direct-email-hmac",
+      MAILER_TENANT_ID: "tenant",
+      MAILER_CLIENT_ID: "client",
+      MAILER_CLIENT_SECRET: "mailer-secret",
+      MAILER_SENDER_ADDRESS: "notifications@adg.sbay.sa"
+    }
+  );
+  const value = await response.json();
+  assert.equal(value.accountEnabled, true);
+  assert.equal(value.emailVerificationEnabled, true);
+  assert.equal(JSON.stringify(value).includes("mailer-secret"), false);
 });
 
 test("draft progress follows the enabled linguistic controls", () => {
@@ -121,6 +175,29 @@ test("social usernames are normalized without collecting a phone number", () => 
       socialAccounts: { whatsapp: "123456" }
     }),
     /واتساب/
+  );
+});
+
+test("discussion email requires an explicit independent preference", () => {
+  assert.deepEqual(
+    validateAccountConsent({
+      identityStorage: true,
+      futureContact: true,
+      discussionNotifications: true
+    }),
+    {
+      identityStorage: true,
+      futureContact: true,
+      discussionNotifications: true
+    }
+  );
+  assert.deepEqual(
+    validateAccountConsent({ identityStorage: true }),
+    {
+      identityStorage: true,
+      futureContact: false,
+      discussionNotifications: false
+    }
   );
 });
 

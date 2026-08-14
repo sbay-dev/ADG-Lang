@@ -135,6 +135,61 @@
         <output id="dashboard-status" class="status"
                 aria-live="polite"></output>
       </section>
+
+      <section class="participants-panel">
+        <div class="participants-toolbar">
+          <div>
+            <h2>حوكمة الإجماع</h2>
+            <p>
+              حالات المهام والاستئنافات والتعليقات المجهّلة. كل إجراء
+              إداري يسجل في سجل تدقيق خاص.
+            </p>
+          </div>
+        </div>
+        <h3>المهام</h3>
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>المهمة</th>
+                <th>الحالة</th>
+                <th>الجولة</th>
+                <th>المستودع</th>
+                <th>إجراء</th>
+              </tr>
+            </thead>
+            <tbody id="governance-tasks-body"></tbody>
+          </table>
+        </div>
+
+        <h3>الاستئنافات</h3>
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>المهمة والدليل</th>
+                <th>الحالة</th>
+                <th>القرار المعلّل</th>
+              </tr>
+            </thead>
+            <tbody id="governance-appeals-body"></tbody>
+          </table>
+        </div>
+
+        <h3>إشراف النقاش</h3>
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>التعليق</th>
+                <th>الحالة</th>
+                <th>إجراء الإشراف</th>
+              </tr>
+            </thead>
+            <tbody id="governance-comments-body"></tbody>
+          </table>
+        </div>
+      </section>
     </section>
   </main>
 

@@ -1,0 +1,96 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: adg-postgres-migrate
+  namespace: adg-data-plane
+  labels:
+    app.kubernetes.io/name: adg-cpoly-postgres
+    app.kubernetes.io/component: migration
+spec:
+  backoffLimit: 1
+  activeDeadlineSeconds: 1800
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: adg-cpoly-postgres
+        app.kubernetes.io/component: migration
+        cpoly.sbay.sa/network-client: migration
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: migrate
+          image: postgres:16-bookworm@sha256:60f4761b9035e0b8d5218f701a8c3382f641bf12b1604822574cf5be3baeb537
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - /opt/cpoly/scripts/apply-migrations.sh
+          env:
+            - name: MIGRATIONS_DIR
+              value: /migrations/postgresql
+            - name: PGHOST
+              value: adg-postgres-recovery.adg-data-plane.svc.cluster.local
+            - name: PGPORT
+              value: "5432"
+            - name: PGDATABASE
+              value: adg_adjudication
+            - name: PGUSER
+              value: adg_migrator
+            - name: PGSSLMODE
+              value: verify-full
+            - name: PGSSLROOTCERT
+              value: /run/secrets/tls/postgres-ca.crt
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: scripts
+              mountPath: /opt/cpoly/scripts
+              readOnly: true
+            - name: migrations
+              mountPath: /migrations/postgresql
+              readOnly: true
+            - name: role-secrets
+              mountPath: /run/secrets/roles
+              readOnly: true
+            - name: tls-secrets
+              mountPath: /run/secrets/tls
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: scripts
+          configMap:
+            name: adg-postgres-scripts
+            defaultMode: 0555
+        - name: migrations
+          configMap:
+            name: adg-postgres-migrations
+        - name: role-secrets
+          secret:
+            secretName: adg-postgres-role-secrets
+            defaultMode: 0440
+        - name: tls-secrets
+          secret:
+            secretName: adg-postgres-server-tls
+            defaultMode: 0440
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 64Mi

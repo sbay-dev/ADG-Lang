@@ -1,6 +1,31 @@
+EVIDENCE_ARCHIVE_MODE=d1
+D1_TIME_TRAVEL_RETENTION_DAYS=30
 AZURE_CLIENT_ID=
 AZURE_CLIENT_SECRET=
 TURNSTILE_SITE_KEY=
 TURNSTILE_SECRET=
-# The Entra client secret is retrieved from Azure Key Vault using
-# ENTRA_CLIENT_SECRET_NAME; do not duplicate it in this file.
+MAILER_TENANT_ID=
+MAILER_CLIENT_ID=
+MAILER_CLIENT_SECRET=
+MAILER_SENDER_ADDRESS=notifications@example.test
+# Hyperdrive is configured as a Wrangler binding, not a .dev.vars value.
+# Private CPOLY recovery secrets for the internal encrypted backup/journal
+# lane. Do not expose them through public config.
+CPOLY_POSTGRES_INTERNAL_TOKEN=
+CPOLY_BACKUP_HMAC_KEY=
+CPOLY_BACKUP_MASTER_KEY=
+CPOLY_BACKUP_BASE_URL=https://adg.sbay.sa
+CPOLY_ALLOW_FRESH_BOOTSTRAP=false
+ADG_MIGRATOR_PASSWORD=
+ADG_RUNTIME_PASSWORD=
+ADG_BACKUP_PASSWORD=
+POSTGRES_SUPERUSER_PASSWORD=
+# Optional direct Worker secret bindings that satisfy the existing
+# *_SECRET_NAME variables without Azure Key Vault.
+ENTITYCRYPT_MASTER_KEY=
+SUBMISSION_HMAC_KEY=
+REPOSITORY_RECEIPT_HMAC_KEY=
+EMAIL_VERIFICATION_HMAC_KEY=
+ENTRA_CLIENT_SECRET=
+# Keep ENTRA_CLIENT_SECRET empty unless this session is intentionally
+# using the direct Worker-secret path instead of Azure Key Vault.

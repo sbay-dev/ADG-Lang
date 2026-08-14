@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: adg-postgres-walg-settings
+  namespace: adg-data-plane
+  labels:
+    app.kubernetes.io/name: adg-cpoly-postgres
+    app.kubernetes.io/component: backup
+data:
+  WALG_S3_PREFIX: s3://REPLACE_BUCKET/adg-msa-adjudication/postgres
+  AWS_ENDPOINT: https://REPLACE_S3_ENDPOINT
+  AWS_REGION: auto
+  AWS_S3_FORCE_PATH_STYLE: "true"
+  WALG_S3_SSE: AES256
+  WALG_RETENTION_FULL: "14"
+  WALG_COMPRESSION_METHOD: zstd
+  WALG_PREVENT_WAL_OVERWRITE: "true"
+

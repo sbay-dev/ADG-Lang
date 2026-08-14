@@ -1,0 +1,39 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - kubernetes/manifests/namespace.yaml
+  - kubernetes/manifests/backup-settings.yaml
+  - kubernetes/manifests/services.yaml
+  - kubernetes/manifests/networkpolicy.yaml
+  - kubernetes/manifests/statefulset.yaml
+  - kubernetes/manifests/backup-cronjob.yaml
+configMapGenerator:
+  - name: adg-postgres-scripts
+    namespace: adg-data-plane
+    files:
+      - cpoly-postgres-entrypoint.sh=scripts/cpoly-postgres-entrypoint.sh
+      - render-hba.sh=scripts/render-hba.sh
+      - bootstrap-roles.sh=scripts/bootstrap-roles.sh
+      - apply-migrations.sh=scripts/apply-migrations.sh
+      - load-walg-env.sh=scripts/load-walg-env.sh
+      - walg-backup.sh=scripts/walg-backup.sh
+      - walg-restore-fetch.sh=scripts/walg-restore-fetch.sh
+      - kubernetes-restore.sh=scripts/kubernetes-restore.sh
+      - d1_backup_client.py=scripts/d1_backup_client.py
+      - restore-logical.sh=scripts/restore-logical.sh
+      - create-encrypted-backup.sh=scripts/create-encrypted-backup.sh
+      - restore-encrypted-backup.sh=scripts/restore-encrypted-backup.sh
+      - verify-encrypted-backup-job.sh=scripts/verify-encrypted-backup-job.sh
+      - mark-recovery-ready.sh=scripts/mark-recovery-ready.sh
+      - create-kv-binary-backup.sh=scripts/create-kv-binary-backup.sh
+      - verify-binary-backup-job.sh=scripts/verify-binary-backup-job.sh
+      - restore-binary-backup.sh=scripts/restore-binary-backup.sh
+  - name: adg-postgres-migrations
+    namespace: adg-data-plane
+    files:
+      - 0001_portal_v15.sql=migrations/postgresql/0001_portal_v15.sql
+generatorOptions:
+  disableNameSuffixHash: true
+  labels:
+    app.kubernetes.io/part-of: adg-msa-adjudication
+    app.kubernetes.io/managed-by: cpoly-kubernetes-workbench

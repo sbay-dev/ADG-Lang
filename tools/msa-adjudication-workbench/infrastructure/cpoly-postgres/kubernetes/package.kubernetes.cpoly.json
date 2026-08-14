@@ -1,0 +1,84 @@
+{
+  "schema": "cpoly.package.kubernetes.v1",
+  "id": "adg-msa-adjudication-postgres",
+  "name": "ADG MSA Adjudication PostgreSQL",
+  "workbench": "cpoly-kubernetes-workbench",
+  "workloadKind": "StatefulSet",
+  "replicas": 1,
+  "deploymentModes": [
+    "external-cluster"
+  ],
+  "telemetry": [
+    "events",
+    "health",
+    "backup",
+    "migration"
+  ],
+  "telemetryProfile": "relational-db",
+  "kubernetesClaims": {
+    "nativeNode": false,
+    "compatibleTelemetry": true,
+    "requiresExternalClusterForDataPlane": true,
+    "highAvailability": false,
+    "availabilityMode": "single-primary-with-backup-restore"
+  },
+  "storage": {
+    "kind": "PersistentVolumeClaim",
+    "storageClass": "cpoly-postgres-retain",
+    "requestedCapacity": "50Gi",
+    "retention": "Retain"
+  },
+  "backupRestore": {
+    "primary": {
+      "transport": "worker-private-kv-api",
+      "metadataAndJournal": "cloudflare-d1",
+      "objectStore": "CPOLY_BACKUPS-kv",
+      "archiveFormat": "postgres-custom",
+      "database": "adg_adjudication",
+      "rolePasswordMaterial": "excluded",
+      "entityCryptAttestation": "adg.cpoly-postgres.backup-attestations.v1",
+      "authentication": "canonical-hmac-sha256",
+      "maximumChunkBytes": 524288,
+      "restoreVerification": "per-chunk-and-final-sha256",
+      "snapshot": {
+        "isolation": "repeatable-read-exported-snapshot",
+        "generationSource": "adjudication.cpoly_runtime_state.current_generation",
+        "watermarkSource": "max(adjudication.cpoly_write_receipts.receipt_seq)",
+        "sameSnapshotAsPgDump": true
+      },
+      "recoveryGate": {
+        "workerBeginRequired": true,
+        "workerCompleteAndStatusRequired": true,
+        "journalReplayExhaustionRequired": true,
+        "postgresReceiptVerificationRequired": true,
+        "applicationReadinessDefault": "closed"
+      }
+    },
+    "optionalSecondCopies": [
+      {
+        "transport": "qdrant-style-aes256-openpgp",
+        "artifact": "scripts/create-encrypted-backup.sh"
+      },
+      {
+        "transport": "wal-g-s3-compatible",
+        "r2Required": false,
+        "artifact": "optional/walg"
+      }
+    ],
+    "pvcAloneIsBackup": false
+  },
+  "databaseAccess": {
+    "client": "cloudflare-hyperdrive",
+    "path": "direct-postgresql-wire-protocol",
+    "tlsMode": "verify-full",
+    "genericProviderProxyAllowed": false
+  },
+  "execution": {
+    "contract": "cpoly-execution.cpoly.json",
+    "selectedProductionRuntime": false,
+    "renderer": "kubectl-kustomize",
+    "artifact": "../kustomization.yaml",
+    "deploymentAuthority": "external-governed-kubernetes-credential",
+    "workbenchApiPackageApplySupported": false
+  }
+}

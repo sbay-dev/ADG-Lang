@@ -8,9 +8,20 @@ const searchInput = document.querySelector("#participant-search");
 const statusSelect = document.querySelector("#participant-status");
 const refreshButton = document.querySelector("#refresh-dashboard");
 const logoutButton = document.querySelector("#admin-logout");
+const governanceTasksBody =
+  document.querySelector("#governance-tasks-body");
+const governanceAppealsBody =
+  document.querySelector("#governance-appeals-body");
+const governanceCommentsBody =
+  document.querySelector("#governance-comments-body");
 
 const state = {
-  participants: []
+  participants: [],
+  governance: {
+    tasks: [],
+    appeals: [],
+    comments: []
+  }
 };
 
 refreshButton.addEventListener("click", loadProgress);
@@ -65,8 +76,14 @@ async function loadProgress() {
   try {
     const result = await api("/api/admin/progress");
     state.participants = result.participants || [];
+    state.governance = result.governance || {
+      tasks: [],
+      appeals: [],
+      comments: []
+    };
     renderSummary(result.summary);
     renderParticipants();
+    renderGovernance();
     document.querySelector("#generated-at").textContent =
       `آخر تحديث: ${formatDate(result.generatedAtUtc)}`;
     setDashboardStatus("", false);
@@ -139,12 +156,16 @@ function participantCell(participant) {
   wrapper.className = "participant-name";
   const name = document.createElement("strong");
   name.textContent = participant.fullName;
-  const email = document.createElement("a");
-  email.href = `mailto:${participant.email}`;
-  email.textContent = participant.email;
   const affiliation = document.createElement("span");
   affiliation.textContent = participant.affiliation || "بلا جهة مسجلة";
-  wrapper.append(name, email, affiliation);
+  wrapper.append(name);
+  if (participant.email) {
+    const email = document.createElement("a");
+    email.href = `mailto:${participant.email}`;
+    email.textContent = participant.email;
+    wrapper.append(email);
+  }
+  wrapper.append(affiliation);
   const social = socialAccountsElement(participant.socialAccounts);
   if (social) wrapper.append(social);
   cell.append(wrapper);
@@ -211,6 +232,9 @@ function socialAccountsElement(accounts = {}) {
 }
 
 function experienceCell(participant) {
+  if (participant.experienceYears === null) {
+    return textCell("ممحوة وفق سياسة الاحتفاظ", "muted");
+  }
   const label = specializationLabel(participant.specialization);
   return textCell(`${label} · ${participant.experienceYears} سنة`);
 }
@@ -265,6 +289,186 @@ function textCell(text, className = "") {
   return cell;
 }
 
+function renderGovernance() {
+  governanceTasksBody.replaceChildren();
+  governanceAppealsBody.replaceChildren();
+  governanceCommentsBody.replaceChildren();
+
+  for (const task of state.governance.tasks || []) {
+    const row = document.createElement("tr");
+    row.append(
+      textCell(`${task.packetId} · v${task.taskVersion}`),
+      textCell(task.state),
+      textCell(String(task.round)),
+      textCell(
+        task.githubIssueNumber
+          ? `${task.repositoryStatus} · #${task.githubIssueNumber}`
+          : task.repositoryStatus
+      ),
+      taskReissueCell(task)
+    );
+    governanceTasksBody.append(row);
+  }
+
+  for (const appeal of state.governance.appeals || []) {
+    const row = document.createElement("tr");
+    const evidence = document.createElement("td");
+    const title = document.createElement("strong");
+    title.textContent = appeal.packetId;
+    const text = document.createElement("p");
+    text.textContent = appeal.evidence;
+    evidence.append(title, text);
+    row.append(
+      evidence,
+      textCell(appeal.status),
+      appealReviewCell(appeal)
+    );
+    governanceAppealsBody.append(row);
+  }
+
+  for (const comment of state.governance.comments || []) {
+    const row = document.createElement("tr");
+    const detail = document.createElement("td");
+    const title = document.createElement("strong");
+    title.textContent =
+      `${comment.participantPseudonym} · ${comment.packetId}`;
+    const text = document.createElement("p");
+    text.textContent = comment.body;
+    detail.append(title, text);
+    row.append(
+      detail,
+      textCell(comment.moderationState),
+      commentModerationCell(comment)
+    );
+    governanceCommentsBody.append(row);
+  }
+}
+
+function taskReissueCell(task) {
+  const cell = document.createElement("td");
+  if (!["escalated", "revoked"].includes(task.state)) {
+    cell.textContent = "لا إجراء يدوي مطلوب";
+    cell.className = "muted";
+    return cell;
+  }
+  const select = document.createElement("select");
+  for (const reason of [
+    "missing-quorum-deadline",
+    "accepted-recusal",
+    "j2-disagreement",
+    "accepted-appeal",
+    "material-evidence-defect",
+    "low-independent-agreement",
+    "novel-primary-decision"
+  ]) {
+    const option = document.createElement("option");
+    option.value = reason;
+    option.textContent = reason;
+    select.append(option);
+  }
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "button secondary compact";
+  button.textContent = "إعادة الطرح";
+  button.addEventListener("click", async () => {
+    await runGovernanceAction(button, async () => {
+      await api("/api/admin/tasks/reissue", {
+        method: "POST",
+        body: {
+          taskVersionId: task.taskVersionId,
+          reason: select.value
+        }
+      });
+    });
+  });
+  cell.append(select, button);
+  return cell;
+}
+
+function appealReviewCell(appeal) {
+  const cell = document.createElement("td");
+  if (appeal.status !== "pending") {
+    cell.textContent = "تم البت";
+    cell.className = "muted";
+    return cell;
+  }
+  const reason = document.createElement("textarea");
+  reason.rows = 3;
+  reason.maxLength = 4000;
+  reason.placeholder = "تعليل مستقل من 20 حرفًا على الأقل";
+  const accept = governanceButton("قبول", "primary", async () => {
+    await reviewAppeal(appeal.id, "accepted", reason.value);
+  });
+  const reject = governanceButton("رفض", "secondary", async () => {
+    await reviewAppeal(appeal.id, "rejected", reason.value);
+  });
+  cell.append(reason, accept, reject);
+  return cell;
+}
+
+async function reviewAppeal(appealId, decision, reason) {
+  if (reason.trim().length < 20) {
+    throw new Error("اكتب تعليلًا من 20 حرفًا على الأقل.");
+  }
+  await api("/api/admin/appeals/review", {
+    method: "POST",
+    body: { appealId, decision, reason: reason.trim() }
+  });
+}
+
+function commentModerationCell(comment) {
+  const cell = document.createElement("td");
+  const select = document.createElement("select");
+  for (const value of ["hidden", "redacted", "blocked"]) {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = value;
+    select.append(option);
+  }
+  const reason = document.createElement("input");
+  reason.maxLength = 1000;
+  reason.placeholder = "سبب الإشراف";
+  const button = governanceButton("تطبيق", "secondary", async () => {
+    if (reason.value.trim().length < 10) {
+      throw new Error("اكتب سببًا من 10 أحرف على الأقل.");
+    }
+    await api("/api/admin/discussion/moderate", {
+      method: "POST",
+      body: {
+        commentId: comment.commentId,
+        state: select.value,
+        reason: reason.value.trim()
+      }
+    });
+  });
+  cell.append(select, reason, button);
+  return cell;
+}
+
+function governanceButton(label, style, action) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = `button ${style} compact`;
+  button.textContent = label;
+  button.addEventListener("click", () => {
+    void runGovernanceAction(button, action);
+  });
+  return button;
+}
+
+async function runGovernanceAction(button, action) {
+  button.disabled = true;
+  setDashboardStatus("", false);
+  try {
+    await action();
+    await loadProgress();
+  } catch (error) {
+    setDashboardStatus(error.message, true);
+  } finally {
+    button.disabled = false;
+  }
+}
+
 async function logout() {
   setBusy(true);
   try {
@@ -273,6 +477,7 @@ async function logout() {
       body: {}
     });
     state.participants = [];
+    state.governance = { tasks: [], appeals: [], comments: [] };
     showLogin();
     loginStatus.textContent = "تم تسجيل الخروج من اللوحة.";
     loginStatus.className = "status success";
@@ -326,7 +531,9 @@ function statusLabel(status) {
 function roleLabel(role) {
   if (role === "A") return "المعلّق A";
   if (role === "B") return "المعلّق B";
-  return "المحكّم الثالث";
+  if (role === "adjudication" || role === "J1") return "المحكّم J1";
+  if (role === "ratification" || role === "J2") return "المراجع J2";
+  return role;
 }
 
 function specializationLabel(value) {

@@ -1,0 +1,47 @@
+{
+  "schema": "cpoly.package.cloudflare-container.v1",
+  "id": "adg-msa-adjudication-postgres",
+  "name": "ADG CPOLY PostgreSQL Cloudflare Container",
+  "selectedProductionRuntime": true,
+  "integrationTargets": {
+    "cpolyFieldAppId": "a033613d-c3cf-45d8-b1d3-2de9447d7012",
+    "cpolyWorkbenchAppId": "a03397c9-f19f-49ad-9f80-28ec719a38bb",
+    "deploymentClaim": false
+  },
+  "container": {
+    "className": "CpolyAdgPostgresContainer",
+    "stableInstanceId": "standard-1",
+    "instanceType": "standard-1",
+    "maxInstances": 1,
+    "defaultPort": 18444,
+    "externallyRoutedPorts": [
+      18444
+    ],
+    "postgresTcpExternallyRouted": false
+  },
+  "database": {
+    "engine": "PostgreSQL",
+    "majorVersion": 16,
+    "pgdata": "ephemeral",
+    "authoritativeWhileReady": true,
+    "readinessRequiresWorkerRecoveryGate": true
+  },
+  "durability": {
+    "chunkObjectStore": "CPOLY_BACKUPS KV",
+    "metadataJournalGate": "D1",
+    "archiveFormat": "postgres-custom",
+    "entityCryptProtectedValues": true,
+    "localDiskDurabilityClaim": false
+  },
+  "bridge": {
+    "contract": "contract/database-bridge.v1.json",
+    "authentication": "private-bearer",
+    "idempotentReceipts": true
+  },
+  "optionalVariants": [
+    "kubernetes",
+    "remote-host-compose",
+    "qdrant-openpgp",
+    "wal-g"
+  ]
+}

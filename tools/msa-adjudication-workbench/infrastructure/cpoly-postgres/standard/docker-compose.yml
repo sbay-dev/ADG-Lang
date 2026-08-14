@@ -1,0 +1,324 @@
+name: cpoly-adg-postgres
+
+x-postgres-image: &postgres-image "postgres:16-bookworm@sha256:60f4761b9035e0b8d5218f701a8c3382f641bf12b1604822574cf5be3baeb537"
+x-walg-image: &walg-image "chekkan/wal-g:v3.0.7@sha256:a0bb7869eb7777aded6f5e51f22a4730a9f481485ee7225a3b75fa39f5d15c4b"
+
+services:
+  postgres:
+    image: *postgres-image
+    restart: unless-stopped
+    stop_grace_period: 120s
+    entrypoint:
+      - /bin/sh
+      - /opt/cpoly/scripts/cpoly-postgres-entrypoint.sh
+    command:
+      - postgres
+      - -c
+      - listen_addresses=*
+      - -c
+      - ssl=on
+      - -c
+      - ssl_cert_file=/var/lib/postgresql/cpoly-tls/server.crt
+      - -c
+      - ssl_key_file=/var/lib/postgresql/cpoly-tls/server.key
+      - -c
+      - ssl_ca_file=/var/lib/postgresql/cpoly-tls/ca.crt
+      - -c
+      - ssl_min_protocol_version=TLSv1.2
+      - -c
+      - password_encryption=scram-sha-256
+      - -c
+      - max_connections=${CPOLY_POSTGRES_MAX_CONNECTIONS:-80}
+      - -c
+      - shared_buffers=512MB
+      - -c
+      - log_connections=on
+      - -c
+      - log_disconnections=on
+      - -c
+      - log_line_prefix=%m [%p] %q%u@%d
+    environment:
+      PGDATA: /var/lib/postgresql/data/pgdata
+      POSTGRES_USER: postgres
+      POSTGRES_DB: postgres
+      POSTGRES_PASSWORD_FILE: /run/secrets/roles/postgres-superuser-password
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256 --auth-local=peer --data-checksums
+      CPOLY_REQUIRE_CLIENT_CERT: ${CPOLY_REQUIRE_CLIENT_CERT:-false}
+    ports:
+      - "${CPOLY_POSTGRES_BIND_ADDRESS:-127.0.0.1}:${CPOLY_POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ../scripts:/opt/cpoly/scripts:ro
+      - ../scripts/bootstrap-roles.sh:/docker-entrypoint-initdb.d/10-bootstrap-roles.sh:ro
+      - ../scripts/render-hba.sh:/docker-entrypoint-initdb.d/20-render-hba.sh:ro
+    secrets:
+      - source: postgres_superuser_password
+        target: /run/secrets/roles/postgres-superuser-password
+      - source: adg_migrator_password
+        target: /run/secrets/roles/adg-migrator-password
+      - source: adg_runtime_password
+        target: /run/secrets/roles/adg-runtime-password
+      - source: adg_backup_password
+        target: /run/secrets/roles/adg-backup-password
+      - source: postgres_server_cert
+        target: /run/secrets/tls/postgres-server.crt
+      - source: postgres_server_key
+        target: /run/secrets/tls/postgres-server.key
+      - source: postgres_ca_cert
+        target: /run/secrets/tls/postgres-ca.crt
+    tmpfs:
+      - /var/lib/postgresql/cpoly-tls:rw,noexec,nosuid,nodev,size=16m,mode=0700
+      - /tmp:rw,noexec,nosuid,nodev,size=64m
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          PGSSLMODE=verify-ca
+          PGSSLROOTCERT=/var/lib/postgresql/cpoly-tls/ca.crt
+          pg_isready -h 127.0.0.1 -p 5432 -U adg_runtime -d adg_adjudication
+      interval: 15s
+      timeout: 5s
+      start_period: 60s
+      retries: 8
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+    pids_limit: 512
+    mem_limit: ${CPOLY_POSTGRES_MEMORY_LIMIT:-4g}
+    cpus: ${CPOLY_POSTGRES_CPU_LIMIT:-2.0}
+    networks:
+      - data-plane
+
+  migrate:
+    image: *postgres-image
+    profiles: [operations]
+    restart: "no"
+    entrypoint:
+      - /bin/sh
+      - /opt/cpoly/scripts/apply-migrations.sh
+    environment:
+      MIGRATIONS_DIR: /migrations/postgresql
+      PGHOST: ${CPOLY_POSTGRES_INTERNAL_TLS_NAME:-postgres}
+      PGPORT: "5432"
+      PGDATABASE: adg_adjudication
+      PGUSER: adg_migrator
+      PGSSLMODE: verify-full
+      PGSSLROOTCERT: /run/secrets/tls/postgres-ca.crt
+    volumes:
+      - ../scripts:/opt/cpoly/scripts:ro
+      - type: bind
+        source: ${ADG_POSTGRES_MIGRATIONS_DIR:-../migrations/postgresql}
+        target: /migrations/postgresql
+        read_only: true
+    secrets:
+      - source: adg_migrator_password
+        target: /run/secrets/roles/adg-migrator-password
+      - source: postgres_ca_cert
+        target: /run/secrets/tls/postgres-ca.crt
+    depends_on:
+      postgres:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    pids_limit: 128
+    mem_limit: 512m
+    cpus: 0.5
+    networks:
+      - data-plane
+
+  walg-backup:
+    image: *walg-image
+    profiles: [backup]
+    restart: "no"
+    entrypoint:
+      - /bin/sh
+      - /opt/cpoly/scripts/walg-backup.sh
+    environment: &walg-environment
+      WALG_S3_PREFIX: ${WALG_S3_PREFIX:-s3://REPLACE_BUCKET/adg-msa-adjudication/postgres}
+      AWS_ENDPOINT: ${AWS_ENDPOINT:-https://REPLACE_S3_ENDPOINT}
+      AWS_REGION: ${AWS_REGION:-auto}
+      AWS_S3_FORCE_PATH_STYLE: ${AWS_S3_FORCE_PATH_STYLE:-true}
+      WALG_S3_SSE: ${WALG_S3_SSE:-AES256}
+      WALG_RETENTION_FULL: ${WALG_RETENTION_FULL:-14}
+      WALG_COMPRESSION_METHOD: zstd
+      WALG_PREVENT_WAL_OVERWRITE: "true"
+      PGHOST: ${CPOLY_POSTGRES_INTERNAL_TLS_NAME:-postgres}
+      PGPORT: "5432"
+      PGDATABASE: postgres
+      PGUSER: adg_backup
+      PGSSLMODE: verify-full
+      PGSSLROOTCERT: /run/secrets/tls/postgres-ca.crt
+    volumes:
+      - ../scripts:/opt/cpoly/scripts:ro
+    secrets: &walg-secrets
+      - source: adg_backup_password
+        target: /run/secrets/roles/adg-backup-password
+      - source: postgres_ca_cert
+        target: /run/secrets/tls/postgres-ca.crt
+      - source: backup_aws_access_key_id
+        target: /run/secrets/backup/aws-access-key-id
+      - source: backup_aws_secret_access_key
+        target: /run/secrets/backup/aws-secret-access-key
+      - source: backup_libsodium_key
+        target: /run/secrets/backup/libsodium-key
+    depends_on:
+      postgres:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    pids_limit: 256
+    mem_limit: 1g
+    cpus: 1.0
+    networks:
+      - data-plane
+      - backup-egress
+
+  walg-restore:
+    image: *walg-image
+    profiles: [restore]
+    restart: "no"
+    user: "0:0"
+    entrypoint:
+      - /bin/sh
+      - /opt/cpoly/scripts/walg-restore-fetch.sh
+      - /restore/pgdata
+      - ${WALG_RESTORE_BACKUP:-LATEST}
+    environment: *walg-environment
+    volumes:
+      - ../scripts:/opt/cpoly/scripts:ro
+      - postgres-data:/restore
+    secrets: *walg-secrets
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    pids_limit: 256
+    mem_limit: 1g
+    cpus: 1.0
+    networks:
+      - backup-egress
+
+  walg-restore-drill:
+    image: *walg-image
+    profiles: [restore-drill]
+    restart: "no"
+    user: "0:0"
+    entrypoint:
+      - /bin/sh
+      - /opt/cpoly/scripts/walg-restore-fetch.sh
+      - /restore/pgdata
+      - ${WALG_RESTORE_BACKUP:-LATEST}
+    environment: *walg-environment
+    volumes:
+      - ../scripts:/opt/cpoly/scripts:ro
+      - restore-drill-data:/restore
+    secrets: *walg-secrets
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    pids_limit: 256
+    mem_limit: 1g
+    cpus: 1.0
+    networks:
+      - backup-egress
+
+  postgres-restore-drill:
+    image: *postgres-image
+    profiles: [restore-drill]
+    restart: "no"
+    entrypoint:
+      - /bin/sh
+      - /opt/cpoly/scripts/cpoly-postgres-entrypoint.sh
+    command:
+      - postgres
+      - -c
+      - listen_addresses=
+      - -c
+      - ssl=on
+      - -c
+      - ssl_cert_file=/var/lib/postgresql/cpoly-tls/server.crt
+      - -c
+      - ssl_key_file=/var/lib/postgresql/cpoly-tls/server.key
+      - -c
+      - ssl_ca_file=/var/lib/postgresql/cpoly-tls/ca.crt
+      - -c
+      - password_encryption=scram-sha-256
+    environment:
+      PGDATA: /var/lib/postgresql/data/pgdata
+      POSTGRES_USER: postgres
+      POSTGRES_DB: postgres
+      POSTGRES_PASSWORD_FILE: /run/secrets/roles/postgres-superuser-password
+      CPOLY_REQUIRE_CLIENT_CERT: ${CPOLY_REQUIRE_CLIENT_CERT:-false}
+    volumes:
+      - restore-drill-data:/var/lib/postgresql/data
+      - ../scripts:/opt/cpoly/scripts:ro
+    secrets:
+      - source: postgres_superuser_password
+        target: /run/secrets/roles/postgres-superuser-password
+      - source: postgres_server_cert
+        target: /run/secrets/tls/postgres-server.crt
+      - source: postgres_server_key
+        target: /run/secrets/tls/postgres-server.key
+      - source: postgres_ca_cert
+        target: /run/secrets/tls/postgres-ca.crt
+    tmpfs:
+      - /var/lib/postgresql/cpoly-tls:rw,noexec,nosuid,nodev,size=16m,mode=0700
+      - /tmp:rw,noexec,nosuid,nodev,size=64m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+    pids_limit: 256
+    mem_limit: 2g
+    cpus: 1.0
+    networks:
+      - restore-drill
+
+networks:
+  data-plane:
+    internal: true
+  backup-egress:
+  restore-drill:
+    internal: true
+
+volumes:
+  postgres-data:
+    name: ${CPOLY_POSTGRES_DATA_VOLUME:-cpoly-adg-postgres-data}
+  restore-drill-data:
+    name: cpoly-adg-postgres-restore-drill
+
+secrets:
+  postgres_superuser_password:
+    file: ${CPOLY_SECRET_DIR:-./secrets}/postgres-superuser-password
+  adg_migrator_password:
+    file: ${CPOLY_SECRET_DIR:-./secrets}/adg-migrator-password
+  adg_runtime_password:
+    file: ${CPOLY_SECRET_DIR:-./secrets}/adg-runtime-password
+  adg_backup_password:
+    file: ${CPOLY_SECRET_DIR:-./secrets}/adg-backup-password
+  postgres_server_cert:
+    file: ${CPOLY_SECRET_DIR:-./secrets}/postgres-server.crt
+  postgres_server_key:
+    file: ${CPOLY_SECRET_DIR:-./secrets}/postgres-server.key
+  postgres_ca_cert:
+    file: ${CPOLY_SECRET_DIR:-./secrets}/postgres-ca.crt
+  backup_aws_access_key_id:
+    file: ${CPOLY_SECRET_DIR:-./secrets}/backup-aws-access-key-id
+  backup_aws_secret_access_key:
+    file: ${CPOLY_SECRET_DIR:-./secrets}/backup-aws-secret-access-key
+  backup_libsodium_key:
+    file: ${CPOLY_SECRET_DIR:-./secrets}/backup-libsodium-key

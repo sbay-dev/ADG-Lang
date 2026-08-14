@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://adg.example.invalid/schemas/cpoly-adg-postgres.v1.schema.json",
+  "title": "ADG CPOLY PostgreSQL package contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "id",
+    "derivedFrom",
+    "selectedProductionVariant",
+    "productionBoundary",
+    "origin",
+    "variants",
+    "claims"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "cpoly.adg.postgres.v1"
+    },
+    "id": {
+      "const": "adg-msa-adjudication-postgres"
+    },
+    "selectedProductionVariant": {
+      "const": "cloudflare-container"
+    },
+    "derivedFrom": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["standard", "kubernetes", "referencePackage"],
+      "properties": {
+        "standard": { "const": "cpoly.package.standard.v1" },
+        "kubernetes": { "const": "cpoly.package.kubernetes.v1" },
+        "referencePackage": { "const": "CpolyServerPackages/packages/postgres" }
+      }
+    },
+    "productionBoundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["publicApplication", "databaseAccess", "mailPath", "forbidden"],
+      "properties": {
+        "publicApplication": { "const": "cloudflare-workers" },
+        "databaseAccess": { "const": "hyperdrive-direct-postgresql-tls" },
+        "mailPath": { "const": "cloudflare-workers-graph" },
+        "forbidden": {
+          "type": "array",
+          "minItems": 7,
+          "uniqueItems": true,
+          "contains": { "const": "workstation-production-runtime" },
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "origin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["engine", "majorVersion", "image", "transport", "tlsMode"],
+      "properties": {
+        "engine": { "const": "postgresql" },
+        "majorVersion": { "const": 16 },
+        "image": {
+          "type": "string",
+          "pattern": "^postgres:16-bookworm@sha256:[0-9a-f]{64}$"
+        },
+        "transport": { "const": "postgresql-wire-protocol" },
+        "tlsMode": { "const": "verify-full" }
+      }
+    },
+    "variants": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["standard", "kubernetes", "cloudflare"],
+      "properties": {
+        "standard": { "$ref": "#/$defs/variant" },
+        "kubernetes": { "$ref": "#/$defs/variant" },
+        "cloudflare": { "$ref": "#/$defs/variant" }
+      }
+    },
+    "claims": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "availability",
+        "durability",
+        "backup",
+        "pitr",
+        "cloudflareContainer"
+      ],
+      "properties": {
+        "availability": { "const": "single-primary-not-ha" },
+        "durability": { "const": "worker-kv-d1-recovery-backed-ephemeral-pgdata" },
+        "backup": { "const": "worker-kv-signed-pg-dump-custom-primary-with-optional-gpg-and-wal-g" },
+        "pitr": { "const": "not-claimed" },
+        "cloudflareContainer": { "const": "selected-production-ephemeral-postgres-runtime" }
+      }
+    }
+  },
+  "$defs": {
+    "variant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "dataPlane",
+        "alwaysOn",
+        "localProductionEligible",
+        "productionSelected"
+      ],
+      "properties": {
+        "contract": { "type": "string", "minLength": 1 },
+        "dataPlane": {
+          "enum": [
+            "remote-container-host",
+            "external-kubernetes-cluster",
+            "cloudflare-container"
+          ]
+        },
+        "alwaysOn": { "const": true },
+        "localProductionEligible": { "const": false },
+        "productionSelected": { "type": "boolean" }
+      }
+    }
+  }
+}

@@ -3,6 +3,7 @@
   "name": "adg-msa-adjudication",
   "main": "src/index.js",
   "compatibility_date": "2026-08-14",
+  "compatibility_flags": ["nodejs_compat"],
   "workers_dev": false,
   "preview_urls": false,
   "assets": {
@@ -11,6 +12,34 @@
     "run_worker_first": true,
     "not_found_handling": "404-page"
   },
+  // Contract placeholder only. Replace ./postgres/Dockerfile with the
+  // infra-owned CPOLY PostgreSQL provider image before deployment.
+  "containers": [
+    {
+      "class_name": "CpolyAdgPostgresContainer",
+      "image": "./postgres/Dockerfile",
+      "max_instances": 1,
+      "instance_type": "standard-1"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "CPOLY_POSTGRES",
+        "class_name": "CpolyAdgPostgresContainer"
+      }
+    ]
+  },
+  "r2_buckets": [
+    {
+      "binding": "SUBMISSION_OBJECTS",
+      "bucket_name": "replace-with-private-submission-bucket"
+    },
+    {
+      "binding": "IDENTITY_OBJECTS",
+      "bucket_name": "replace-with-private-identity-bucket"
+    }
+  ],
   "d1_databases": [
     {
       "binding": "DB",
@@ -19,6 +48,30 @@
       "migrations_dir": "migrations"
     }
   ],
+  "kv_namespaces": [
+    {
+      "binding": "CPOLY_BACKUPS",
+      "id": "replace-with-cpoly-backups-kv-namespace-id",
+      "preview_id": "replace-with-cpoly-backups-kv-preview-id"
+    }
+  ],
+  "migrations": [
+    {
+      "tag": "v1-cpoly-postgres-container",
+      "new_sqlite_classes": ["CpolyAdgPostgresContainer"]
+    }
+  ],
+  // Optional rollback lane after the container contract is live. Keep D1 bound
+  // even when Hyperdrive is active: D1 remains the rollback store and the
+  // private CPOLY recovery lane metadata store (encrypted write journal,
+  // backup descriptors, signed nonces, recovery state). CPOLY_BACKUPS stores
+  // immutable backup bytes.
+  // "hyperdrive": [
+  //   {
+  //     "binding": "HYPERDRIVE",
+  //     "id": "replace-with-hyperdrive-binding-id"
+  //   }
+  // ],
   "routes": [
     {
       "pattern": "adg.sbay.sa",
@@ -29,18 +82,54 @@
       "custom_domain": true
     }
   ],
+  "triggers": {
+    "crons": ["* * * * *"]
+  },
   "vars": {
     "ALLOWED_ORIGIN": "https://adg.sbay.sa",
     "SUBMISSION_ENABLED": "false",
     "MAX_SUBMISSION_BYTES": "900000",
     "TURNSTILE_SITE_KEY": "",
     "GITHUB_REPOSITORY": "owner/repository",
+    "EVIDENCE_ARCHIVE_MODE": "d1",
+    "D1_TIME_TRAVEL_RETENTION_DAYS": "30",
+    "CPOLY_POSTGRES_INSTANCE_ID": "replace-with-stable-cpoly-postgres-instance-id",
+    "CPOLY_POSTGRES_PROVIDER_PORT": "18444",
+    "CPOLY_BACKUP_BASE_URL": "https://adg.sbay.sa",
+    "CPOLY_ALLOW_FRESH_BOOTSTRAP": "false",
+    "CPOLY_RESUME_RECOVERY": "false",
+    "MAILER_TENANT_ID": "",
+    "MAILER_CLIENT_ID": "",
+    "MAILER_SENDER_ADDRESS": "notifications@example.test",
+    // Private CPOLY recovery caps for the internal backup/journal lane.
+    "CPOLY_BACKUP_RETENTION_HOURS": "168",
+    "CPOLY_BACKUP_MAX_CHUNK_BYTES": "524288",
+    "CPOLY_BACKUP_MAX_BACKUP_BYTES": "33554432",
+    "CPOLY_BACKUP_MAX_CHUNKS": "512",
+    "CPOLY_BACKUP_MAX_RETAINED_BACKUPS": "7",
+    "CPOLY_BACKUP_MAX_RETAINED_BYTES": "67108864",
+    "CPOLY_BACKUP_STALE_UPLOAD_HOURS": "12",
+    "CPOLY_BACKUP_KV_PROPAGATION_DELAY_MS": "60000",
+    "CPOLY_BACKUP_RESTORE_LEASE_MS": "1800000",
+    "CPOLY_NONCE_PRUNE_LIMIT": "200",
+    "CPOLY_JOURNAL_REPLAY_LIMIT": "24",
+    "CPOLY_JOURNAL_CLEANUP_LIMIT": "64",
+    "CPOLY_RECOVERY_LEASE_MS": "3600000",
+    "CPOLY_JOURNAL_MAX_CIPHERTEXT_BYTES": "1572864",
     "AZURE_TENANT_ID": "",
     "AZURE_CLIENT_ID": "",
     "AZURE_KEY_VAULT_URL": "https://your-vault.vault.azure.net",
+    "ACS_EMAIL_ENDPOINT": "https://your-resource.communication.azure.com",
+    "ACS_EMAIL_SENDER_ADDRESS": "notifications@your-verified-domain.example",
+    "ACS_EMAIL_SCOPE": "https://communication.azure.com/.default",
+    "NOTIFICATION_EMAIL_ENABLED": "false",
+    "EMAIL_VERIFICATION_ENABLED": "false",
+    "IDENTITY_RETENTION_DAYS": "365",
     "SUBMISSION_SAS_SECRET_NAME": "adg-submissions-write-sas",
     "IDENTITY_SAS_SECRET_NAME": "adg-identities-write-sas",
     "SUBMISSION_HMAC_SECRET_NAME": "adg-github-submission-hmac",
+    "REPOSITORY_RECEIPT_HMAC_SECRET_NAME": "adg-repository-receipt-hmac",
+    "EMAIL_VERIFICATION_HMAC_SECRET_NAME": "adg-email-verification-hmac",
     "ENTITYCRYPT_MASTER_KEY_SECRET_NAME": "adg-entitycrypt-master-key-v1",
     "ENTRA_TENANT_ID": "",
     "ENTRA_CLIENT_ID": "",

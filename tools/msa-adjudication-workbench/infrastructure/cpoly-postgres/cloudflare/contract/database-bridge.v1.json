@@ -1,0 +1,59 @@
+{
+  "schema": "adg.cpoly-postgres.container-provider.contract.v1",
+  "port": 18444,
+  "authentication": {
+    "type": "Bearer",
+    "source": "CPOLY_POSTGRES_INTERNAL_TOKEN",
+    "constantTimeComparison": true
+  },
+  "paths": {
+    "status": "/api/internal/postgres/v1/status",
+    "query": "/api/internal/postgres/v1/query",
+    "receiptWatermark": "/api/internal/postgres/v1/runtime/receipt-watermark",
+    "promoteGeneration": "/api/internal/postgres/v1/runtime/promote-generation",
+    "keepalive": "/api/internal/postgres/v1/runtime/keepalive",
+    "backupTrigger": "/api/internal/postgres/v1/backups/trigger"
+  },
+  "execute": {
+    "schema": "adg.cpoly-postgres.execute.v1",
+    "request": {
+      "requestId": "<uuid-v4-or-null-for-read>",
+      "payloadHash": "<sha256-or-null-for-read>",
+      "operationKind": "read|run|batch",
+      "statementCount": 1,
+      "transaction": false,
+      "expectedGeneration": null,
+      "operations": [
+        {
+          "mode": "run|all",
+          "sql": "<single PostgreSQL statement>",
+          "params": []
+        }
+      ]
+    },
+    "response": {
+      "ok": true,
+      "schema": "adg.cpoly-postgres.execute.v1",
+      "results": [
+        {
+          "success": true,
+          "results": [],
+          "meta": {
+            "changes": 0,
+            "last_row_id": 0
+          }
+        }
+      ],
+      "receipt": {
+        "generation": 1,
+        "receiptSeq": 1
+      }
+    }
+  },
+  "statusSchema": "adg.cpoly-postgres.status.v1",
+  "receiptSchema": "adg.cpoly-postgres.receipt-watermark.v1",
+  "promoteSchema": "adg.cpoly-postgres.promote-generation.v1",
+  "keepaliveSchema": "adg.cpoly-postgres.keepalive.v1",
+  "backupTriggerSchema": "adg.cpoly-postgres.backup-trigger.v1"
+}
+

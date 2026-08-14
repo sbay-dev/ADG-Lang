@@ -1,0 +1,137 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: adg-postgres-restore-drill
+  namespace: adg-data-plane
+  labels:
+    app.kubernetes.io/name: adg-cpoly-postgres
+    app.kubernetes.io/component: restore-drill
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: cpoly-postgres-retain
+  resources:
+    requests:
+      storage: 50Gi
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: adg-postgres-d1-restore-verify
+  namespace: adg-data-plane
+  labels:
+    app.kubernetes.io/name: adg-cpoly-postgres
+    app.kubernetes.io/component: restore-drill
+    cpoly.sbay.sa/backup-source: worker-d1
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 14400
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: adg-cpoly-postgres
+        app.kubernetes.io/component: restore-drill
+        cpoly.sbay.sa/network-client: portal-backup
+        cpoly.sbay.sa/backup-source: worker-d1
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: signed-download
+          image: python:3.13-slim-bookworm@sha256:00faa2debb87529f9f0764e9491d8ba400a3678976616c3bd7cb193745ac20d1
+          imagePullPolicy: IfNotPresent
+          command:
+            - python
+            - /opt/cpoly/scripts/d1_backup_client.py
+            - download
+            - --output
+            - /backup/adg-adjudication.dump
+            - --manifest-output
+            - /backup/manifest.json
+          env:
+            - name: ADG_BACKUP_BASE_URL_FILE
+              value: /run/secrets/portal-backup/base-url
+            - name: ADG_BACKUP_HMAC_KEY_FILE
+              value: /run/secrets/portal-backup/hmac-key
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: scripts
+              mountPath: /opt/cpoly/scripts
+              readOnly: true
+            - name: backup-work
+              mountPath: /backup
+            - name: portal-backup-secrets
+              mountPath: /run/secrets/portal-backup
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      containers:
+        - name: postgres16-restore-verifier
+          image: postgres:16-bookworm@sha256:60f4761b9035e0b8d5218f701a8c3382f641bf12b1604822574cf5be3baeb537
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - /opt/cpoly/scripts/verify-binary-backup-job.sh
+          env:
+            - name: BINARY_ARCHIVE
+              value: /backup/adg-adjudication.dump
+            - name: VERIFY_ROOT
+              value: /verify
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: "2"
+              memory: 4Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: scripts
+              mountPath: /opt/cpoly/scripts
+              readOnly: true
+            - name: backup-work
+              mountPath: /backup
+            - name: restore-data
+              mountPath: /verify
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: scripts
+          configMap:
+            name: adg-postgres-scripts
+            defaultMode: 0555
+        - name: backup-work
+          emptyDir:
+            sizeLimit: 10Gi
+        - name: restore-data
+          persistentVolumeClaim:
+            claimName: adg-postgres-restore-drill
+        - name: portal-backup-secrets
+          secret:
+            secretName: adg-postgres-portal-backup-secrets
+            defaultMode: 0440
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 64Mi
