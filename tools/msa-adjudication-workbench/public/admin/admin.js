@@ -107,8 +107,8 @@ function renderParticipants() {
     const haystack = [
       participant.fullName,
       participant.email,
-      participant.phone,
-      participant.affiliation
+      participant.affiliation,
+      ...Object.values(participant.socialAccounts || {})
     ].filter(Boolean).join(" ").toLocaleLowerCase("ar");
     return matchesStatus && (!query || haystack.includes(query));
   });
@@ -142,14 +142,72 @@ function participantCell(participant) {
   const email = document.createElement("a");
   email.href = `mailto:${participant.email}`;
   email.textContent = participant.email;
-  const phone = document.createElement("a");
-  phone.href = `tel:${participant.phone.replace(/[ ()-]/g, "")}`;
-  phone.textContent = participant.phone;
   const affiliation = document.createElement("span");
   affiliation.textContent = participant.affiliation || "بلا جهة مسجلة";
-  wrapper.append(name, email, phone, affiliation);
+  wrapper.append(name, email, affiliation);
+  const social = socialAccountsElement(participant.socialAccounts);
+  if (social) wrapper.append(social);
   cell.append(wrapper);
   return cell;
+}
+
+function socialAccountsElement(accounts = {}) {
+  const labels = {
+    whatsapp: "واتساب",
+    x: "X",
+    tiktok: "TikTok",
+    instagram: "Instagram",
+    threads: "Threads",
+    telegram: "Telegram",
+    snapchat: "Snapchat",
+    facebook: "Facebook",
+    linkedin: "LinkedIn",
+    youtube: "YouTube",
+    bluesky: "Bluesky"
+  };
+  const links = {
+    x: handle => `https://x.com/${encodeURIComponent(handle)}`,
+    tiktok: handle =>
+      `https://www.tiktok.com/@${encodeURIComponent(handle)}`,
+    instagram: handle =>
+      `https://www.instagram.com/${encodeURIComponent(handle)}`,
+    threads: handle =>
+      `https://www.threads.net/@${encodeURIComponent(handle)}`,
+    telegram: handle => `https://t.me/${encodeURIComponent(handle)}`,
+    snapchat: handle =>
+      `https://www.snapchat.com/add/${encodeURIComponent(handle)}`,
+    facebook: handle =>
+      `https://www.facebook.com/${encodeURIComponent(handle)}`,
+    linkedin: handle =>
+      `https://www.linkedin.com/in/${encodeURIComponent(handle)}`,
+    youtube: handle =>
+      `https://www.youtube.com/@${encodeURIComponent(handle)}`,
+    bluesky: handle =>
+      `https://bsky.app/profile/${encodeURIComponent(handle)}`
+  };
+  const container = document.createElement("div");
+  container.className = "social-handles";
+  for (const [key, label] of Object.entries(labels)) {
+    const handle = accounts[key];
+    if (!handle) continue;
+    const element = links[key]
+      ? document.createElement("a")
+      : document.createElement("span");
+    if (links[key]) {
+      element.href = links[key](handle);
+      element.target = "_blank";
+      element.rel = "noopener noreferrer";
+    }
+    element.textContent = `${label}: @${handle}`;
+    container.append(element);
+  }
+  if (accounts.otherPlatform && accounts.otherUsername) {
+    const other = document.createElement("span");
+    other.textContent =
+      `${accounts.otherPlatform}: @${accounts.otherUsername}`;
+    container.append(other);
+  }
+  return container.childElementCount === 0 ? null : container;
 }
 
 function experienceCell(participant) {

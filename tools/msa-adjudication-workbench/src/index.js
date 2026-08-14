@@ -10,11 +10,13 @@ const JSON_HEADERS = {
   "cache-control": "no-store"
 };
 
-const SESSION_COOKIE_NAME = "ads_session";
+const DEFAULT_ORIGIN = "https://adg.sbay.sa";
+const LEGACY_HOST = "ads.sbay.sa";
+const SESSION_COOKIE_NAME = "adg_session";
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const CHALLENGE_TTL_MS = 5 * 60 * 1000;
 const MAX_ACCOUNT_BODY_BYTES = 750000;
-const ADMIN_COOKIE_NAME = "ads_admin";
+const ADMIN_COOKIE_NAME = "adg_admin";
 const ADMIN_SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 const ADMIN_STATE_TTL_MS = 10 * 60 * 1000;
 const GLOBAL_ADMIN_ROLE_TEMPLATE_ID =
@@ -24,7 +26,37 @@ const PII_KEYS = new Set([
   "fullName",
   "email",
   "phone",
-  "affiliation"
+  "affiliation",
+  "socialAccounts",
+  "whatsapp",
+  "x",
+  "tiktok",
+  "instagram",
+  "threads",
+  "telegram",
+  "snapchat",
+  "facebook",
+  "linkedin",
+  "youtube",
+  "bluesky",
+  "otherPlatform",
+  "otherUsername"
+]);
+
+const SOCIAL_ACCOUNT_KEYS = new Set([
+  "whatsapp",
+  "x",
+  "tiktok",
+  "instagram",
+  "threads",
+  "telegram",
+  "snapchat",
+  "facebook",
+  "linkedin",
+  "youtube",
+  "bluesky",
+  "otherPlatform",
+  "otherUsername"
 ]);
 
 const FORBIDDEN_ANALYSIS_KEYS = new Set([
@@ -51,6 +83,9 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     try {
+      const legacyRedirect = redirectLegacyOrigin(request, env, url);
+      if (legacyRedirect) return legacyRedirect;
+
       if (url.pathname === "/api/config" && request.method === "GET") {
         return json({
           submissionEnabled:
@@ -95,7 +130,7 @@ export default {
       return withSecurityHeaders(asset);
     } catch (error) {
       if (!(error instanceof PublicError && error.status < 500)) {
-        console.error("ADS request failed", {
+        console.error("ADG request failed", {
           path: url.pathname,
           name: error?.name,
           message: error?.message
@@ -449,7 +484,7 @@ async function getAdminProgress(request, env) {
       userId: user.id,
       fullName: profile.fullName,
       email: profile.email,
-      phone: profile.phone,
+      socialAccounts: profile.socialAccounts ?? {},
       specialization: profile.specialization,
       affiliation: profile.affiliation,
       experienceYears: profile.experienceYears,
@@ -1512,7 +1547,7 @@ async function readJsonBody(request) {
   }
 }
 
-function validateAccountProfile(profile) {
+export function validateAccountProfile(profile) {
   if (!profile || typeof profile !== "object"
       || Array.isArray(profile)) {
     throw new PublicError("بيانات المحكّم غير صالحة.", 400);
@@ -1529,7 +1564,6 @@ function validateAccountProfile(profile) {
     160,
     "البريد الإلكتروني"
   ).toLowerCase();
-  const phone = normalizedText(profile.phone, 7, 32, "رقم الهاتف");
   const experienceYears = Number(profile.experienceYears);
   const specialization = normalizedText(
     profile.specialization,
@@ -1548,9 +1582,6 @@ function validateAccountProfile(profile) {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     throw new PublicError("البريد الإلكتروني غير صالح.", 400);
   }
-  if (!/^\+?[0-9 ()-]{7,24}$/.test(phone)) {
-    throw new PublicError("رقم الهاتف غير صالح.", 400);
-  }
   if (!Number.isInteger(experienceYears)
       || experienceYears < 0 || experienceYears > 80) {
     throw new PublicError("سنوات الخبرة غير صالحة.", 400);
@@ -1562,14 +1593,63 @@ function validateAccountProfile(profile) {
     || String(profile.affiliation).trim() === ""
     ? null
     : normalizedText(profile.affiliation, 1, 160, "الجهة العلمية");
+  const socialAccounts = validateSocialAccounts(profile.socialAccounts);
   return {
     fullName,
     email,
-    phone,
     experienceYears,
     specialization,
-    affiliation
+    affiliation,
+    socialAccounts
   };
+}
+
+function validateSocialAccounts(value) {
+  if (value == null) return {};
+  if (typeof value !== "object" || Array.isArray(value)) {
+    throw new PublicError("حسابات التواصل غير صالحة.", 400);
+  }
+  const unknownKeys = Object.keys(value).filter(
+    key => !SOCIAL_ACCOUNT_KEYS.has(key)
+  );
+  if (unknownKeys.length !== 0) {
+    throw new PublicError("تحتوي حسابات التواصل حقولًا غير معروفة.", 400);
+  }
+  const normalized = {};
+  for (const key of SOCIAL_ACCOUNT_KEYS) {
+    if (key === "otherPlatform") continue;
+    const raw = value[key];
+    if (raw == null || String(raw).trim() === "") continue;
+    const handle = String(raw).trim().replace(/^@+/, "");
+    if (!/^[^\s/@?#]{1,80}$/u.test(handle)) {
+      throw new PublicError(
+        "اسم المستخدم في حسابات التواصل غير صالح.",
+        400
+      );
+    }
+    normalized[key] = handle;
+  }
+  if (normalized.whatsapp
+      && !/^[a-z][a-z0-9._]{2,34}$/.test(normalized.whatsapp)) {
+    throw new PublicError("اسم مستخدم واتساب غير صالح.", 400);
+  }
+  const otherPlatform = value.otherPlatform == null
+    || String(value.otherPlatform).trim() === ""
+    ? null
+    : normalizedText(
+      value.otherPlatform,
+      2,
+      40,
+      "اسم المنصة الأخرى"
+    );
+  if (Boolean(otherPlatform) !== Boolean(normalized.otherUsername)) {
+    throw new PublicError(
+      "يجب إدخال اسم المنصة الأخرى واسم المستخدم معًا.",
+      400
+    );
+  }
+  if (otherPlatform) normalized.otherPlatform = otherPlatform;
+  return normalized;
 }
 
 function validateAccountConsent(consent) {
@@ -1812,7 +1892,7 @@ async function receiveSubmission(request, env) {
   const publicEnvelope = {
     schema: "adg-msa-github-inbox-v1",
     receiptId,
-    participantPseudonym: `ads-${receiptId.slice(0, 12)}`,
+    participantPseudonym: `adg-${receiptId.slice(0, 12)}`,
     receivedAtUtc,
     artifactType: submission.artifactType,
     artifactSha256: actualArtifactSha256,
@@ -1907,21 +1987,7 @@ function validateSubmission(value) {
     throw new PublicError("غلاف التقييم غير صالح.", 400);
   }
 
-  const profile = value.profile;
-  if (!profile
-      || !boundedText(profile.fullName, 2, 120)
-      || !boundedText(profile.email, 5, 160)
-      || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profile.email)
-      || !boundedText(profile.phone, 7, 32)
-      || !/^\+?[0-9 ()-]{7,24}$/.test(profile.phone)
-      || !Number.isInteger(profile.experienceYears)
-      || profile.experienceYears < 0
-      || profile.experienceYears > 80
-      || !boundedText(profile.specialization, 2, 60)
-      || (profile.affiliation !== null
-        && !boundedText(profile.affiliation, 1, 160))) {
-    throw new PublicError("بيانات المحكّم ناقصة أو غير صالحة.", 400);
-  }
+  validateAccountProfile(value.profile);
 
   if (value.consent?.identityStorage !== true
       || value.attestation?.independent !== true
@@ -2191,17 +2257,29 @@ function containsKey(value, keys) {
 }
 
 function enforceOrigin(request, env) {
-  const expected = env.ALLOWED_ORIGIN || "https://ads.sbay.sa";
+  const expected = env.ALLOWED_ORIGIN || DEFAULT_ORIGIN;
   const origin = request.headers.get("origin");
   if (origin && origin !== expected) {
     throw new PublicError("مصدر الطلب غير مسموح.", 403);
   }
 }
 
-function boundedText(value, minimum, maximum) {
-  return typeof value === "string"
-    && value.trim().length >= minimum
-    && value.trim().length <= maximum;
+function redirectLegacyOrigin(request, env, url) {
+  if (!["GET", "HEAD"].includes(request.method)
+      || url.hostname !== LEGACY_HOST) {
+    return null;
+  }
+  const target = new URL(env.ALLOWED_ORIGIN || DEFAULT_ORIGIN);
+  if (target.hostname === LEGACY_HOST) return null;
+  target.pathname = url.pathname;
+  target.search = url.search;
+  return new Response(null, {
+    status: 308,
+    headers: {
+      location: target.toString(),
+      "cache-control": "public, max-age=3600"
+    }
+  });
 }
 
 function isUuid(value) {

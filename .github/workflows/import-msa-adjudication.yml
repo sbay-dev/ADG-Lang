@@ -20,10 +20,10 @@ jobs:
     environment: msa-adjudication-production
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Sign in to Azure with OIDC
-        uses: azure/login@v2
+        uses: azure/login@v3
         with:
           client-id: ${{ vars.ADG_AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.ADG_AZURE_TENANT_ID }}
@@ -110,7 +110,7 @@ jobs:
             --base main `
             --head $branch `
             --title "evidence: import anonymized MSA adjudication" `
-            --body "Imports signed, PII-free submissions from ads.sbay.sa. Human identity remains in private Azure storage. Every artifact still requires repository review before use."
+            --body "Imports signed, PII-free submissions from adg.sbay.sa. Human identity remains in private Azure storage. Every artifact still requires repository review before use."
           "url=$url" | Out-File $env:GITHUB_OUTPUT -Append
 
       - name: Archive accepted queue items

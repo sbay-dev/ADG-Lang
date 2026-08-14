@@ -1,6 +1,8 @@
 # ADS deployment
 
-Target: `https://ads.sbay.sa`
+Canonical target: `https://adg.sbay.sa`
+
+Legacy target: `https://ads.sbay.sa` (HTTP 308 redirect)
 
 ## Azure resources
 
@@ -59,7 +61,9 @@ Entra ordinary variables:
 
 The Entra application must include this Web redirect URI:
 
-`https://ads.sbay.sa/signin-microsoft`
+`https://adg.sbay.sa/signin-microsoft`
+
+The Turnstile widget hostname allowlist must contain `adg.sbay.sa`.
 
 It requires delegated `User.Read` and the existing application permission
 `RoleManagement.Read.Directory` with tenant-admin consent. The administrative

@@ -76,6 +76,25 @@ const IRAB = [
   ["mafool-maah", "مفعول معه"]
 ];
 
+const PUBLIC_PORTAL_URL = "https://adg.sbay.sa/";
+const INVITATION_TEXT =
+  "دعوة لمعلمي اللغة العربية وخبرائها للمشاركة في التحكيم اللغوي "
+  + "المستقل لمحلل ADG-Lang. لا تحتاج إلى خبرة تقنية، ويمكن حفظ "
+  + "العمل والعودة إليه لاحقًا.";
+const SOCIAL_FIELDS = [
+  ["whatsapp", "social-whatsapp"],
+  ["x", "social-x"],
+  ["tiktok", "social-tiktok"],
+  ["instagram", "social-instagram"],
+  ["threads", "social-threads"],
+  ["telegram", "social-telegram"],
+  ["snapchat", "social-snapchat"],
+  ["facebook", "social-facebook"],
+  ["linkedin", "social-linkedin"],
+  ["youtube", "social-youtube"],
+  ["bluesky", "social-bluesky"]
+];
+
 const FIELD_HELP = {
   upos: "الصنف العام للكلمة، مثل اسم أو فعل أو ضمير.",
   head: "رقم الكلمة التي تتعلق بها؛ استخدم 0 لجذر الجملة.",
@@ -134,6 +153,10 @@ const saveDraftButton = document.querySelector("#save-draft");
 const draftStatus = document.querySelector("#draft-status");
 const savedDrafts = document.querySelector("#saved-drafts");
 const draftList = document.querySelector("#draft-list");
+const shareWhatsapp = document.querySelector("#share-whatsapp");
+const shareX = document.querySelector("#share-x");
+const copyInvitationButton = document.querySelector("#copy-invitation");
+const shareStatus = document.querySelector("#share-status");
 
 document.querySelectorAll('input[name="role"]').forEach(control => {
   control.addEventListener("change", syncRoleControls);
@@ -149,6 +172,7 @@ registerPasskeyButton.addEventListener("click", registerPasskey);
 loginPasskeyButton.addEventListener("click", loginWithPasskey);
 logoutAccountButton.addEventListener("click", logoutAccount);
 saveDraftButton.addEventListener("click", saveDraft);
+copyInvitationButton.addEventListener("click", copyInvitation);
 workspace.addEventListener("input", () => {
   updateCompletion();
   scheduleAutosave();
@@ -169,7 +193,29 @@ document.addEventListener("visibilitychange", () => {
   }
 });
 
+configureSharing();
 initialize();
+
+function configureSharing() {
+  const message = `${INVITATION_TEXT}\n\n${PUBLIC_PORTAL_URL}`;
+  shareWhatsapp.href =
+    `https://wa.me/?text=${encodeURIComponent(message)}`;
+  shareX.href =
+    "https://twitter.com/intent/tweet?text="
+    + encodeURIComponent(INVITATION_TEXT)
+    + `&url=${encodeURIComponent(PUBLIC_PORTAL_URL)}`;
+}
+
+async function copyInvitation() {
+  const message = `${INVITATION_TEXT}\n\n${PUBLIC_PORTAL_URL}`;
+  try {
+    await navigator.clipboard.writeText(message);
+    shareStatus.textContent = "نُسخت الدعوة.";
+  } catch {
+    shareStatus.textContent =
+      "تعذر النسخ الآلي؛ استخدم خيار واتساب أو X.";
+  }
+}
 
 async function initialize() {
   applyRoleFromQuery();
@@ -248,6 +294,11 @@ function showStep(step) {
   previousButton.hidden = step === 1;
   nextButton.hidden = step === 5;
   nextButton.textContent = step === 4 ? "مراجعة النتيجة" : "التالي";
+  if (step === 5) {
+    void ensureTurnstileWidget().catch(error => {
+      showStatus(error.message, true);
+    });
+  }
   document.querySelector("#adjudication").scrollIntoView({
     behavior: "smooth",
     block: "start"
@@ -257,21 +308,17 @@ function showStep(step) {
 function validateProfile() {
   const fullName = value("full-name");
   const email = value("email");
-  const phone = value("phone");
   const years = Number(value("experience-years"));
   requireText(fullName, "الاسم الكامل");
   requireText(email, "البريد الإلكتروني");
-  requireText(phone, "رقم الهاتف");
   requireText(value("specialization"), "مجال التخصص");
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     throw new Error("أدخل بريدًا إلكترونيًا صالحًا.");
   }
-  if (!/^\+?[0-9 ()-]{7,24}$/.test(phone)) {
-    throw new Error("أدخل رقم هاتف صالحًا مع رمز الدولة.");
-  }
   if (!Number.isInteger(years) || years < 0 || years > 80) {
     throw new Error("سنوات الخبرة يجب أن تكون بين صفر و80.");
   }
+  validateSocialAccounts(socialAccounts());
   if (!checked("privacy-consent")) {
     throw new Error("الموافقة على حفظ بيانات التواصل مطلوبة للإرسال.");
   }
@@ -281,11 +328,60 @@ function accountProfile() {
   return {
     fullName: value("full-name"),
     email: value("email"),
-    phone: value("phone"),
     experienceYears: Number(value("experience-years")),
     specialization: value("specialization"),
-    affiliation: nullable(value("affiliation"))
+    affiliation: nullable(value("affiliation")),
+    socialAccounts: socialAccounts()
   };
+}
+
+function socialAccounts() {
+  const accounts = {};
+  for (const [key, id] of SOCIAL_FIELDS) {
+    const handle = normalizeSocialHandle(value(id));
+    if (handle) accounts[key] = handle;
+  }
+  const otherPlatform = value("social-other-platform");
+  const otherUsername = normalizeSocialHandle(
+    value("social-other-username")
+  );
+  if (otherPlatform) accounts.otherPlatform = otherPlatform;
+  if (otherUsername) accounts.otherUsername = otherUsername;
+  return accounts;
+}
+
+function normalizeSocialHandle(handle) {
+  return handle.trim().replace(/^@+/, "");
+}
+
+function validateSocialAccounts(accounts) {
+  if (accounts.whatsapp
+      && !/^[a-z][a-z0-9._]{2,34}$/.test(accounts.whatsapp)) {
+    throw new Error(
+      "اسم مستخدم واتساب يجب أن يبدأ بحرف لاتيني صغير، وأن يتكون "
+      + "من 3 إلى 35 حرفًا أو رقمًا أو نقطة أو شرطة سفلية."
+    );
+  }
+  for (const [key, handle] of Object.entries(accounts)) {
+    if (key === "otherPlatform") continue;
+    if (!/^[^\s/@?#]{1,80}$/u.test(handle)) {
+      throw new Error(
+        "اكتب أسماء المستخدم من دون @ أو مسافات أو روابط كاملة."
+      );
+    }
+  }
+  const hasOtherPlatform = Boolean(accounts.otherPlatform);
+  const hasOtherUsername = Boolean(accounts.otherUsername);
+  if (hasOtherPlatform !== hasOtherUsername) {
+    throw new Error(
+      "أكمل اسم المنصة الأخرى واسم المستخدم فيها معًا."
+    );
+  }
+  if (hasOtherPlatform
+      && (accounts.otherPlatform.length < 2
+        || accounts.otherPlatform.length > 40)) {
+    throw new Error("اسم المنصة الأخرى غير صالح.");
+  }
 }
 
 function accountConsent() {
@@ -321,13 +417,20 @@ function fillProfile(profile, consent) {
   if (!profile) return;
   document.querySelector("#full-name").value = profile.fullName ?? "";
   document.querySelector("#email").value = profile.email ?? "";
-  document.querySelector("#phone").value = profile.phone ?? "";
   document.querySelector("#experience-years").value =
     profile.experienceYears ?? "";
   document.querySelector("#specialization").value =
     profile.specialization ?? "";
   document.querySelector("#affiliation").value =
     profile.affiliation ?? "";
+  const social = profile.socialAccounts ?? {};
+  for (const [key, id] of SOCIAL_FIELDS) {
+    document.querySelector(`#${id}`).value = social[key] ?? "";
+  }
+  document.querySelector("#social-other-platform").value =
+    social.otherPlatform ?? "";
+  document.querySelector("#social-other-username").value =
+    social.otherUsername ?? "";
   document.querySelector("#privacy-consent").checked =
     consent?.identityStorage === true;
   document.querySelector("#contact-consent").checked =
@@ -1268,8 +1371,9 @@ function renderReview() {
       <div><dt>طريقة النشر</dt><dd>نتيجة مجهّلة</dd></div>
     </dl>
     <p>
-      راجع التعهدات أدناه. سيُحفظ اسمك وبريدك وهاتفك في Azure منفصلًا،
-      بينما تُرسل القرارات اللغوية إلى قناة الاستيراد الخاصة بالمستودع.
+      راجع التعهدات أدناه. سيُحفظ اسمك وبريدك وحسابات التواصل التي
+      أضفتها في Azure منفصلة، بينما تُرسل القرارات اللغوية إلى قناة
+      الاستيراد الخاصة بالمستودع.
     </p>`;
 }
 
@@ -1333,7 +1437,7 @@ async function submitEvaluation() {
       artifactType: artifact.kind,
       artifactSha256,
       artifact,
-      clientVersion: "ads-v14.1",
+      clientVersion: "adg-v14.2",
       turnstileToken
     };
     const body = JSON.stringify(payload);
@@ -1369,6 +1473,14 @@ async function configureTurnstile() {
   await loadScript(
     "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
   );
+}
+
+async function ensureTurnstileWidget() {
+  if (!state.config.turnstileSiteKey
+      || state.turnstileWidgetId !== null) {
+    return;
+  }
+  if (!window.turnstile) await configureTurnstile();
   state.turnstileWidgetId = turnstile.render("#turnstile-slot", {
     sitekey: state.config.turnstileSiteKey,
     language: "ar",
