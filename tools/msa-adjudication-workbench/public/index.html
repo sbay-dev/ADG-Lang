@@ -1,0 +1,635 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description"
+        content="منصة عربية مبسطة للتحكيم النحوي المستقل لبارسر ADG-Lang.">
+  <title>منصة محكِّم العربية | ADS</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#adjudication">انتقل إلى نموذج التحكيم</a>
+
+  <header class="site-header">
+    <nav class="nav shell" aria-label="التنقل الرئيسي">
+      <a class="brand" href="#top" aria-label="منصة محكم العربية">
+        <span class="brand-mark" aria-hidden="true">ض</span>
+        <span>
+          <strong>محكِّم العربية</strong>
+          <small>Arabic Adjudication Studio · ADS</small>
+        </span>
+      </a>
+      <div class="nav-links">
+        <a href="#about">عن البارسر</a>
+        <a href="#criteria">معايير التحكيم</a>
+        <a href="#timeline">رحلة التطوير</a>
+        <a class="button compact" href="#adjudication">ابدأ التجربة</a>
+      </div>
+    </nav>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <div class="shell hero-grid">
+        <div>
+          <span class="eyebrow">دعوة لمعلمي العربية وخبرائها</span>
+          <h1>خبرتك اللغوية هي المعيار،<br>ولا تحتاج أي خبرة تقنية.</h1>
+          <p class="lead">
+            قيّم جملًا عربية واضحة من خلال خطوات مفسرة، وسجّل رأيك النحوي
+            والإعرابي من دون رؤية أي نتيجة صادرة من البارسر.
+          </p>
+          <div class="hero-actions">
+            <a class="button primary" href="#adjudication">
+              ابدأ العينة التجريبية
+            </a>
+            <a class="button secondary"
+               href="https://github.com/sbay-dev/ADG-Lang"
+               target="_blank" rel="noreferrer">صفحة المشروع</a>
+          </div>
+          <ul class="trust-list" aria-label="ضمانات المنصة">
+            <li>تحكيم أعمى بلا توقعات مسبقة</li>
+            <li>هوية المحكّم لا تُنشر في GitHub</li>
+            <li>يمكن حفظ العمل محليًا قبل الإرسال</li>
+          </ul>
+        </div>
+        <aside class="hero-card" aria-label="ملخص التجربة">
+          <div class="metric">
+            <strong>9</strong>
+            <span>جمل في العينة الأولى</span>
+          </div>
+          <div class="metric">
+            <strong>36</strong>
+            <span>وحدة لغوية</span>
+          </div>
+          <div class="metric">
+            <strong>10</strong>
+            <span>فئات إعرابية ممثلة</span>
+          </div>
+          <p>
+            تستغرق التجربة الأولية نحو 15–25 دقيقة. نتيجتها تختبر وضوح
+            المنصة والبروتوكول، ولا تُعد حكمًا نهائيًا على جاهزية البارسر.
+          </p>
+        </aside>
+      </div>
+    </section>
+
+    <section id="about" class="section shell">
+      <div class="section-heading">
+        <span class="eyebrow">ما الذي نختبره؟</span>
+        <h2>بارسر ADG-Lang للنحو العربي</h2>
+        <p>
+          محلل حتمي يهدف إلى بناء تمثيل صرفي ونحوي وإعرابي قابل للفحص.
+          بدأ من النص القرآني المنضبط ثم انتقل بحذر إلى العربية المعيارية.
+          المنصة الحالية تجمع تقييم الخبراء قبل أي ادعاء بالجاهزية العامة.
+        </p>
+      </div>
+      <div class="feature-grid">
+        <article class="feature-card">
+          <span class="feature-icon">١</span>
+          <h3>لا نطلب منك تصحيح برنامج</h3>
+          <p>نعرض النص فقط، وأنت تحدد التحليل الذي تراه صحيحًا لغويًا.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">٢</span>
+          <h3>لا نوجّه إجابتك</h3>
+          <p>نتائج البارسر مخفية حتى ينتهي التعليق المستقل والتحكيم.</p>
+        </article>
+        <article class="feature-card">
+          <span class="feature-icon">٣</span>
+          <h3>نقيس الاختلاف بوضوح</h3>
+          <p>تُعرض مواضع الخلاف للمحكّم الثالث مع طلب سبب موجز للحسم.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="criteria" class="section muted">
+      <div class="shell">
+        <div class="section-heading">
+          <span class="eyebrow">دليل سريع قبل البدء</span>
+          <h2>معايير التحكيم</h2>
+          <p>تجد الشرح نفسه داخل كل خطوة، ويمكن فتح الأمثلة عند الحاجة.</p>
+        </div>
+        <div class="criteria-grid">
+          <details open>
+            <summary>سلامة التركيب واكتمال الإسناد</summary>
+            <p>
+              حدّد هل الجملة مقبولة في العربية المعيارية، وهل اكتملت
+              العلاقة الإسنادية فيها، سواء أكانت فعلية أم اسمية.
+            </p>
+          </details>
+          <details>
+            <summary>نوع الكلمة UPOS</summary>
+            <p>
+              اختر النوع العام: اسم، فعل، صفة، ضمير، حرف جر، أداة، علامة
+              ترقيم، وغيرها. تظهر ترجمة عربية بجوار الاختصار.
+            </p>
+          </details>
+          <details>
+            <summary>الرأس والعلاقة النحوية</summary>
+            <p>
+              الرأس هو الوحدة التي تتعلق بها الكلمة، والعلاقة تصف وظيفتها
+              مثل فاعل أو مفعول أو نعت. الرقم صفر مخصص لجذر الجملة.
+            </p>
+          </details>
+          <details>
+            <summary>الإعراب التقليدي</summary>
+            <p>
+              اختر الفئة الملائمة مثل فاعل أو مفعول به أو خبر، وحدد
+              الكلمة التي يرتبط بها هذا الدور داخل الجملة. هذا الحقل
+              ليس حكمًا على «العامل» بمعناه النحوي النظري الكامل.
+              اختر «غير منطبق» عندما لا تنطبق الفئات المدعومة.
+            </p>
+          </details>
+          <details>
+            <summary>سبب الحسم</summary>
+            <p>
+              عند اختلاف المعلّقين، أو عند تغيير قرار اتفقا عليه، يجب أن
+              يكتب المحكّم سببًا لغويًا موجزًا يمكن مراجعته.
+            </p>
+          </details>
+          <details>
+            <summary>ما الذي لا يدخل التقييم؟</summary>
+            <p>
+              لا تُعرض نتائج البارسر، ولا تستخدم PADT أو PUD كعينة نهائية،
+              ولا يُنشر اسم المحكّم أو بريده أو هاتفه في المستودع.
+            </p>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <section id="timeline" class="section shell">
+      <div class="section-heading">
+        <span class="eyebrow">خط زمني مختصر</span>
+        <h2>كيف وصل المشروع إلى التحكيم البشري؟</h2>
+      </div>
+      <ol class="timeline">
+        <li>
+          <span>المرحلة 1</span>
+          <h3>نواة قرآنية حتمية</h3>
+          <p>بناء التطبيع والتقطيع والأدلة الصرفية مع حفظ مواضع النص.</p>
+        </li>
+        <li>
+          <span>المرحلة 2</span>
+          <h3>قواعد نحوية قابلة للاختبار</h3>
+          <p>إغلاق خصائص القرآن باختبارات حتمية بلغت 403/403.</p>
+        </li>
+        <li>
+          <span>v13</span>
+          <h3>إصلاح جذور العربية المعيارية</h3>
+          <p>فصل مسارات التطوير والتقييم وتجميد العينات المستهلكة.</p>
+        </li>
+        <li>
+          <span>v14</span>
+          <h3>منصة التحكيم البشري</h3>
+          <p>تحويل البروتوكول إلى تجربة عربية سهلة يمكن للخبراء فحصها.</p>
+        </li>
+      </ol>
+    </section>
+
+    <section id="adjudication" class="section portal-section">
+      <div class="shell">
+        <div class="section-heading">
+          <span class="eyebrow">التجربة العملية</span>
+          <h2>ابدأ التحكيم خطوة بخطوة</h2>
+          <p>
+            بيانات التواصل تحفظ في مخزن خاص منفصل. المستودع يستقبل
+            النتيجة المجهّلة فقط بعد اجتياز فحص النزاهة.
+          </p>
+        </div>
+
+        <div class="portal">
+          <ol class="steps" aria-label="خطوات التحكيم">
+            <li class="active" data-step-indicator="1">
+              <span>1</span> التعريف والموافقة
+            </li>
+            <li data-step-indicator="2"><span>2</span> الحساب والشرح</li>
+            <li data-step-indicator="3"><span>3</span> اختيار المهمة</li>
+            <li data-step-indicator="4"><span>4</span> التحليل اللغوي</li>
+            <li data-step-indicator="5"><span>5</span> المراجعة والإرسال</li>
+          </ol>
+
+          <form id="portal-form" novalidate>
+            <section class="step-panel active" data-step="1">
+              <div class="panel-heading">
+                <span>الخطوة الأولى</span>
+                <h3>بيانات المحكّم</h3>
+                <p>
+                  نستخدم هذه البيانات للتوثيق والتواصل فقط، ولا نضيفها
+                  إلى ملفات GitHub العامة.
+                </p>
+              </div>
+              <div class="resume-banner">
+                <div>
+                  <strong>هل سبق أن أنشأت حسابًا؟</strong>
+                  <p>
+                    ادخل ببصمة الوجه أو الإصبع أو رمز الجهاز أو مفتاح
+                    المرور، ثم تابع مسودتك من حيث توقفت.
+                  </p>
+                </div>
+                <button id="quick-login" class="button secondary"
+                        type="button" disabled>دخول ومتابعة</button>
+              </div>
+              <div class="form-grid">
+                <label>
+                  الاسم الكامل
+                  <input id="full-name" name="fullName" autocomplete="name"
+                         maxlength="120" required>
+                </label>
+                <label>
+                  البريد الإلكتروني
+                  <input id="email" name="email" type="email"
+                         autocomplete="email" maxlength="160" required>
+                </label>
+                <label>
+                  رقم الهاتف مع رمز الدولة
+                  <input id="phone" name="phone" type="tel"
+                         autocomplete="tel" maxlength="32"
+                         placeholder="+966…" required>
+                </label>
+                <label>
+                  سنوات الخبرة في تعليم العربية
+                  <input id="experience-years" name="experienceYears"
+                         type="number" min="0" max="80" required>
+                </label>
+                <label>
+                  مجال التخصص
+                  <select id="specialization" name="specialization" required>
+                    <option value="">اختر التخصص</option>
+                    <option value="grammar">النحو</option>
+                    <option value="morphology">الصرف</option>
+                    <option value="arabic-education">تعليم اللغة العربية</option>
+                    <option value="quranic-arabic">العربية القرآنية</option>
+                    <option value="linguistics">اللسانيات</option>
+                    <option value="other">تخصص عربي آخر</option>
+                  </select>
+                </label>
+                <label>
+                  الجهة أو الصفة العلمية <small>(اختياري)</small>
+                  <input id="affiliation" name="affiliation" maxlength="160">
+                </label>
+              </div>
+              <div class="consent-box">
+                <label class="check-row">
+                  <input id="privacy-consent" type="checkbox" required>
+                  <span>
+                    أوافق على حفظ بيانات التواصل في مخزن خاص لغرض توثيق
+                    المشاركة والتواصل بشأن هذا التقييم.
+                  </span>
+                </label>
+                <label class="check-row">
+                  <input id="contact-consent" type="checkbox">
+                  <span>أوافق على التواصل معي في جولات تقييم لاحقة.</span>
+                </label>
+                <p>
+                  تُحفظ الهوية منفصلة عن النتيجة، ويصل إلى GitHub معرف
+                  عشوائي لا يكشف اسمك أو بريدك أو هاتفك.
+                </p>
+              </div>
+            </section>
+
+            <section class="step-panel" data-step="2" hidden>
+              <div class="panel-heading">
+                <span>الخطوة الثانية</span>
+                <h3>أنشئ مفتاح المرور وافهم المهمة</h3>
+                <p>
+                  لا توجد كلمة مرور. يحفظ جهازك مفتاحًا آمنًا، وتؤكد
+                  الدخول لاحقًا بالطريقة التي يدعمها: الوجه أو البصمة
+                  أو رمز الجهاز أو مفتاح أمان خارجي. لا تحتاج إلى
+                  حساب المؤسسة أو حساب Microsoft.
+                </p>
+              </div>
+
+              <div class="account-card">
+                <div>
+                  <span class="eyebrow">حساب الاستكمال</span>
+                  <h4 id="account-title">أنشئ حسابك الآمن</h4>
+                  <p id="account-description">
+                    ستُشفّر بيانات التعريف والمسودات قبل حفظها، ولا
+                    يملك الموقع كلمة مرور يمكن تسريبها.
+                  </p>
+                </div>
+                <div class="account-actions">
+                  <button id="register-passkey" class="button primary"
+                          type="button" disabled>تسجيل مفتاح المرور</button>
+                  <button id="login-passkey" class="button secondary"
+                          type="button" disabled>لدي حساب: دخول</button>
+                  <button id="logout-account" class="button ghost"
+                          type="button" hidden>تسجيل الخروج</button>
+                </div>
+                <output id="account-status" class="status"
+                        aria-live="polite"></output>
+              </div>
+
+              <div class="guide-intro">
+                <span class="eyebrow">قبل اختيار المهمة</span>
+                <h3>ما الذي ستفعله بالضبط؟</h3>
+                <p>
+                  ستقرأ جملًا عربية قصيرة، ثم تصف وظيفة كل كلمة
+                  وعلاقتها بما حولها. المطلوب حكمك اللغوي، لا معرفة
+                  البرمجة ولا استخدام GitHub.
+                </p>
+              </div>
+              <div class="guide-grid">
+                <article class="guide-card">
+                  <span>1</span>
+                  <h4>اقرأ الجملة كاملة</h4>
+                  <p>
+                    حدّد أولًا هل تركيبها فصيح وهل اكتمل فيها الإسناد
+                    بين المسند والمسند إليه.
+                  </p>
+                </article>
+                <article class="guide-card">
+                  <span>2</span>
+                  <h4>حلّل كل كلمة</h4>
+                  <p>
+                    اختر نوعها، والكلمة التي تتعلق بها، واسم العلاقة
+                    النحوية، ثم فئتها الإعرابية والكلمة التي يرتبط بها
+                    هذا الدور.
+                  </p>
+                </article>
+                <article class="guide-card">
+                  <span>3</span>
+                  <h4>راجع ثم وثّق الحكم</h4>
+                  <p>
+                    يمكنك حفظ مسودة والعودة إليها. لا تُرسل النتيجة
+                    حتى تتأكد أن كل اختيار يمثل رأيك العلمي.
+                  </p>
+                </article>
+              </div>
+              <div class="worked-example">
+                <div>
+                  <span class="eyebrow">مثال مبسّط</span>
+                  <h4>«كتبَ الطالبُ الدرسَ»</h4>
+                  <p>
+                    الفعل «كتب» هو مركز الجملة؛ «الطالب» فاعله،
+                    و«الدرس» مفعوله. أرقام الكلمات في المهمة هي التي
+                    تستخدم لاختيار الروابط، لكن القائمة ستعرض لك الرقم
+                    والكلمة معًا ولن تطلب رقمًا مجردًا.
+                  </p>
+                </div>
+                <div class="example-table-wrap">
+                  <table class="example-table">
+                    <thead>
+                      <tr>
+                        <th>الكلمة</th>
+                        <th>النوع</th>
+                        <th>الرأس</th>
+                        <th>العلاقة</th>
+                        <th>الإعراب</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>1. كتبَ</td>
+                        <td>فعل VERB</td>
+                        <td>0</td>
+                        <td>جذر الجملة root</td>
+                        <td>غير منطبق في القائمة الحالية</td>
+                      </tr>
+                      <tr>
+                        <td>2. الطالبُ</td>
+                        <td>اسم NOUN</td>
+                        <td>1</td>
+                        <td>فاعل nsubj</td>
+                        <td>فاعل، مرتبط بـ 1 «كتب»</td>
+                      </tr>
+                      <tr>
+                        <td>3. الدرسَ</td>
+                        <td>اسم NOUN</td>
+                        <td>1</td>
+                        <td>مفعول obj</td>
+                        <td>مفعول به، مرتبط بـ 1 «كتب»</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div class="privacy-note">
+                <strong>حدود هذا المثال:</strong>
+                <span>
+                  هو لتوضيح طريقة تعبئة الحقول فقط، وليس إجابة لعينة
+                  التحكيم، ولن تظهر لك توقعات البارسر أثناء العمل.
+                </span>
+              </div>
+            </section>
+
+            <section class="step-panel" data-step="3" hidden>
+              <div class="panel-heading">
+                <span>الخطوة الثالثة</span>
+                <h3>اختر دورك وحمّل حالة التقييم</h3>
+                <p>
+                  إن أرسل إليك المنسق اسم الدور أو ملفات محددة فاتبع
+                  تعليماته. للاختبار الأول اختر A وحمّل العينة
+                  التجريبية.
+                </p>
+              </div>
+              <fieldset class="role-grid">
+                <legend>الدور في هذه الجولة</legend>
+                <label class="choice-card">
+                  <input type="radio" name="role" value="A" checked>
+                  <strong>المعلّق المستقل A</strong>
+                  <span>
+                    ابدأ من النص وحده. الحرف A مجرد رمز لفصل نسختك
+                    عن نسخة معلّق مستقل آخر.
+                  </span>
+                </label>
+                <label class="choice-card">
+                  <input type="radio" name="role" value="B">
+                  <strong>المعلّق المستقل B</strong>
+                  <span>
+                    المهمة نفسها تمامًا، لكن لمن عيّنه المنسق بوصفه
+                    المعلّق الثاني. لا تطّلع على ملف A.
+                  </span>
+                </label>
+                <label class="choice-card">
+                  <input type="radio" name="role" value="adjudication">
+                  <strong>المحكّم الثالث</strong>
+                  <span>
+                    لا تختره إلا إذا تسلمت الحزمة وملفي A وB؛ ستقارن
+                    القرارين وتكتب سبب الحسم عند الخلاف.
+                  </span>
+                </label>
+              </fieldset>
+
+              <div id="saved-drafts" class="saved-drafts" hidden>
+                <div class="subheading">
+                  <h4>مسوداتك المحفوظة</h4>
+                  <p>اختر مسودة للعودة مباشرة إلى شاشة التحليل.</p>
+                </div>
+                <div id="draft-list" class="draft-list"></div>
+              </div>
+
+              <div class="task-instructions">
+                <strong>طريقة البدء</strong>
+                <ol>
+                  <li>اختر الدور الذي حدده لك منسق الجولة.</li>
+                  <li>
+                    اختر «تحميل العينة التجريبية» للتجربة، أو افتح
+                    ملف JSON الذي أرسله المنسق.
+                  </li>
+                  <li>
+                    تأكد من ظهور عدد الجمل والوحدات، ثم اضغط «التالي».
+                  </li>
+                </ol>
+              </div>
+              <div class="source-actions">
+                <button id="load-pilot" class="button primary" type="button">
+                  تحميل العينة التجريبية
+                </button>
+                <label class="file-button">
+                  حزمة يرسلها منسق التقييم
+                  <input id="packet-file" type="file"
+                         accept=".json,application/json">
+                </label>
+              </div>
+              <div id="adjudication-files" class="form-grid" hidden>
+                <label>
+                  ملف المعلّق A
+                  <input id="annotation-a-file" type="file"
+                         accept=".json,application/json">
+                </label>
+                <label>
+                  ملف المعلّق B
+                  <input id="annotation-b-file" type="file"
+                         accept=".json,application/json">
+                </label>
+              </div>
+              <div id="packet-summary" class="case-summary" hidden></div>
+            </section>
+
+            <section class="step-panel" data-step="4" hidden>
+              <div class="panel-heading sticky-heading">
+                <div>
+                  <span>الخطوة الرابعة</span>
+                  <h3>التحليل اللغوي</h3>
+                </div>
+                <div class="analysis-toolbar">
+                  <div class="completion">
+                    <strong id="completion-value">0%</strong>
+                    <span>نسبة الإكمال</span>
+                  </div>
+                  <button id="save-draft" class="button secondary compact"
+                          type="button">حفظ ومتابعة لاحقًا</button>
+                </div>
+              </div>
+              <div class="integrity-note">
+                لا توجد نتيجة صحيحة مقترحة مسبقًا. استخدم حكمك العلمي وحده.
+              </div>
+              <details class="field-guide" open>
+                <summary>شرح الحقول التي ستظهر لكل كلمة</summary>
+                <div class="field-guide-grid">
+                  <div>
+                    <strong>نوع الكلمة</strong>
+                    <p>
+                      صنفها العام: اسم، فعل، صفة، ضمير، حرف جر...
+                      يظهر الرمز الدولي بجانب الوصف العربي.
+                    </p>
+                  </div>
+                  <div>
+                    <strong>الرأس النحوي</strong>
+                    <p>
+                      رقم الكلمة التي تعتمد عليها هذه الكلمة. اكتب
+                      0 للكلمة المركزية الوحيدة في الجملة.
+                    </p>
+                  </div>
+                  <div>
+                    <strong>العلاقة</strong>
+                    <p>
+                      وظيفة الصلة بالرأس: فاعل، مفعول، نعت، مضاف
+                      إليه... اختر الأقرب إلى تحليلك.
+                    </p>
+                  </div>
+                  <div>
+                    <strong>فئة الإعراب</strong>
+                    <p>
+                      الموقع الإعرابي المطلوب من القائمة. اختر «غير
+                      منطبق» إذا لم تنطبق أي فئة ضمن نطاق التجربة.
+                    </p>
+                  </div>
+                  <div>
+                    <strong>رأس علاقة الإعراب</strong>
+                    <p>
+                      اختر من القائمة الكلمة التي يقوم معها الدور
+                      الإعرابي: الفاعل والمفعول يرتبطان بالفعل، والنعت
+                      بالمنعوت، والمضاف إليه بالمضاف، والخبر بالمبتدأ.
+                    </p>
+                    <p>
+                      لا نطلب هنا تحديد العامل اللفظي أو المعنوي أو
+                      المقدّر وفق المدارس النحوية؛ العقد الحالي يسجل
+                      رابطًا محدودًا بين كلمتين ظاهرتين فقط.
+                    </p>
+                  </div>
+                </div>
+              </details>
+              <output id="draft-status" class="status"
+                      aria-live="polite"></output>
+              <div id="workspace" class="workspace"></div>
+            </section>
+
+            <section class="step-panel" data-step="5" hidden>
+              <div class="panel-heading">
+                <span>الخطوة الخامسة</span>
+                <h3>راجع التعهد ثم أرسل النتيجة</h3>
+              </div>
+              <div id="review-summary" class="review-summary"></div>
+              <div class="attestations">
+                <label class="check-row">
+                  <input id="attest-independent" type="checkbox" required>
+                  <span>أنجزت التقييم باستقلال عن فريق تطوير البارسر.</span>
+                </label>
+                <label class="check-row">
+                  <input id="attest-blind" type="checkbox" required>
+                  <span>لم أشاهد توقعات البارسر أو إجاباته قبل الإكمال.</span>
+                </label>
+                <label class="check-row">
+                  <input id="attest-authentic" type="checkbox" required>
+                  <span>القرارات المسجلة تمثل حكمي اللغوي الحقيقي.</span>
+                </label>
+              </div>
+              <div id="turnstile-slot" class="turnstile-slot"></div>
+              <div class="submission-actions">
+                <button id="download" class="button secondary" type="button">
+                  حفظ نسخة على الجهاز
+                </button>
+                <button id="submit" class="button primary" type="button">
+                  إرسال التقييم بأمان
+                </button>
+              </div>
+              <output id="submission-status" class="status"
+                      aria-live="polite"></output>
+            </section>
+
+            <output id="wizard-status" class="status wizard-status"
+                    aria-live="polite"></output>
+            <div class="wizard-actions">
+              <button id="previous-step" class="button ghost"
+                      type="button" hidden>السابق</button>
+              <button id="next-step" class="button primary"
+                      type="button">التالي</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="shell footer-grid">
+      <div>
+        <strong>منصة محكِّم العربية · ADS</strong>
+        <p>مشروع بحثي مفتوح للفحص، وليس خدمة تصحيح لغوي نهائية.</p>
+      </div>
+      <div>
+        <a href="https://x.com/sbay_team/status/2085059547790528514"
+           target="_blank" rel="noreferrer">الإعلان السابق للمشروع</a>
+        <a href="https://github.com/sbay-dev/ADG-Lang/pull/1"
+           target="_blank" rel="noreferrer">نقاش النشر والتقييم</a>
+      </div>
+    </div>
+  </footer>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

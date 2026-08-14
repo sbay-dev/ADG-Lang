@@ -1,0 +1,111 @@
+{
+  "schema": "adg-msa-adjudication-packet-v2",
+  "packetId": "msa-adjudication-pilot-v1",
+  "holdoutId": "pilot-authored-msa-not-final",
+  "protocolId": "adg-msa-blind-adjudication-protocol-v1",
+  "releaseCandidateId": "adg-lang-v14",
+  "pilotOnly": true,
+  "developerVisible": true,
+  "parserPredictionsExcluded": true,
+  "derivedFromExcludedCorpus": false,
+  "holdoutManifestSha256": null,
+  "sentences": [
+    {
+      "sentenceId": "pilot-01",
+      "text": "كتبَ الطالبُ الدرسَ.",
+      "tokens": [
+        { "id": 1, "form": "كتبَ" },
+        { "id": 2, "form": "الطالبُ" },
+        { "id": 3, "form": "الدرسَ" },
+        { "id": 4, "form": "." }
+      ]
+    },
+    {
+      "sentenceId": "pilot-02",
+      "text": "كُتبَ القرارُ.",
+      "tokens": [
+        { "id": 1, "form": "كُتبَ" },
+        { "id": 2, "form": "القرارُ" },
+        { "id": 3, "form": "." }
+      ]
+    },
+    {
+      "sentenceId": "pilot-03",
+      "text": "الطالبُ مجتهدٌ.",
+      "tokens": [
+        { "id": 1, "form": "الطالبُ" },
+        { "id": 2, "form": "مجتهدٌ" },
+        { "id": 3, "form": "." }
+      ]
+    },
+    {
+      "sentenceId": "pilot-04",
+      "text": "قرأتُ كتابَ الطالبِ.",
+      "tokens": [
+        { "id": 1, "form": "قرأتُ" },
+        { "id": 2, "form": "كتابَ" },
+        { "id": 3, "form": "الطالبِ" },
+        { "id": 4, "form": "." }
+      ]
+    },
+    {
+      "sentenceId": "pilot-05",
+      "text": "جاءَ الطالبُ المجتهدُ.",
+      "tokens": [
+        { "id": 1, "form": "جاءَ" },
+        { "id": 2, "form": "الطالبُ" },
+        { "id": 3, "form": "المجتهدُ" },
+        { "id": 4, "form": "." }
+      ]
+    },
+    {
+      "sentenceId": "pilot-06",
+      "text": "عادَ المسافرُ مسرعًا.",
+      "tokens": [
+        { "id": 1, "form": "عادَ" },
+        { "id": 2, "form": "المسافرُ" },
+        { "id": 3, "form": "مسرعًا" },
+        { "id": 4, "form": "." }
+      ]
+    },
+    {
+      "sentenceId": "pilot-07",
+      "text": "دقَّ العاملُ البابَ دقًّا.",
+      "tokens": [
+        { "id": 1, "form": "دقَّ" },
+        { "id": 2, "form": "العاملُ" },
+        { "id": 3, "form": "البابَ" },
+        { "id": 4, "form": "دقًّا" },
+        { "id": 5, "form": "." }
+      ]
+    },
+    {
+      "sentenceId": "pilot-08",
+      "text": "درستُ رغبةً في النجاحِ.",
+      "tokens": [
+        { "id": 1, "form": "درستُ" },
+        { "id": 2, "form": "رغبةً" },
+        { "id": 3, "form": "في" },
+        { "id": 4, "form": "النجاحِ" },
+        { "id": 5, "form": "." }
+      ]
+    },
+    {
+      "sentenceId": "pilot-09",
+      "text": "سارَ القائدُ والجيشَ.",
+      "tokens": [
+        { "id": 1, "form": "سارَ" },
+        { "id": 2, "form": "القائدُ" },
+        { "id": 3, "form": "والجيشَ" },
+        { "id": 4, "form": "." }
+      ]
+    }
+  ],
+  "instructions": [
+    "Annotate without viewing parser output.",
+    "Assign UPOS, dependency head, and dependency relation to every token.",
+    "Assign one supported traditional i'rab category or explicitly mark it not applicable.",
+    "Record structural acceptability and complete-predicate status per sentence.",
+    "This authored, developer-visible packet is pilot-only and cannot become a final holdout."
+  ]
+}

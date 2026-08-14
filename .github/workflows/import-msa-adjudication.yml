@@ -1,0 +1,138 @@
+name: Import MSA adjudication submissions
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+  pull-requests: write
+
+concurrency:
+  group: msa-adjudication-import
+  cancel-in-progress: false
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    environment: msa-adjudication-production
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Sign in to Azure with OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.ADG_AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.ADG_AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.ADG_AZURE_SUBSCRIPTION_ID }}
+
+      - name: Download and validate pending submissions
+        id: inbox
+        shell: pwsh
+        env:
+          STORAGE_ACCOUNT: ${{ vars.ADG_AZURE_STORAGE_ACCOUNT }}
+          KEY_VAULT: ${{ vars.ADG_AZURE_KEY_VAULT }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $pending = "adg-submissions-pending"
+          $output = Join-Path $PWD ".portal-inbox"
+          $raw = Join-Path $PWD ".portal-raw"
+          New-Item -ItemType Directory -Path $output, $raw -Force |
+            Out-Null
+
+          $hmac = az keyvault secret show `
+            --vault-name $env:KEY_VAULT `
+            --name adg-github-submission-hmac `
+            --query value `
+            --output tsv
+          if (-not $hmac) {
+            throw "The submission HMAC key is unavailable."
+          }
+          Write-Output "::add-mask::$hmac"
+          $env:ADG_SUBMISSION_HMAC = $hmac
+
+          $blobs = @(
+            az storage blob list `
+              --account-name $env:STORAGE_ACCOUNT `
+              --container-name $pending `
+              --auth-mode login `
+              --query "[].name" `
+              --output json |
+              ConvertFrom-Json
+          )
+          if ($blobs.Count -eq 0) {
+            "count=0" | Out-File $env:GITHUB_OUTPUT -Append
+            exit 0
+          }
+
+          foreach ($blob in $blobs) {
+            $rawPath = Join-Path $raw $blob
+            $targetPath = Join-Path $output $blob
+            az storage blob download `
+              --account-name $env:STORAGE_ACCOUNT `
+              --container-name $pending `
+              --name $blob `
+              --file $rawPath `
+              --auth-mode login `
+              --no-progress `
+              --output none
+            node scripts/arabic-text/import-msa-portal-submission.mjs `
+              $rawPath $targetPath
+          }
+
+          "count=$($blobs.Count)" |
+            Out-File $env:GITHUB_OUTPUT -Append
+
+      - name: Create adjudication inbox pull request
+        if: steps.inbox.outputs.count != '0'
+        id: pull_request
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $branch = "automation/msa-adjudication-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b $branch
+          New-Item -ItemType Directory `
+            -Path "human-evidence/inbox" `
+            -Force | Out-Null
+          Copy-Item ".portal-inbox/*.json" `
+            "human-evidence/inbox/" -Force
+          git add human-evidence/inbox
+          git commit -m "evidence: import anonymized MSA adjudication"
+          git push --set-upstream origin $branch
+          $url = gh pr create `
+            --base main `
+            --head $branch `
+            --title "evidence: import anonymized MSA adjudication" `
+            --body "Imports signed, PII-free submissions from ads.sbay.sa. Human identity remains in private Azure storage. Every artifact still requires repository review before use."
+          "url=$url" | Out-File $env:GITHUB_OUTPUT -Append
+
+      - name: Archive accepted queue items
+        if: steps.inbox.outputs.count != '0' && steps.pull_request.outputs.url != ''
+        shell: pwsh
+        env:
+          STORAGE_ACCOUNT: ${{ vars.ADG_AZURE_STORAGE_ACCOUNT }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          Get-ChildItem ".portal-raw/*.json" | ForEach-Object {
+            az storage blob upload `
+              --account-name $env:STORAGE_ACCOUNT `
+              --container-name adg-submissions-processed `
+              --name $_.Name `
+              --file $_.FullName `
+              --auth-mode login `
+              --overwrite false `
+              --output none
+            az storage blob delete `
+              --account-name $env:STORAGE_ACCOUNT `
+              --container-name adg-submissions-pending `
+              --name $_.Name `
+              --auth-mode login `
+              --output none
+          }

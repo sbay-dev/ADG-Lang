@@ -1,0 +1,38 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "adg-msa-adjudication",
+  "main": "src/index.js",
+  "compatibility_date": "2026-08-14",
+  "workers_dev": true,
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": true,
+    "not_found_handling": "404-page"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "adg-msa-adjudication-accounts",
+      "database_id": "replace-with-d1-database-id",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "vars": {
+    "ALLOWED_ORIGIN": "https://your-domain.example",
+    "SUBMISSION_ENABLED": "false",
+    "MAX_SUBMISSION_BYTES": "900000",
+    "TURNSTILE_SITE_KEY": "",
+    "GITHUB_REPOSITORY": "owner/repository",
+    "AZURE_TENANT_ID": "",
+    "AZURE_CLIENT_ID": "",
+    "AZURE_KEY_VAULT_URL": "https://your-vault.vault.azure.net",
+    "SUBMISSION_SAS_SECRET_NAME": "adg-submissions-write-sas",
+    "IDENTITY_SAS_SECRET_NAME": "adg-identities-write-sas",
+    "SUBMISSION_HMAC_SECRET_NAME": "adg-github-submission-hmac",
+    "ENTITYCRYPT_MASTER_KEY_SECRET_NAME": "adg-entitycrypt-master-key-v1",
+    "ENTRA_TENANT_ID": "",
+    "ENTRA_CLIENT_ID": "",
+    "ENTRA_CLIENT_SECRET_NAME": "adg-entra-client-secret"
+  }
+}

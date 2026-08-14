@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <meta name="description"
+        content="لوحة متابعة خاصة بمسؤولي منصة تحكيم ADG.">
+  <title>لوحة متابعة المحكّمين · ADS</title>
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/admin/admin.css">
+</head>
+<body class="admin-body">
+  <a class="skip-link" href="#admin-main">انتقل إلى المحتوى</a>
+  <header class="admin-header">
+    <div class="shell admin-nav">
+      <a class="brand" href="/">
+        <span class="brand-mark">ض</span>
+        <span>
+          <strong>لوحة متابعة المحكّمين</strong>
+          <small>ADS · ADMIN</small>
+        </span>
+      </a>
+      <span class="private-badge">خاص · مسؤول Entra فقط</span>
+    </div>
+  </header>
+
+  <main id="admin-main" class="admin-main shell">
+    <section id="admin-login" class="admin-login-card">
+      <span class="eyebrow">وصول إداري محمي</span>
+      <h1>متابعة تقدم المحكّمين</h1>
+      <p>
+        لا تُعرض هذه اللوحة إلا لعضو من مستأجر المؤسسة تثبت له صلاحية
+        Global Administrator من Microsoft Entra أو Microsoft Graph.
+      </p>
+      <a class="button primary" href="/api/admin/auth/login">
+        الدخول بهوية Microsoft Entra
+      </a>
+      <output id="login-status" class="status"
+              aria-live="polite"></output>
+    </section>
+
+    <section id="admin-dashboard" hidden>
+      <div class="dashboard-heading">
+        <div>
+          <span class="eyebrow">لوحة النتائج الخاصة</span>
+          <h1>حالة جولة التحكيم</h1>
+          <p id="generated-at">جارٍ تحميل أحدث حالة…</p>
+        </div>
+        <div class="admin-account">
+          <strong id="admin-name"></strong>
+          <span id="admin-source"></span>
+          <div>
+            <button id="refresh-dashboard" class="button secondary compact"
+                    type="button">تحديث</button>
+            <button id="admin-logout" class="button ghost compact"
+                    type="button">تسجيل الخروج</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="admin-privacy">
+        <strong>بيانات مقيدة:</strong>
+        <span>
+          تعرض هذه الصفحة بيانات التواصل المشفرة بعد فكها في الخادم
+          للمسؤول المخوّل فقط. لا تنسخها إلى GitHub أو قنوات عامة.
+        </span>
+      </div>
+
+      <section class="summary-grid" aria-label="ملخص التقدم">
+        <article>
+          <span>إجمالي المحكّمين</span>
+          <strong id="summary-total">0</strong>
+        </article>
+        <article>
+          <span>قيد العمل</span>
+          <strong id="summary-active">0</strong>
+        </article>
+        <article>
+          <span>أرسلوا النتيجة</span>
+          <strong id="summary-completed">0</strong>
+        </article>
+        <article>
+          <span>لم يبدأوا</span>
+          <strong id="summary-not-started">0</strong>
+        </article>
+        <article>
+          <span>متوسط الإكمال</span>
+          <strong id="summary-average">0%</strong>
+        </article>
+      </section>
+
+      <section class="participants-panel">
+        <div class="participants-toolbar">
+          <div>
+            <h2>تقدم كل محكّم</h2>
+            <p>تتحدث النسبة عند الحفظ التلقائي أو اليدوي للمسودة.</p>
+          </div>
+          <div class="admin-filters">
+            <label>
+              بحث بالاسم أو البريد
+              <input id="participant-search" type="search"
+                     autocomplete="off" placeholder="اكتب للبحث">
+            </label>
+            <label>
+              الحالة
+              <select id="participant-status">
+                <option value="all">كل الحالات</option>
+                <option value="in-progress">قيد العمل</option>
+                <option value="submitted">تم الإرسال</option>
+                <option value="not-started">لم يبدأ</option>
+              </select>
+            </label>
+          </div>
+        </div>
+
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>المحكّم</th>
+                <th>الخبرة</th>
+                <th>المهمة والدور</th>
+                <th>التقدم</th>
+                <th>آخر نشاط</th>
+                <th>الحالة</th>
+              </tr>
+            </thead>
+            <tbody id="participants-body"></tbody>
+          </table>
+          <p id="empty-participants" class="empty-state" hidden>
+            لا توجد سجلات مطابقة.
+          </p>
+        </div>
+        <output id="dashboard-status" class="status"
+                aria-live="polite"></output>
+      </section>
+    </section>
+  </main>
+
+  <script type="module" src="/admin/admin.js"></script>
+</body>
+</html>

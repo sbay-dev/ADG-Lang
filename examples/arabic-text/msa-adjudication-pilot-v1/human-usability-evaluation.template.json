@@ -1,0 +1,18 @@
+{
+  "schema": "adg-msa-workbench-usability-v1",
+  "packetId": "msa-adjudication-pilot-v1",
+  "participantSlot": "REPLACE_WITH_A_B_OR_ADJUDICATOR",
+  "participantPseudonym": "REPLACE_WITH_PSEUDONYM",
+  "isHuman": true,
+  "independentFromImplementationTeam": true,
+  "completed": false,
+  "completionMinutes": 0,
+  "instructionClarityScore1To5": 0,
+  "fieldClarityScore1To5": 0,
+  "blindnessConfidenceScore1To5": 0,
+  "workloadScore1To5": 0,
+  "blockingIssue": null,
+  "ambiguousFields": [],
+  "comments": null,
+  "approveProtocolForSealedHoldout": false
+}

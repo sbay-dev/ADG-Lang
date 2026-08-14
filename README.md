@@ -36,6 +36,20 @@ This public repository is the official community-facing language repository for:
 4. Parser and compiler design notes.
 5. Community verification and research tasks.
 
+## Human Arabic Adjudication
+
+Arabic teachers and linguists can evaluate the parser without GitHub or
+command-line knowledge at:
+
+**https://ads.sbay.sa**
+
+The Arabic-first portal explains every criterion, hides parser predictions,
+keeps participant identity encrypted outside GitHub, and is designed to import
+only signed, pseudonymous linguistic evidence through a review pull request.
+Passkey accounts and encrypted draft resumption are live; central submission
+remains disabled until the import workflow is merged and revalidated. Its
+source and security model are under `tools\msa-adjudication-workbench`.
+
 ## Start Here
 
 | Document | Purpose |
