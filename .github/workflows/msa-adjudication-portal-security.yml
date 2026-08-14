@@ -66,6 +66,11 @@ jobs:
           if ($LASTEXITCODE -eq 0 -and $matches) {
             throw "Credential-like content found in tracked files."
           }
+          if ($LASTEXITCODE -eq 1) {
+            $global:LASTEXITCODE = 0
+          } elseif ($LASTEXITCODE -gt 1) {
+            throw "Credential scan failed with exit code $LASTEXITCODE."
+          }
 
       - name: Write security report
         shell: pwsh
