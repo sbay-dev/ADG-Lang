@@ -1,0 +1,124 @@
+{
+  "schema": "adg-msa-annotation-submission-v2",
+  "packetId": "msa-adjudication-pilot-v1",
+  "holdoutId": "pilot-authored-msa-not-final",
+  "protocolId": "adg-msa-blind-adjudication-protocol-v1",
+  "packetMerkleRoot": "2528f0a37e372ee756a4e11de8e929f7f4a51182e9e08b35f11ff5de1be00717",
+  "annotatorSlot": "A",
+  "annotatorPseudonym": "synthetic-annotator-a",
+  "isHuman": false,
+  "isSynthetic": true,
+  "independentFromImplementationTeam": true,
+  "blindToParserInternals": true,
+  "parserPredictionsViewed": false,
+  "sentences": [
+    {
+      "sentenceId": "pilot-01",
+      "structurallyAcceptable": true,
+      "completePredicate": true,
+      "tokens": [
+        { "tokenId": 1, "universalPartOfSpeech": "VERB", "headTokenId": 0, "dependencyRelation": "root", "irabHeadTokenId": null, "irabCategory": null, "irabNotApplicable": true, "note": null },
+        { "tokenId": 2, "universalPartOfSpeech": "NOUN", "headTokenId": 1, "dependencyRelation": "nsubj", "irabHeadTokenId": 1, "irabCategory": "faail", "irabNotApplicable": false, "note": null },
+        { "tokenId": 3, "universalPartOfSpeech": "NOUN", "headTokenId": 1, "dependencyRelation": "obj", "irabHeadTokenId": 1, "irabCategory": "mafool-bih", "irabNotApplicable": false, "note": null },
+        { "tokenId": 4, "universalPartOfSpeech": "PUNCT", "headTokenId": 1, "dependencyRelation": "punct", "irabHeadTokenId": null, "irabCategory": null, "irabNotApplicable": true, "note": null }
+      ],
+      "note": null
+    },
+    {
+      "sentenceId": "pilot-02",
+      "structurallyAcceptable": true,
+      "completePredicate": true,
+      "tokens": [
+        { "tokenId": 1, "universalPartOfSpeech": "VERB", "headTokenId": 0, "dependencyRelation": "root", "irabHeadTokenId": null, "irabCategory": null, "irabNotApplicable": true, "note": null },
+        { "tokenId": 2, "universalPartOfSpeech": "NOUN", "headTokenId": 1, "dependencyRelation": "nsubj:pass", "irabHeadTokenId": 1, "irabCategory": "naaib-faail", "irabNotApplicable": false, "note": null },
+        { "tokenId": 3, "universalPartOfSpeech": "PUNCT", "headTokenId": 1, "dependencyRelation": "punct", "irabHeadTokenId": null, "irabCategory": null, "irabNotApplicable": true, "note": null }
+      ],
+      "note": null
+    },
+    {
+      "sentenceId": "pilot-03",
+      "structurallyAcceptable": true,
+      "completePredicate": true,
+      "tokens": [
+        { "tokenId": 1, "universalPartOfSpeech": "NOUN", "headTokenId": 2, "dependencyRelation": "nsubj", "irabHeadTokenId": null, "irabCategory": null, "irabNotApplicable": true, "note": null },
+        { "tokenId": 2, "universalPartOfSpeech": "ADJ", "headTokenId": 0, "dependencyRelation": "root", "irabHeadTokenId": 1, "irabCategory": "khabar", "irabNotApplicable": false, "note": null },
+        { "tokenId": 3, "universalPartOfSpeech": "PUNCT", "headTokenId": 2, "dependencyRelation": "punct", "irabHeadTokenId": null, "irabCategory": null, "irabNotApplicable": true, "note": null }
+      ],
+      "note": null
+    },
+    {
+      "sentenceId": "pilot-04",
+      "structurallyAcceptable": true,
+      "completePredicate": true,
+      "tokens": [
+        { "tokenId": 1, "universalPartOfSpeech": "VERB", "headTokenId": 0, "dependencyRelation": "root", "irabHeadTokenId": null, "irabCategory": null, "irabNotApplicable": true, "note": null },
+        { "tokenId": 2, "universalPartOfSpeech": "NOUN", "headTokenId": 1, "dependencyRelation": "obj", "irabHeadTokenId": 1, "irabCategory": "mafool-bih", "irabNotApplicable": false, "note": null },
+        { "tokenId": 3, "universalPartOfSpeech": "NOUN", "headTokenId": 2, "dependencyRelation": "nmod", "irabHeadTokenId": 2, "irabCategory": "mudaf-ilayh", "irabNotApplicable": false, "note": null },
+        { "tokenId": 4, "universalPartOfSpeech": "PUNCT", "headTokenId": 1, "dependencyRelation": "punct", "irabHeadTokenId": null, "irabCategory": null, "irabNotApplicable": true, "note": null }
+      ],
+      "note": null
+    },
+    {
+      "sentenceId": "pilot-05",
+      "structurallyAcceptable": true,
+      "completePredicate": true,
+      "tokens": [
+        { "tokenId": 1, "universalPartOfSpeech": "VERB", "headTokenId": 0, "dependencyRelation": "root", "irabHeadTokenId": null, "irabCategory": null, "irabNotApplicable": true, "note": null },
+        { "tokenId": 2, "universalPartOfSpeech": "NOUN", "headTokenId": 1, "dependencyRelation": "nsubj", "irabHeadTokenId": 1, "irabCategory": "faail", "irabNotApplicable": false, "note": null },
+        { "tokenId": 3, "universalPartOfSpeech": "ADJ", "headTokenId": 2, "dependencyRelation": "amod", "irabHeadTokenId": 2, "irabCategory": "nat", "irabNotApplicable": false, "note": null },
+        { "tokenId": 4, "universalPartOfSpeech": "PUNCT", "headTokenId": 1, "dependencyRelation": "punct", "irabHeadTokenId": null, "irabCategory": null, "irabNotApplicable": true, "note": null }
+      ],
+      "note": null
+    },
+    {
+      "sentenceId": "pilot-06",
+      "structurallyAcceptable": true,
+      "completePredicate": true,
+      "tokens": [
+        { "tokenId": 1, "universalPartOfSpeech": "VERB", "headTokenId": 0, "dependencyRelation": "root", "irabHeadTokenId": null, "irabCategory": null, "irabNotApplicable": true, "note": null },
+        { "tokenId": 2, "universalPartOfSpeech": "NOUN", "headTokenId": 1, "dependencyRelation": "nsubj", "irabHeadTokenId": 1, "irabCategory": "faail", "irabNotApplicable": false, "note": null },
+        { "tokenId": 3, "universalPartOfSpeech": "ADV", "headTokenId": 1, "dependencyRelation": "advmod", "irabHeadTokenId": 1, "irabCategory": "hal", "irabNotApplicable": false, "note": null },
+        { "tokenId": 4, "universalPartOfSpeech": "PUNCT", "headTokenId": 1, "dependencyRelation": "punct", "irabHeadTokenId": null, "irabCategory": null, "irabNotApplicable": true, "note": null }
+      ],
+      "note": null
+    },
+    {
+      "sentenceId": "pilot-07",
+      "structurallyAcceptable": true,
+      "completePredicate": true,
+      "tokens": [
+        { "tokenId": 1, "universalPartOfSpeech": "VERB", "headTokenId": 0, "dependencyRelation": "root", "irabHeadTokenId": null, "irabCategory": null, "irabNotApplicable": true, "note": null },
+        { "tokenId": 2, "universalPartOfSpeech": "NOUN", "headTokenId": 1, "dependencyRelation": "nsubj", "irabHeadTokenId": 1, "irabCategory": "faail", "irabNotApplicable": false, "note": null },
+        { "tokenId": 3, "universalPartOfSpeech": "NOUN", "headTokenId": 1, "dependencyRelation": "obj", "irabHeadTokenId": 1, "irabCategory": "mafool-bih", "irabNotApplicable": false, "note": null },
+        { "tokenId": 4, "universalPartOfSpeech": "NOUN", "headTokenId": 1, "dependencyRelation": "obl", "irabHeadTokenId": 1, "irabCategory": "mafool-mutlaq", "irabNotApplicable": false, "note": null },
+        { "tokenId": 5, "universalPartOfSpeech": "PUNCT", "headTokenId": 1, "dependencyRelation": "punct", "irabHeadTokenId": null, "irabCategory": null, "irabNotApplicable": true, "note": null }
+      ],
+      "note": null
+    },
+    {
+      "sentenceId": "pilot-08",
+      "structurallyAcceptable": true,
+      "completePredicate": true,
+      "tokens": [
+        { "tokenId": 1, "universalPartOfSpeech": "VERB", "headTokenId": 0, "dependencyRelation": "root", "irabHeadTokenId": null, "irabCategory": null, "irabNotApplicable": true, "note": null },
+        { "tokenId": 2, "universalPartOfSpeech": "NOUN", "headTokenId": 1, "dependencyRelation": "obl", "irabHeadTokenId": 1, "irabCategory": "mafool-li-ajlih", "irabNotApplicable": false, "note": null },
+        { "tokenId": 3, "universalPartOfSpeech": "ADP", "headTokenId": 4, "dependencyRelation": "case", "irabHeadTokenId": null, "irabCategory": null, "irabNotApplicable": true, "note": null },
+        { "tokenId": 4, "universalPartOfSpeech": "NOUN", "headTokenId": 2, "dependencyRelation": "nmod", "irabHeadTokenId": null, "irabCategory": null, "irabNotApplicable": true, "note": null },
+        { "tokenId": 5, "universalPartOfSpeech": "PUNCT", "headTokenId": 1, "dependencyRelation": "punct", "irabHeadTokenId": null, "irabCategory": null, "irabNotApplicable": true, "note": null }
+      ],
+      "note": null
+    },
+    {
+      "sentenceId": "pilot-09",
+      "structurallyAcceptable": true,
+      "completePredicate": true,
+      "tokens": [
+        { "tokenId": 1, "universalPartOfSpeech": "VERB", "headTokenId": 0, "dependencyRelation": "root", "irabHeadTokenId": null, "irabCategory": null, "irabNotApplicable": true, "note": null },
+        { "tokenId": 2, "universalPartOfSpeech": "NOUN", "headTokenId": 1, "dependencyRelation": "nsubj", "irabHeadTokenId": 1, "irabCategory": "faail", "irabNotApplicable": false, "note": null },
+        { "tokenId": 3, "universalPartOfSpeech": "NOUN", "headTokenId": 1, "dependencyRelation": "obl", "irabHeadTokenId": 1, "irabCategory": "mafool-maah", "irabNotApplicable": false, "note": null },
+        { "tokenId": 4, "universalPartOfSpeech": "PUNCT", "headTokenId": 1, "dependencyRelation": "punct", "irabHeadTokenId": null, "irabCategory": null, "irabNotApplicable": true, "note": null }
+      ],
+      "note": null
+    }
+  ]
+}

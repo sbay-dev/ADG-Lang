@@ -1,0 +1,1710 @@
+import {
+  ADJUDICATION_SCHEMA,
+  ANNOTATION_SCHEMA,
+  computeAdjudicationMerkleRoot,
+  computeAnnotationMerkleRoot,
+  computePacketMerkleRoot,
+  decisionNeedsResolution,
+  sha256Json,
+  tokenDecisionKey,
+  validatePacket,
+  validateSubmissionBinding
+} from "./protocol.js";
+
+const UPOS = [
+  ["ADJ", "صفة"],
+  ["ADP", "حرف جر"],
+  ["ADV", "ظرف"],
+  ["AUX", "فعل مساعد"],
+  ["CCONJ", "حرف عطف"],
+  ["DET", "أداة تعريف"],
+  ["INTJ", "اسم فعل أو صوت"],
+  ["NOUN", "اسم"],
+  ["NUM", "عدد"],
+  ["PART", "أداة"],
+  ["PRON", "ضمير"],
+  ["PROPN", "اسم علم"],
+  ["PUNCT", "علامة ترقيم"],
+  ["SCONJ", "أداة ربط"],
+  ["SYM", "رمز"],
+  ["VERB", "فعل"],
+  ["X", "غير مصنف"]
+];
+
+const RELATIONS = [
+  ["acl", "صلة وصفية"],
+  ["advcl", "جملة حالية أو ظرفية"],
+  ["advmod", "متعلق ظرفي"],
+  ["amod", "نعت"],
+  ["appos", "بدل أو عطف بيان"],
+  ["aux", "فعل مساعد"],
+  ["case", "حرف جر"],
+  ["cc", "حرف عطف"],
+  ["ccomp", "مقول أو جملة متممة"],
+  ["compound", "تركيب مركب"],
+  ["conj", "معطوف"],
+  ["cop", "رابط إسنادي"],
+  ["dep", "علاقة عامة"],
+  ["det", "تعريف"],
+  ["discourse", "أداة خطاب"],
+  ["fixed", "تركيب ثابت"],
+  ["flat", "تركيب اسمي"],
+  ["iobj", "مفعول غير مباشر"],
+  ["mark", "أداة ربط"],
+  ["nmod", "مضاف إليه أو متعلق اسمي"],
+  ["nsubj", "فاعل أو مسند إليه"],
+  ["nsubj:pass", "نائب فاعل"],
+  ["obj", "مفعول به"],
+  ["obl", "متعلق مجرور أو منصوب"],
+  ["parataxis", "جملة مستقلة مرتبطة"],
+  ["punct", "ترقيم"],
+  ["root", "جذر الجملة"],
+  ["xcomp", "متمم إسنادي"]
+];
+
+const IRAB = [
+  ["_", "غير منطبق"],
+  ["faail", "فاعل"],
+  ["naaib-faail", "نائب فاعل"],
+  ["mafool-bih", "مفعول به"],
+  ["nat", "نعت"],
+  ["mudaf-ilayh", "مضاف إليه"],
+  ["khabar", "خبر"],
+  ["hal", "حال"],
+  ["mafool-mutlaq", "مفعول مطلق"],
+  ["mafool-li-ajlih", "مفعول لأجله"],
+  ["mafool-maah", "مفعول معه"]
+];
+
+const FIELD_HELP = {
+  upos: "الصنف العام للكلمة، مثل اسم أو فعل أو ضمير.",
+  head: "رقم الكلمة التي تتعلق بها؛ استخدم 0 لجذر الجملة.",
+  relation: "اسم الصلة النحوية بين الكلمة ورأسها.",
+  irabCategory: "الموقع الإعرابي ضمن الفئات المتاحة في هذه الجولة.",
+  irabHead:
+    "اختر الكلمة التي يرتبط بها هذا الدور. هذا ليس «العامل» "
+    + "بمعناه النحوي النظري الكامل."
+};
+
+const state = {
+  step: 1,
+  participantId: crypto.randomUUID(),
+  packet: null,
+  annotationA: null,
+  annotationB: null,
+  config: {
+    submissionEnabled: false,
+    maxSubmissionBytes: 900000,
+    turnstileSiteKey: null,
+    accountEnabled: false
+  },
+  account: {
+    authenticated: false,
+    userId: null
+  },
+  autosaveTimer: null,
+  draftSaving: false,
+  turnstileWidgetId: null
+};
+
+const form = document.querySelector("#portal-form");
+const nextButton = document.querySelector("#next-step");
+const previousButton = document.querySelector("#previous-step");
+const loadPilotButton = document.querySelector("#load-pilot");
+const packetFile = document.querySelector("#packet-file");
+const annotationAFile = document.querySelector("#annotation-a-file");
+const annotationBFile = document.querySelector("#annotation-b-file");
+const adjudicationFiles = document.querySelector("#adjudication-files");
+const packetSummary = document.querySelector("#packet-summary");
+const workspace = document.querySelector("#workspace");
+const completionValue = document.querySelector("#completion-value");
+const reviewSummary = document.querySelector("#review-summary");
+const submitButton = document.querySelector("#submit");
+const downloadButton = document.querySelector("#download");
+const submissionStatus = document.querySelector("#submission-status");
+const wizardStatus = document.querySelector("#wizard-status");
+const quickLoginButton = document.querySelector("#quick-login");
+const registerPasskeyButton = document.querySelector("#register-passkey");
+const loginPasskeyButton = document.querySelector("#login-passkey");
+const logoutAccountButton = document.querySelector("#logout-account");
+const accountTitle = document.querySelector("#account-title");
+const accountDescription = document.querySelector("#account-description");
+const accountStatus = document.querySelector("#account-status");
+const saveDraftButton = document.querySelector("#save-draft");
+const draftStatus = document.querySelector("#draft-status");
+const savedDrafts = document.querySelector("#saved-drafts");
+const draftList = document.querySelector("#draft-list");
+
+document.querySelectorAll('input[name="role"]').forEach(control => {
+  control.addEventListener("change", syncRoleControls);
+});
+nextButton.addEventListener("click", goNext);
+previousButton.addEventListener("click", goPrevious);
+loadPilotButton.addEventListener("click", loadPilot);
+packetFile.addEventListener("change", loadPacketFile);
+submitButton.addEventListener("click", submitEvaluation);
+downloadButton.addEventListener("click", downloadEvaluation);
+quickLoginButton.addEventListener("click", loginWithPasskey);
+registerPasskeyButton.addEventListener("click", registerPasskey);
+loginPasskeyButton.addEventListener("click", loginWithPasskey);
+logoutAccountButton.addEventListener("click", logoutAccount);
+saveDraftButton.addEventListener("click", saveDraft);
+workspace.addEventListener("input", () => {
+  updateCompletion();
+  scheduleAutosave();
+});
+workspace.addEventListener("change", event => {
+  if (event.target.matches(".irab-category")) {
+    syncIrabHead(event.target);
+  }
+  updateCompletion();
+  scheduleAutosave();
+});
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden"
+      && state.step === 4
+      && state.account.authenticated
+      && state.packet) {
+    void saveDraft({ silent: true });
+  }
+});
+
+initialize();
+
+async function initialize() {
+  applyRoleFromQuery();
+  syncRoleControls();
+  try {
+    const response = await fetch("/api/config", {
+      headers: { accept: "application/json" }
+    });
+    if (response.ok) {
+      state.config = await response.json();
+    }
+  } catch {
+    // Local-file use remains available without a backend.
+  }
+  await restoreAccount();
+  await configureTurnstile();
+}
+
+function applyRoleFromQuery() {
+  const role = new URL(location.href).searchParams.get("role");
+  const normalized = role?.toLowerCase();
+  const value = normalized === "b"
+    ? "B"
+    : normalized === "adjudication"
+      ? "adjudication"
+      : "A";
+  const control = document.querySelector(
+    `input[name="role"][value="${value}"]`
+  );
+  if (control) control.checked = true;
+}
+
+async function goNext() {
+  clearStatus();
+  try {
+    if (state.step === 1) {
+      validateProfile();
+    } else if (state.step === 2) {
+      if (!state.account.authenticated) {
+        throw new Error(
+          "سجّل مفتاح المرور أو ادخل إلى حسابك قبل اختيار المهمة."
+        );
+      }
+      await refreshDraftList();
+    } else if (state.step === 3) {
+      await prepareCase();
+    } else if (state.step === 4) {
+      await validateWorkspace();
+      renderReview();
+    } else {
+      return;
+    }
+    showStep(state.step + 1);
+  } catch (error) {
+    showStatus(error.message, true);
+  }
+}
+
+function goPrevious() {
+  clearStatus();
+  if (state.step > 1) showStep(state.step - 1);
+}
+
+function showStep(step) {
+  state.step = step;
+  document.querySelectorAll(".step-panel").forEach(panel => {
+    const active = Number(panel.dataset.step) === step;
+    panel.hidden = !active;
+    panel.classList.toggle("active", active);
+  });
+  document.querySelectorAll("[data-step-indicator]").forEach(indicator => {
+    const value = Number(indicator.dataset.stepIndicator);
+    indicator.classList.toggle("active", value === step);
+    indicator.classList.toggle("complete", value < step);
+  });
+  previousButton.hidden = step === 1;
+  nextButton.hidden = step === 5;
+  nextButton.textContent = step === 4 ? "مراجعة النتيجة" : "التالي";
+  document.querySelector("#adjudication").scrollIntoView({
+    behavior: "smooth",
+    block: "start"
+  });
+}
+
+function validateProfile() {
+  const fullName = value("full-name");
+  const email = value("email");
+  const phone = value("phone");
+  const years = Number(value("experience-years"));
+  requireText(fullName, "الاسم الكامل");
+  requireText(email, "البريد الإلكتروني");
+  requireText(phone, "رقم الهاتف");
+  requireText(value("specialization"), "مجال التخصص");
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new Error("أدخل بريدًا إلكترونيًا صالحًا.");
+  }
+  if (!/^\+?[0-9 ()-]{7,24}$/.test(phone)) {
+    throw new Error("أدخل رقم هاتف صالحًا مع رمز الدولة.");
+  }
+  if (!Number.isInteger(years) || years < 0 || years > 80) {
+    throw new Error("سنوات الخبرة يجب أن تكون بين صفر و80.");
+  }
+  if (!checked("privacy-consent")) {
+    throw new Error("الموافقة على حفظ بيانات التواصل مطلوبة للإرسال.");
+  }
+}
+
+function accountProfile() {
+  return {
+    fullName: value("full-name"),
+    email: value("email"),
+    phone: value("phone"),
+    experienceYears: Number(value("experience-years")),
+    specialization: value("specialization"),
+    affiliation: nullable(value("affiliation"))
+  };
+}
+
+function accountConsent() {
+  return {
+    identityStorage: checked("privacy-consent"),
+    futureContact: checked("contact-consent")
+  };
+}
+
+async function restoreAccount() {
+  if (!state.config.accountEnabled) {
+    renderAccountState();
+    return;
+  }
+  try {
+    const account = await apiJson("/api/account");
+    state.account.authenticated = true;
+    state.account.userId = account.userId;
+    fillProfile(account.profile, account.consent);
+    renderAccountState();
+    await refreshDraftList();
+  } catch (error) {
+    if (error.status !== 401) {
+      setAccountStatus(error.message, true);
+    }
+    state.account.authenticated = false;
+    state.account.userId = null;
+    renderAccountState();
+  }
+}
+
+function fillProfile(profile, consent) {
+  if (!profile) return;
+  document.querySelector("#full-name").value = profile.fullName ?? "";
+  document.querySelector("#email").value = profile.email ?? "";
+  document.querySelector("#phone").value = profile.phone ?? "";
+  document.querySelector("#experience-years").value =
+    profile.experienceYears ?? "";
+  document.querySelector("#specialization").value =
+    profile.specialization ?? "";
+  document.querySelector("#affiliation").value =
+    profile.affiliation ?? "";
+  document.querySelector("#privacy-consent").checked =
+    consent?.identityStorage === true;
+  document.querySelector("#contact-consent").checked =
+    consent?.futureContact === true;
+}
+
+function renderAccountState() {
+  const supported = webAuthnSupported();
+  const available = state.config.accountEnabled && supported;
+  const authenticated = state.account.authenticated;
+
+  registerPasskeyButton.hidden = authenticated;
+  loginPasskeyButton.hidden = authenticated;
+  logoutAccountButton.hidden = !authenticated;
+  quickLoginButton.hidden = authenticated;
+  registerPasskeyButton.disabled = !available;
+  loginPasskeyButton.disabled = !available;
+  quickLoginButton.disabled = !available;
+
+  if (authenticated) {
+    accountTitle.textContent = "حسابك متصل ومحمي";
+    accountDescription.textContent =
+      "يمكنك الآن اختيار المهمة وحفظ أي تقدم مشفّرًا للمتابعة لاحقًا.";
+    setAccountStatus("تم الدخول بمفتاح المرور.", false);
+    return;
+  }
+  accountTitle.textContent = "أنشئ حسابك الآمن";
+  accountDescription.textContent = available
+    ? "ستُشفّر بيانات التعريف والمسودات قبل حفظها، ولا توجد كلمة مرور."
+    : "هذا المتصفح أو خدمة الحساب لا يدعم مفتاح المرور حاليًا.";
+}
+
+async function registerPasskey() {
+  clearStatus();
+  setAccountStatus("", false);
+  try {
+    validateProfile();
+    ensureWebAuthn();
+    setAccountBusy(true);
+    const start = await apiJson(
+      "/api/account/register/options",
+      {
+        method: "POST",
+        body: {
+          profile: accountProfile(),
+          consent: accountConsent()
+        }
+      }
+    );
+    const credential = await navigator.credentials.create({
+      publicKey: registrationOptions(start.options)
+    });
+    if (!credential) {
+      throw new Error("لم يُنشأ مفتاح المرور.");
+    }
+    const result = await apiJson(
+      "/api/account/register/verify",
+      {
+        method: "POST",
+        body: {
+          challengeId: start.challengeId,
+          response: registrationResponse(credential)
+        }
+      }
+    );
+    state.account.authenticated = true;
+    state.account.userId = result.userId;
+    renderAccountState();
+    setAccountStatus(result.message, false);
+    await refreshDraftList();
+  } catch (error) {
+    setAccountStatus(passkeyErrorMessage(error), true);
+  } finally {
+    setAccountBusy(false);
+  }
+}
+
+async function loginWithPasskey(event) {
+  clearStatus();
+  setAccountStatus("", false);
+  const quickLogin = event?.currentTarget === quickLoginButton;
+  try {
+    ensureWebAuthn();
+    setAccountBusy(true);
+    const start = await apiJson(
+      "/api/account/login/options",
+      { method: "POST", body: {} }
+    );
+    const credential = await navigator.credentials.get({
+      publicKey: authenticationOptions(start.options)
+    });
+    if (!credential) {
+      throw new Error("لم يُحدد مفتاح مرور.");
+    }
+    const result = await apiJson(
+      "/api/account/login/verify",
+      {
+        method: "POST",
+        body: {
+          challengeId: start.challengeId,
+          response: authenticationResponse(credential)
+        }
+      }
+    );
+    state.account.authenticated = true;
+    state.account.userId = result.userId;
+    await restoreAccount();
+    setAccountStatus(result.message, false);
+    if (quickLogin) showStep(3);
+  } catch (error) {
+    const message = passkeyErrorMessage(error);
+    setAccountStatus(message, true);
+    if (quickLogin) showStatus(message, true);
+  } finally {
+    setAccountBusy(false);
+  }
+}
+
+async function logoutAccount() {
+  try {
+    setAccountBusy(true);
+    await apiJson(
+      "/api/account/logout",
+      { method: "POST", body: {} }
+    );
+    state.account.authenticated = false;
+    state.account.userId = null;
+    state.packet = null;
+    state.annotationA = null;
+    state.annotationB = null;
+    workspace.replaceChildren();
+    packetSummary.hidden = true;
+    savedDrafts.hidden = true;
+    form.reset();
+    applyRoleFromQuery();
+    syncRoleControls();
+    renderAccountState();
+    showStep(1);
+  } catch (error) {
+    setAccountStatus(error.message, true);
+  } finally {
+    setAccountBusy(false);
+  }
+}
+
+function setAccountBusy(busy) {
+  registerPasskeyButton.disabled = busy;
+  loginPasskeyButton.disabled = busy;
+  quickLoginButton.disabled = busy;
+  logoutAccountButton.disabled = busy;
+  if (!busy) renderAccountState();
+}
+
+function setAccountStatus(message, error) {
+  accountStatus.textContent = message || "";
+  accountStatus.className = `status${message
+    ? error ? " error" : " success"
+    : ""}`;
+}
+
+function webAuthnSupported() {
+  return Boolean(
+    window.PublicKeyCredential
+    && navigator.credentials
+    && navigator.credentials.create
+    && navigator.credentials.get
+  );
+}
+
+function ensureWebAuthn() {
+  if (!state.config.accountEnabled) {
+    throw new Error("خدمة الحساب غير مفعّلة حاليًا.");
+  }
+  if (!webAuthnSupported()) {
+    throw new Error(
+      "استخدم متصفحًا حديثًا يدعم مفاتيح المرور مثل Safari أو Chrome أو Edge."
+    );
+  }
+}
+
+function registrationOptions(options) {
+  return {
+    ...options,
+    challenge: base64UrlToBuffer(options.challenge),
+    user: {
+      ...options.user,
+      id: base64UrlToBuffer(options.user.id)
+    },
+    excludeCredentials: (options.excludeCredentials || []).map(item => ({
+      ...item,
+      id: base64UrlToBuffer(item.id)
+    }))
+  };
+}
+
+function authenticationOptions(options) {
+  return {
+    ...options,
+    challenge: base64UrlToBuffer(options.challenge),
+    allowCredentials: options.allowCredentials?.map(item => ({
+      ...item,
+      id: base64UrlToBuffer(item.id)
+    }))
+  };
+}
+
+function registrationResponse(credential) {
+  const response = credential.response;
+  const publicKey = response.getPublicKey?.();
+  const authenticatorData = response.getAuthenticatorData?.();
+  return {
+    id: credential.id,
+    rawId: bufferToBase64Url(credential.rawId),
+    type: credential.type,
+    authenticatorAttachment:
+      credential.authenticatorAttachment ?? undefined,
+    clientExtensionResults: credential.getClientExtensionResults(),
+    response: {
+      clientDataJSON: bufferToBase64Url(response.clientDataJSON),
+      attestationObject: bufferToBase64Url(response.attestationObject),
+      transports: response.getTransports?.() || [],
+      publicKeyAlgorithm: response.getPublicKeyAlgorithm?.(),
+      publicKey: publicKey ? bufferToBase64Url(publicKey) : undefined,
+      authenticatorData: authenticatorData
+        ? bufferToBase64Url(authenticatorData)
+        : undefined
+    }
+  };
+}
+
+function authenticationResponse(credential) {
+  const response = credential.response;
+  return {
+    id: credential.id,
+    rawId: bufferToBase64Url(credential.rawId),
+    type: credential.type,
+    authenticatorAttachment:
+      credential.authenticatorAttachment ?? undefined,
+    clientExtensionResults: credential.getClientExtensionResults(),
+    response: {
+      clientDataJSON: bufferToBase64Url(response.clientDataJSON),
+      authenticatorData: bufferToBase64Url(response.authenticatorData),
+      signature: bufferToBase64Url(response.signature),
+      userHandle: response.userHandle
+        ? bufferToBase64Url(response.userHandle)
+        : undefined
+    }
+  };
+}
+
+function base64UrlToBuffer(value) {
+  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = normalized
+    + "=".repeat((4 - normalized.length % 4) % 4);
+  const binary = atob(padded);
+  return Uint8Array.from(
+    binary,
+    character => character.charCodeAt(0)
+  ).buffer;
+}
+
+function bufferToBase64Url(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/u, "");
+}
+
+function passkeyErrorMessage(error) {
+  if (error?.name === "NotAllowedError") {
+    return "أُلغي استخدام مفتاح المرور أو انتهت المهلة. أعد المحاولة.";
+  }
+  if (error?.name === "InvalidStateError") {
+    return "مفتاح المرور هذا مسجل مسبقًا لهذا الموقع.";
+  }
+  return error?.message || "تعذر استخدام مفتاح المرور.";
+}
+
+async function apiJson(path, options = {}) {
+  const init = {
+    method: options.method || "GET",
+    credentials: "same-origin",
+    headers: { accept: "application/json" }
+  };
+  if (Object.hasOwn(options, "body")) {
+    init.headers["content-type"] = "application/json";
+    init.body = JSON.stringify(options.body);
+  }
+  const response = await fetch(path, init);
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(
+      payload.message || "تعذر إكمال الطلب بأمان."
+    );
+    error.status = response.status;
+    throw error;
+  }
+  return payload;
+}
+
+async function loadPilot() {
+  clearStatus();
+  try {
+    const response = await fetch("/data/pilot-packet.json", {
+      headers: { accept: "application/json" }
+    });
+    if (!response.ok) throw new Error("تعذر تحميل العينة التجريبية.");
+    state.packet = await response.json();
+    validatePacket(state.packet);
+    renderPacketSummary("العينة التجريبية الجاهزة");
+  } catch (error) {
+    showStatus(
+      `${error.message} يمكنك استخدام ملف الحزمة من منسق التقييم.`,
+      true
+    );
+  }
+}
+
+async function loadPacketFile() {
+  clearStatus();
+  try {
+    state.packet = await readJson(packetFile.files[0], "حزمة النص");
+    validatePacket(state.packet);
+    renderPacketSummary("حزمة منسق التقييم");
+  } catch (error) {
+    state.packet = null;
+    packetSummary.hidden = true;
+    showStatus(error.message, true);
+  }
+}
+
+function renderPacketSummary(sourceLabel) {
+  const tokenCount = state.packet.sentences
+    .reduce((sum, sentence) => sum + sentence.tokens.length, 0);
+  packetSummary.innerHTML = `
+    <dl>
+      <div><dt>المصدر</dt><dd>${escapeHtml(sourceLabel)}</dd></div>
+      <div><dt>الجمل</dt><dd>${state.packet.sentences.length}</dd></div>
+      <div><dt>الوحدات</dt><dd>${tokenCount}</dd></div>
+      <div><dt>الحالة</dt><dd>عمياء بلا توقعات</dd></div>
+    </dl>`;
+  packetSummary.hidden = false;
+}
+
+async function prepareCase() {
+  if (!state.packet) {
+    throw new Error("حمّل العينة التجريبية أو حزمة منسق التقييم أولًا.");
+  }
+  validatePacket(state.packet);
+  if (selectedRole() === "adjudication") {
+    state.annotationA = await readJson(
+      annotationAFile.files[0],
+      "ملف المعلّق A"
+    );
+    state.annotationB = await readJson(
+      annotationBFile.files[0],
+      "ملف المعلّق B"
+    );
+    await validateSubmissionBinding(state.packet, state.annotationA);
+    await validateSubmissionBinding(state.packet, state.annotationB);
+    if (state.annotationA.annotatorSlot === state.annotationB.annotatorSlot) {
+      throw new Error("ملفا التعليق يحملان الدور نفسه.");
+    }
+    renderAdjudication();
+  } else {
+    state.annotationA = null;
+    state.annotationB = null;
+    renderAnnotation();
+  }
+  updateCompletion();
+}
+
+async function saveDraft(options = {}) {
+  const silent = options?.silent === true;
+  if (state.draftSaving) return;
+  if (!silent) setDraftStatus("", false);
+  try {
+    if (!state.account.authenticated) {
+      throw new Error("سجّل الدخول قبل حفظ المسودة.");
+    }
+    if (!state.packet) {
+      throw new Error("لا توجد مهمة محمّلة لحفظها.");
+    }
+    state.draftSaving = true;
+    saveDraftButton.disabled = true;
+    const result = await apiJson("/api/draft", {
+      method: "PUT",
+      body: {
+        packetId: state.packet.packetId,
+        role: selectedRole(),
+        draft: {
+          schema: "adg-msa-portal-draft-v1",
+          savedAtUtc: new Date().toISOString(),
+          participantId: state.participantId,
+          role: selectedRole(),
+          packet: state.packet,
+          annotationA: state.annotationA,
+          annotationB: state.annotationB,
+          fields: captureWorkspace()
+        }
+      }
+    });
+    setDraftStatus(
+      `${silent ? "حفظ تلقائي" : "حُفظت المسودة بأمان"} · `
+        + `${result.progressPercent}% · ${formatDate(result.updatedAtUtc)}.`,
+      false
+    );
+    if (!silent) await refreshDraftList();
+  } catch (error) {
+    setDraftStatus(error.message, true);
+  } finally {
+    state.draftSaving = false;
+    saveDraftButton.disabled = false;
+  }
+}
+
+function scheduleAutosave() {
+  if (state.autosaveTimer) clearTimeout(state.autosaveTimer);
+  if (!state.account.authenticated || !state.packet || state.step !== 4) {
+    return;
+  }
+  state.autosaveTimer = setTimeout(() => {
+    state.autosaveTimer = null;
+    void saveDraft({ silent: true });
+  }, 10000);
+}
+
+async function refreshDraftList() {
+  draftList.replaceChildren();
+  if (!state.account.authenticated) {
+    savedDrafts.hidden = true;
+    return;
+  }
+  try {
+    const result = await apiJson("/api/drafts");
+    const drafts = result.drafts || [];
+    savedDrafts.hidden = drafts.length === 0;
+    drafts.forEach(draft => {
+      const card = document.createElement("div");
+      card.className = "draft-card";
+      const details = document.createElement("div");
+      const title = document.createElement("span");
+      title.textContent =
+        `${draft.packetId} — ${roleLabel(draft.role)}`;
+      const timestamp = document.createElement("small");
+      timestamp.textContent = `آخر حفظ: ${formatDate(draft.updatedAtUtc)}`;
+      if (Number.isFinite(draft.progressPercent)) {
+        timestamp.textContent += ` · ${draft.progressPercent}%`;
+      }
+      details.append(title, timestamp);
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "button secondary compact";
+      button.textContent = "متابعة";
+      button.addEventListener(
+        "click",
+        () => resumeDraft(draft.packetId, draft.role)
+      );
+      card.append(details, button);
+      draftList.append(card);
+    });
+  } catch (error) {
+    savedDrafts.hidden = true;
+    if (error.status !== 401) showStatus(error.message, true);
+  }
+}
+
+async function resumeDraft(packetId, role) {
+  clearStatus();
+  try {
+    const query = new URLSearchParams({ packetId, role });
+    const result = await apiJson(`/api/draft?${query}`);
+    if (!result.found) {
+      throw new Error("لم تعد هذه المسودة متاحة.");
+    }
+    const draft = result.draft;
+    if (draft?.schema !== "adg-msa-portal-draft-v1"
+        || draft.role !== role) {
+      throw new Error("بنية المسودة المحفوظة غير صالحة.");
+    }
+    validatePacket(draft.packet);
+    const roleControl = document.querySelector(
+      `input[name="role"][value="${draft.role}"]`
+    );
+    if (!roleControl) {
+      throw new Error("دور المسودة غير مدعوم.");
+    }
+    roleControl.checked = true;
+    syncRoleControls();
+    state.participantId = draft.participantId || state.participantId;
+    state.packet = draft.packet;
+    state.annotationA = draft.annotationA ?? null;
+    state.annotationB = draft.annotationB ?? null;
+
+    if (draft.role === "adjudication") {
+      if (!state.annotationA || !state.annotationB) {
+        throw new Error("ملفا التحكيم غير موجودين في المسودة.");
+      }
+      await validateSubmissionBinding(state.packet, state.annotationA);
+      await validateSubmissionBinding(state.packet, state.annotationB);
+      renderAdjudication();
+    } else {
+      renderAnnotation();
+    }
+    applyWorkspace(draft.fields);
+    renderPacketSummary("مسودة محفوظة");
+    updateCompletion();
+    setDraftStatus(
+      `استُعيدت المسودة المحفوظة في ${formatDate(result.updatedAtUtc)}.`,
+      false
+    );
+    showStep(4);
+  } catch (error) {
+    showStatus(error.message, true);
+  }
+}
+
+function captureWorkspace() {
+  return [...workspace.querySelectorAll(".sentence")].map(sentence => ({
+    sentenceId: sentence.dataset.sentenceId,
+    structural: controlValue(sentence, "select.structural"),
+    predicate: controlValue(sentence, "select.predicate"),
+    sentenceResolution:
+      controlValue(sentence, ".sentence-resolution input"),
+    tokens: [...sentence.querySelectorAll(".token-card")].map(card => ({
+      tokenId: card.dataset.tokenId,
+      upos: controlValue(card, "select.upos"),
+      head: controlValue(card, ".head"),
+      relation: controlValue(card, "select.relation"),
+      irabCategory: controlValue(card, "select.irab-category"),
+      irabHead: controlValue(card, ".irab-head"),
+      note: controlValue(card, ".note input"),
+      resolution: controlValue(card, ".resolution input")
+    }))
+  }));
+}
+
+function applyWorkspace(fields) {
+  const sentenceStates = new Map(
+    (fields || []).map(item => [String(item.sentenceId), item])
+  );
+  workspace.querySelectorAll(".sentence").forEach(sentence => {
+    const saved = sentenceStates.get(String(sentence.dataset.sentenceId));
+    if (!saved) return;
+    setControlValue(sentence, "select.structural", saved.structural);
+    setControlValue(sentence, "select.predicate", saved.predicate);
+    setControlValue(
+      sentence,
+      ".sentence-resolution input",
+      saved.sentenceResolution
+    );
+    const tokens = new Map(
+      (saved.tokens || []).map(item => [String(item.tokenId), item])
+    );
+    sentence.querySelectorAll(".token-card").forEach(card => {
+      const token = tokens.get(String(card.dataset.tokenId));
+      if (!token) return;
+      setControlValue(card, "select.upos", token.upos);
+      setControlValue(card, ".head", token.head);
+      setControlValue(card, "select.relation", token.relation);
+      setControlValue(
+        card,
+        "select.irab-category",
+        token.irabCategory
+      );
+      syncIrabHead(card.querySelector("select.irab-category"));
+      setControlValue(card, ".irab-head", token.irabHead);
+      setControlValue(card, ".note input", token.note);
+      setControlValue(card, ".resolution input", token.resolution);
+    });
+  });
+}
+
+function controlValue(parent, selector) {
+  return parent.querySelector(selector)?.value ?? "";
+}
+
+function setControlValue(parent, selector, valueToSet) {
+  const control = parent.querySelector(selector);
+  if (control) control.value = valueToSet ?? "";
+}
+
+function setDraftStatus(message, error) {
+  draftStatus.textContent = message || "";
+  draftStatus.className = `status${message
+    ? error ? " error" : " success"
+    : ""}`;
+}
+
+function formatDate(valueToFormat) {
+  return new Intl.DateTimeFormat("ar-SA", {
+    dateStyle: "medium",
+    timeStyle: "short"
+  }).format(new Date(valueToFormat));
+}
+
+function syncRoleControls() {
+  adjudicationFiles.hidden = selectedRole() !== "adjudication";
+}
+
+function renderAnnotation() {
+  workspace.replaceChildren();
+  state.packet.sentences.forEach(sentence => {
+    workspace.append(createAnnotationSentence(sentence));
+  });
+}
+
+function createAnnotationSentence(sentence) {
+  const section = sentenceShell(sentence);
+  const flags = document.createElement("div");
+  flags.className = "sentence-flags";
+  flags.append(
+    labelled(
+      "هل التركيب مقبول في العربية المعيارية؟",
+      booleanSelect("structural")),
+    labelled(
+      "هل الإسناد مكتمل؟",
+      booleanSelect("predicate"))
+  );
+  section.append(flags);
+  const list = document.createElement("div");
+  list.className = "token-list";
+  sentence.tokens.forEach(token => {
+    list.append(annotationTokenCard(token, sentence.tokens));
+  });
+  section.append(list);
+  return section;
+}
+
+function annotationTokenCard(token, sentenceTokens) {
+  const card = document.createElement("div");
+  card.className = "token-card";
+  card.dataset.tokenId = token.id;
+  card.append(
+    tokenForm(token),
+    tokenSelectField("نوع الكلمة", "upos", UPOS),
+    tokenReferenceField(
+      "الرأس النحوي",
+      "head",
+      sentenceTokens,
+      token.id,
+      true
+    ),
+    tokenSelectField("العلاقة", "relation", RELATIONS),
+    irabFields(sentenceTokens, token.id),
+    textField("ملاحظة لغوية (اختياري)", "note")
+  );
+  return card;
+}
+
+function renderAdjudication() {
+  workspace.replaceChildren();
+  const aSentences = sentenceMap(state.annotationA.sentences);
+  const bSentences = sentenceMap(state.annotationB.sentences);
+  state.packet.sentences.forEach(sentence => {
+    workspace.append(createAdjudicationSentence(
+      sentence,
+      aSentences.get(sentence.sentenceId),
+      bSentences.get(sentence.sentenceId)
+    ));
+  });
+}
+
+function createAdjudicationSentence(source, annotationA, annotationB) {
+  const section = sentenceShell(source);
+  const flags = document.createElement("div");
+  flags.className = "sentence-flags";
+  flags.append(
+    labelled(
+      `سلامة التركيب — A: ${yesNo(annotationA.structurallyAcceptable)}، `
+        + `B: ${yesNo(annotationB.structurallyAcceptable)}`,
+      booleanSelect(
+        "structural",
+        annotationA.structurallyAcceptable)),
+    labelled(
+      `اكتمال الإسناد — A: ${yesNo(annotationA.completePredicate)}، `
+        + `B: ${yesNo(annotationB.completePredicate)}`,
+      booleanSelect(
+        "predicate",
+        annotationA.completePredicate)),
+    textField("سبب حسم خلاف الجملة عند الحاجة", "sentence-resolution")
+  );
+  section.append(flags);
+  const aTokens = tokenMap(annotationA.tokens);
+  const bTokens = tokenMap(annotationB.tokens);
+  const list = document.createElement("div");
+  list.className = "token-list";
+  source.tokens.forEach(token => {
+    list.append(adjudicationTokenCard(
+      token,
+      source.tokens,
+      aTokens.get(token.id),
+      bTokens.get(token.id)
+    ));
+  });
+  section.append(list);
+  return section;
+}
+
+function adjudicationTokenCard(
+  source,
+  sentenceTokens,
+  annotationA,
+  annotationB
+) {
+  const card = document.createElement("div");
+  const differs = tokenDecisionKey(annotationA) !== tokenDecisionKey(annotationB);
+  card.className = `token-card${differs ? " difference" : ""}`;
+  card.dataset.tokenId = source.id;
+  const comparison = document.createElement("div");
+  comparison.className = "comparison-box";
+  comparison.innerHTML = `
+    <code><strong>A</strong>\n${escapeHtml(tokenSummary(annotationA))}</code>
+    <code><strong>B</strong>\n${escapeHtml(tokenSummary(annotationB))}</code>`;
+  const resolution = textField(
+    "سبب الحسم أو تغيير اتفاق المعلّقين",
+    "resolution"
+  );
+  resolution.classList.add("resolution");
+  card.append(
+    tokenForm(source),
+    tokenSelectField(
+      "القرار النهائي: نوع الكلمة",
+      "upos",
+      UPOS,
+      annotationA.universalPartOfSpeech),
+    tokenReferenceField(
+      "القرار النهائي: الرأس",
+      "head",
+      sentenceTokens,
+      source.id,
+      true,
+      annotationA.headTokenId),
+    tokenSelectField(
+      "القرار النهائي: العلاقة",
+      "relation",
+      RELATIONS,
+      annotationA.dependencyRelation),
+    irabFields(
+      sentenceTokens,
+      source.id,
+      annotationA.irabNotApplicable
+        ? "_"
+        : annotationA.irabCategory,
+      annotationA.irabHeadTokenId),
+    comparison,
+    resolution
+  );
+  return card;
+}
+
+async function validateWorkspace() {
+  if (selectedRole() === "adjudication") {
+    await collectAdjudication(false);
+  } else {
+    await collectAnnotation(false);
+  }
+}
+
+async function buildArtifactBundle() {
+  validateAttestations();
+  const role = selectedRole();
+  if (role === "adjudication") {
+    const decision = await collectAdjudication(true);
+    await computeAdjudicationMerkleRoot(
+      state.packet,
+      state.annotationA,
+      state.annotationB,
+      decision
+    );
+    return {
+      schema: "adg-msa-portal-artifact-v1",
+      kind: "adjudication-package",
+      packet: state.packet,
+      annotationA: state.annotationA,
+      annotationB: state.annotationB,
+      adjudication: decision
+    };
+  }
+
+  const annotation = await collectAnnotation(true);
+  await computeAnnotationMerkleRoot(state.packet, annotation);
+  return {
+    schema: "adg-msa-portal-artifact-v1",
+    kind: "independent-annotation",
+    packet: state.packet,
+    annotation
+  };
+}
+
+async function collectAnnotation(finalize) {
+  const slot = selectedRole();
+  const sentences = [...workspace.querySelectorAll(".sentence")]
+    .map(section => ({
+      sentenceId: section.dataset.sentenceId,
+      structurallyAcceptable:
+        requiredBoolean(section.querySelector(".structural")),
+      completePredicate:
+        requiredBoolean(section.querySelector(".predicate")),
+      tokens: [...section.querySelectorAll(".token-card")]
+        .map(card => collectToken(card, false)),
+      note: null
+    }));
+  return {
+    schema: ANNOTATION_SCHEMA,
+    packetId: state.packet.packetId,
+    holdoutId: state.packet.holdoutId,
+    protocolId: state.packet.protocolId,
+    packetMerkleRoot: await computePacketMerkleRoot(state.packet),
+    annotatorSlot: slot,
+    annotatorPseudonym: `human-${state.participantId.slice(0, 12)}-${slot}`,
+    isHuman: true,
+    isSynthetic: false,
+    independentFromImplementationTeam:
+      finalize && checked("attest-independent"),
+    blindToParserInternals: finalize && checked("attest-blind"),
+    parserPredictionsViewed: false,
+    sentences
+  };
+}
+
+async function collectAdjudication(finalize) {
+  const aBySentence = sentenceMap(state.annotationA.sentences);
+  const bBySentence = sentenceMap(state.annotationB.sentences);
+  const sentences = [...workspace.querySelectorAll(".sentence")]
+    .map(section => {
+      const sentenceId = section.dataset.sentenceId;
+      const annotationA = aBySentence.get(sentenceId);
+      const annotationB = bBySentence.get(sentenceId);
+      const structural = requiredBoolean(
+        section.querySelector(".structural"));
+      const predicate = requiredBoolean(
+        section.querySelector(".predicate"));
+      const sentenceNote = nullable(
+        section.querySelector("input.sentence-resolution").value);
+      if ((decisionNeedsResolution(
+            annotationA.structurallyAcceptable,
+            annotationB.structurallyAcceptable,
+            structural)
+          || decisionNeedsResolution(
+            annotationA.completePredicate,
+            annotationB.completePredicate,
+            predicate))
+          && !sentenceNote) {
+        throw new Error(
+          `اكتب سبب حسم قرار الجملة ${sentenceId}.`);
+      }
+
+      const aTokens = tokenMap(annotationA.tokens);
+      const bTokens = tokenMap(annotationB.tokens);
+      const tokens = [...section.querySelectorAll(".token-card")]
+        .map(card => {
+          const finalToken = collectToken(card, true);
+          const tokenA = aTokens.get(finalToken.tokenId);
+          const tokenB = bTokens.get(finalToken.tokenId);
+          if (decisionNeedsResolution(
+                tokenDecisionKey(tokenA),
+                tokenDecisionKey(tokenB),
+                tokenDecisionKey(finalToken))
+              && !finalToken.resolutionNote) {
+            throw new Error(
+              `اكتب سبب حسم الوحدة ${finalToken.tokenId} `
+              + `في الجملة ${sentenceId}.`);
+          }
+          return finalToken;
+        });
+      return {
+        sentenceId,
+        structurallyAcceptable: structural,
+        completePredicate: predicate,
+        tokens,
+        resolutionNote: sentenceNote
+      };
+    });
+  return {
+    schema: ADJUDICATION_SCHEMA,
+    packetId: state.packet.packetId,
+    holdoutId: state.packet.holdoutId,
+    protocolId: state.packet.protocolId,
+    packetMerkleRoot: await computePacketMerkleRoot(state.packet),
+    annotationAMerkleRoot:
+      await computeAnnotationMerkleRoot(state.packet, state.annotationA),
+    annotationBMerkleRoot:
+      await computeAnnotationMerkleRoot(state.packet, state.annotationB),
+    annotationASlot: state.annotationA.annotatorSlot,
+    annotationBSlot: state.annotationB.annotatorSlot,
+    adjudicatorPseudonym: `human-${state.participantId.slice(0, 12)}-J`,
+    adjudicatorIsHuman: true,
+    adjudicatorIsSynthetic: false,
+    independentFromImplementationTeam:
+      finalize && checked("attest-independent"),
+    blindToParserInternals: finalize && checked("attest-blind"),
+    parserPredictionsViewed: false,
+    sentences
+  };
+}
+
+function collectToken(card, adjudicated) {
+  const category = requiredControl(
+    card,
+    ".irab-category",
+    "قرار الإعراب"
+  );
+  const notApplicable = category === "_";
+  const token = {
+    tokenId: Number(card.dataset.tokenId),
+    universalPartOfSpeech: requiredControl(card, ".upos", "نوع الكلمة"),
+    headTokenId: integerControl(card, ".head", "الرأس النحوي"),
+    dependencyRelation:
+      requiredControl(card, ".relation", "العلاقة النحوية"),
+    irabHeadTokenId: notApplicable
+      ? null
+      : integerControl(card, ".irab-head", "رأس علاقة الإعراب"),
+    irabCategory: notApplicable ? null : category,
+    irabNotApplicable: notApplicable
+  };
+  if (adjudicated) {
+    token.resolutionNote = nullable(
+      card.querySelector(".resolution input").value);
+  } else {
+    token.note = nullable(card.querySelector(".note input").value);
+  }
+  return token;
+}
+
+function renderReview() {
+  const role = selectedRole();
+  const tokenCount = state.packet.sentences
+    .reduce((sum, sentence) => sum + sentence.tokens.length, 0);
+  reviewSummary.innerHTML = `
+    <dl>
+      <div><dt>الدور</dt><dd>${escapeHtml(roleLabel(role))}</dd></div>
+      <div><dt>الجمل</dt><dd>${state.packet.sentences.length}</dd></div>
+      <div><dt>الوحدات</dt><dd>${tokenCount}</dd></div>
+      <div><dt>طريقة النشر</dt><dd>نتيجة مجهّلة</dd></div>
+    </dl>
+    <p>
+      راجع التعهدات أدناه. سيُحفظ اسمك وبريدك وهاتفك في Azure منفصلًا،
+      بينما تُرسل القرارات اللغوية إلى قناة الاستيراد الخاصة بالمستودع.
+    </p>`;
+}
+
+function validateAttestations() {
+  if (!checked("attest-independent")
+      || !checked("attest-blind")
+      || !checked("attest-authentic")) {
+    throw new Error("يجب تأكيد التعهدات الثلاثة قبل الحفظ أو الإرسال.");
+  }
+}
+
+async function downloadEvaluation() {
+  clearStatus();
+  try {
+    const artifact = await buildArtifactBundle();
+    downloadJson(
+      `${state.packet.packetId}-${selectedRole()}-${state.participantId}.json`,
+      {
+        participantId: state.participantId,
+        exportedAtUtc: new Date().toISOString(),
+        artifact
+      }
+    );
+    showStatus("حُفظت نسخة مجهّلة على جهازك.", false);
+  } catch (error) {
+    showStatus(error.message, true);
+  }
+}
+
+async function submitEvaluation() {
+  clearStatus();
+  submitButton.disabled = true;
+  try {
+    validateProfile();
+    if (!state.account.authenticated) {
+      throw new Error("سجّل الدخول قبل إرسال التقييم.");
+    }
+    const artifact = await buildArtifactBundle();
+    const artifactSha256 = await sha256Json(artifact);
+    const turnstileToken = getTurnstileToken();
+    if (!state.config.submissionEnabled) {
+      throw new Error(
+        "الإرسال المركزي غير مفعّل بعد. احفظ نسخة الجهاز وأرسلها لمنسق "
+        + "التقييم حتى تكتمل تهيئة قناة النشر الآمنة.");
+    }
+    if (!turnstileToken) {
+      throw new Error("أكمل اختبار الحماية قبل الإرسال.");
+    }
+
+    const payload = {
+      schema: "adg-msa-portal-submission-v1",
+      participantId: state.participantId,
+      submittedAtUtc: new Date().toISOString(),
+      profile: accountProfile(),
+      consent: accountConsent(),
+      attestation: {
+        independent: checked("attest-independent"),
+        blind: checked("attest-blind"),
+        authentic: checked("attest-authentic")
+      },
+      artifactType: artifact.kind,
+      artifactSha256,
+      artifact,
+      clientVersion: "ads-v14.1",
+      turnstileToken
+    };
+    const body = JSON.stringify(payload);
+    if (new TextEncoder().encode(body).length
+        > state.config.maxSubmissionBytes) {
+      throw new Error("حجم التقييم أكبر من الحد المسموح لهذه الجولة.");
+    }
+
+    const response = await fetch("/api/submissions", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(result.message || "تعذر إرسال التقييم.");
+    }
+    showStatus(
+      `تم استلام تقييمك برقم ${result.receiptId}. `
+      + "ستظهر النتيجة المجهّلة في المستودع بعد الفحص الآلي.",
+      false
+    );
+  } catch (error) {
+    showStatus(error.message, true);
+  } finally {
+    submitButton.disabled = false;
+    resetTurnstile();
+  }
+}
+
+async function configureTurnstile() {
+  if (!state.config.turnstileSiteKey) return;
+  await loadScript(
+    "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
+  );
+  state.turnstileWidgetId = turnstile.render("#turnstile-slot", {
+    sitekey: state.config.turnstileSiteKey,
+    language: "ar",
+    theme: "light"
+  });
+}
+
+function getTurnstileToken() {
+  if (state.turnstileWidgetId === null || !window.turnstile) return "";
+  return turnstile.getResponse(state.turnstileWidgetId);
+}
+
+function resetTurnstile() {
+  if (state.turnstileWidgetId !== null && window.turnstile) {
+    turnstile.reset(state.turnstileWidgetId);
+  }
+}
+
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = src;
+    script.async = true;
+    script.defer = true;
+    script.addEventListener("load", resolve, { once: true });
+    script.addEventListener(
+      "error",
+      () => reject(new Error("تعذر تحميل اختبار الحماية.")),
+      { once: true });
+    document.head.append(script);
+  });
+}
+
+function updateCompletion() {
+  const controls = [...workspace.querySelectorAll(
+    "select.structural, select.predicate, select.upos, select.relation, "
+    + "select.irab-category, .head, .irab-head"
+  )].filter(control => !control.disabled);
+  const completed = controls.filter(control => control.value !== "").length;
+  const percentage = controls.length === 0
+    ? 0
+    : Math.round(completed / controls.length * 100);
+  completionValue.textContent = `${percentage}%`;
+}
+
+function sentenceShell(sentence) {
+  const section = document.createElement("article");
+  section.className = "sentence";
+  section.dataset.sentenceId = sentence.sentenceId;
+  const title = document.createElement("h4");
+  title.textContent = `الجملة ${sentence.sentenceId}`;
+  const text = document.createElement("div");
+  text.className = "sentence-text";
+  text.textContent = sentence.text;
+  section.append(title, text);
+  return section;
+}
+
+function tokenForm(token) {
+  const element = document.createElement("div");
+  element.className = "token-form";
+  element.textContent = `${token.id}. ${token.form}`;
+  return element;
+}
+
+function tokenSelectField(labelText, className, options, selected = "") {
+  return labelled(
+    labelText,
+    selectControl(className, options, selected),
+    "token-field",
+    FIELD_HELP[className]
+  );
+}
+
+function tokenReferenceField(
+  labelText,
+  className,
+  sentenceTokens,
+  currentTokenId,
+  allowRoot,
+  selected = ""
+) {
+  const control = referenceSelectControl(
+    className,
+    sentenceTokens,
+    currentTokenId,
+    allowRoot,
+    selected
+  );
+  return labelled(
+    labelText,
+    control,
+    "token-field",
+    FIELD_HELP[className]
+  );
+}
+
+function irabFields(
+  sentenceTokens,
+  currentTokenId,
+  category = "",
+  head = ""
+) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "irab-fields";
+  const categoryControl = selectControl(
+    "irab-category",
+    IRAB,
+    category ?? "");
+  const headControl = referenceSelectControl(
+    "irab-head",
+    sentenceTokens,
+    currentTokenId,
+    false,
+    head ?? ""
+  );
+  const categoryField = labelled(
+    "فئة الإعراب",
+    categoryControl,
+    "token-field",
+    FIELD_HELP.irabCategory
+  );
+  const headField = labelled(
+    "رأس علاقة الإعراب",
+    headControl,
+    "token-field",
+    FIELD_HELP.irabHead
+  );
+  wrapper.append(categoryField, headField);
+  syncIrabHead(categoryControl);
+  return wrapper;
+}
+
+function referenceSelectControl(
+  className,
+  sentenceTokens,
+  currentTokenId,
+  allowRoot,
+  selected
+) {
+  const control = document.createElement("select");
+  control.className = className;
+  const blank = document.createElement("option");
+  blank.value = "";
+  blank.textContent = allowRoot
+    ? "اختر كلمة، أو جذر الجملة…"
+    : "اختر الكلمة المرتبط بها الدور…";
+  control.append(blank);
+  if (allowRoot) {
+    const root = document.createElement("option");
+    root.value = "0";
+    root.textContent = "0 — جذر الجملة (لا يتبع كلمة)";
+    root.selected = String(selected) === "0";
+    control.append(root);
+  }
+  sentenceTokens
+    .filter(token => Number(token.id) !== Number(currentTokenId))
+    .forEach(token => {
+      const option = document.createElement("option");
+      option.value = String(token.id);
+      option.textContent = `${token.id} — ${token.form}`;
+      option.selected = String(token.id) === String(selected);
+      control.append(option);
+    });
+  return control;
+}
+
+function syncIrabHead(categoryControl) {
+  const head = categoryControl
+    .closest(".irab-fields")
+    ?.querySelector(".irab-head");
+  if (!head) return;
+  head.disabled = categoryControl.value === "_";
+  if (head.disabled) head.value = "";
+}
+
+function textField(labelText, className) {
+  const input = document.createElement("input");
+  input.className = className;
+  input.type = "text";
+  input.maxLength = 500;
+  return labelled(labelText, input, className);
+}
+
+function booleanSelect(className, selected = null) {
+  return selectControl(
+    className,
+    [["true", "نعم"], ["false", "لا"]],
+    selected === null ? "" : String(selected)
+  );
+}
+
+function selectControl(className, options, selected = "") {
+  const control = document.createElement("select");
+  control.className = className;
+  const blank = document.createElement("option");
+  blank.value = "";
+  blank.textContent = "اختر…";
+  control.append(blank);
+  options.forEach(([value, label]) => {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = `${label} (${value})`;
+    option.selected = String(value) === String(selected);
+    control.append(option);
+  });
+  return control;
+}
+
+function labelled(text, control, className = "", helpText = "") {
+  const label = document.createElement("label");
+  if (className) label.className = className;
+  const span = document.createElement("span");
+  span.textContent = text;
+  label.append(span);
+  if (helpText) {
+    const help = document.createElement("small");
+    help.className = "field-help";
+    help.textContent = helpText;
+    label.append(help);
+  }
+  label.append(control);
+  return label;
+}
+
+function tokenSummary(token) {
+  const irab = token.irabNotApplicable
+    ? "غير منطبق"
+    : `${token.irabCategory} @ ${token.irabHeadTokenId}`;
+  return [
+    `النوع: ${token.universalPartOfSpeech}`,
+    `الرأس: ${token.headTokenId}`,
+    `العلاقة: ${token.dependencyRelation}`,
+    `الإعراب: ${irab}`
+  ].join("\n");
+}
+
+function selectedRole() {
+  return document.querySelector('input[name="role"]:checked')?.value ?? "A";
+}
+
+function roleLabel(role) {
+  if (role === "A") return "المعلّق المستقل A";
+  if (role === "B") return "المعلّق المستقل B";
+  return "المحكّم الثالث";
+}
+
+function requiredBoolean(control) {
+  if (!control || control.value === "") {
+    throw new Error("أكمل قراري سلامة التركيب والإسناد لكل جملة.");
+  }
+  return control.value === "true";
+}
+
+function requiredControl(root, selector, label) {
+  const result = root.querySelector(selector)?.value ?? "";
+  requireText(result, label);
+  return result;
+}
+
+function integerControl(root, selector, label) {
+  const raw = root.querySelector(selector)?.value ?? "";
+  if (raw === "") throw new Error(`${label} مطلوب.`);
+  const result = Number(raw);
+  if (!Number.isInteger(result) || result < 0) {
+    throw new Error(`${label} يجب أن يكون عددًا صحيحًا غير سالب.`);
+  }
+  return result;
+}
+
+function requireText(text, label) {
+  if (!text || !text.trim()) throw new Error(`${label} مطلوب.`);
+}
+
+function value(id) {
+  return document.getElementById(id)?.value.trim() ?? "";
+}
+
+function checked(id) {
+  return Boolean(document.getElementById(id)?.checked);
+}
+
+function nullable(text) {
+  return text && text.trim() ? text.trim() : null;
+}
+
+function yesNo(value) {
+  return value ? "نعم" : "لا";
+}
+
+function sentenceMap(sentences) {
+  return new Map(sentences.map(sentence => [sentence.sentenceId, sentence]));
+}
+
+function tokenMap(tokens) {
+  return new Map(tokens.map(token => [token.tokenId, token]));
+}
+
+async function readJson(file, label) {
+  if (!file) throw new Error(`اختر ${label}.`);
+  try {
+    return JSON.parse(await file.text());
+  } catch {
+    throw new Error(`${label} ليس ملف JSON صالحًا.`);
+  }
+}
+
+function downloadJson(fileName, valueToWrite) {
+  const blob = new Blob(
+    [JSON.stringify(valueToWrite, null, 2) + "\n"],
+    { type: "application/json;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = fileName;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+function showStatus(message, isError) {
+  const target = state.step === 5 ? submissionStatus : wizardStatus;
+  target.textContent = message;
+  target.className = `status ${isError ? "error" : "success"}${
+    target === wizardStatus ? " wizard-status" : ""
+  }`;
+}
+
+function clearStatus() {
+  submissionStatus.textContent = "";
+  submissionStatus.className = "status";
+  wizardStatus.textContent = "";
+  wizardStatus.className = "status wizard-status";
+}
+
+function escapeHtml(valueToEscape) {
+  const element = document.createElement("span");
+  element.textContent = String(valueToEscape);
+  return element.innerHTML;
+}

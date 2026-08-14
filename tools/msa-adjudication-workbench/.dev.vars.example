@@ -1,0 +1,6 @@
+AZURE_CLIENT_ID=
+AZURE_CLIENT_SECRET=
+TURNSTILE_SITE_KEY=
+TURNSTILE_SECRET=
+# The Entra client secret is retrieved from Azure Key Vault using
+# ENTRA_CLIENT_SECRET_NAME; do not duplicate it in this file.

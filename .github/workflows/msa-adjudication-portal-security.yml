@@ -1,0 +1,89 @@
+name: MSA adjudication portal security
+
+on:
+  pull_request:
+    paths:
+      - "tools/msa-adjudication-workbench/**"
+      - "scripts/arabic-text/import-msa-portal-submission.mjs"
+      - ".github/workflows/import-msa-adjudication.yml"
+      - ".github/workflows/msa-adjudication-portal-security.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: tools/msa-adjudication-workbench/package-lock.json
+
+      - name: Install locked dependencies
+        working-directory: tools/msa-adjudication-workbench
+        run: npm ci
+
+      - name: Check JavaScript and tests
+        working-directory: tools/msa-adjudication-workbench
+        run: npm run check && npm test
+
+      - name: Audit production dependencies
+        working-directory: tools/msa-adjudication-workbench
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Reject tracked credentials and private identity data
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $forbiddenNames = @(
+            ".dev.vars",
+            ".env",
+            "client-secret",
+            "private-key",
+            "participant-identities"
+          )
+          $tracked = @(git ls-files)
+          foreach ($name in $forbiddenNames) {
+            $sensitive = @($tracked | Where-Object {
+              $_ -match [regex]::Escape($name) -and
+              $_ -notmatch '\.example$'
+            })
+            if ($sensitive.Count -gt 0) {
+              throw "Tracked sensitive artifact name: $name"
+            }
+          }
+          $matches = git grep -n -I -E `
+            'AZURE_CLIENT_SECRET=.+|ENTRA_CLIENT_SECRET=.+|TURNSTILE_SECRET=.+|gh[opusr]_[A-Za-z0-9_]{20,}' `
+            -- . ':(exclude)*.example' `
+            ':(exclude).github/workflows/msa-adjudication-portal-security.yml'
+          if ($LASTEXITCODE -eq 0 -and $matches) {
+            throw "Credential-like content found in tracked files."
+          }
+
+      - name: Write security report
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory security/reports -Force | Out-Null
+          [ordered]@{
+            schema = "adg-msa-portal-security-report-v1"
+            commit = $env:GITHUB_SHA
+            lockedInstall = $true
+            javascriptChecks = $true
+            tests = $true
+            productionDependencyAudit = $true
+            credentialSurfaceCheck = $true
+          } | ConvertTo-Json -Compress |
+            Set-Content security/reports/msa-adjudication-portal.json
+
+      - name: Upload security report
+        uses: actions/upload-artifact@v4
+        with:
+          name: msa-adjudication-portal-security
+          path: security/reports/msa-adjudication-portal.json

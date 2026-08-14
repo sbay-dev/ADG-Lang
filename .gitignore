@@ -12,3 +12,12 @@ examples/apps/**/artifacts/
 *.o
 *.log
 *.tmp
+**/node_modules/
+**/.wrangler/
+**/.dev.vars
+**/.env
+**/.env.*
+!**/.dev.vars.example
+!**/.env.example
+tools/msa-adjudication-workbench/wrangler.jsonc
+tools/msa-adjudication-workbench/wrangler.staging.jsonc
