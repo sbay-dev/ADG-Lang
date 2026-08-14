@@ -38,6 +38,13 @@ jobs:
         working-directory: tools/msa-adjudication-workbench
         run: npm audit --omit=dev --audit-level=high
 
+      - name: Verify release manifest
+        working-directory: tools/msa-adjudication-workbench
+        run: |
+          npm run release:manifest
+          git diff --exit-code -- release
+          test -z "$(git status --porcelain --untracked-files=all -- release)"
+
       - name: Reject tracked credentials and private identity data
         shell: pwsh
         run: |
@@ -84,6 +91,7 @@ jobs:
             tests = $true
             productionDependencyAudit = $true
             credentialSurfaceCheck = $true
+            releaseManifestFresh = $true
           } | ConvertTo-Json -Compress |
             Set-Content security/reports/msa-adjudication-portal.json
 

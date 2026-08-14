@@ -6,6 +6,7 @@
   "scripts": {
     "check": "node --check public/app.js && node --check public/admin/admin.js && node --check public/protocol.js && node --check src/index.js",
     "test": "node --test tests/*.test.mjs",
+    "release:manifest": "node scripts/generate-release-manifest.mjs",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy"
   },
