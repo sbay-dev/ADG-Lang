@@ -1,0 +1,182 @@
+{
+  "schema": "adg-ordinary-software-release-manifest-v1",
+  "releaseId": "portal-14.2.0",
+  "version": "14.2.0",
+  "classification": "ordinary-software",
+  "publicOrigin": "https://adg.sbay.sa",
+  "repository": "sbay-dev/ADG-Lang",
+  "canonicalization": {
+    "pathSeparator": "/",
+    "pathOrder": "ordinal-ascending",
+    "textLineEndings": "LF",
+    "rootRecord": "<sha256> <bytes> <path>\\n"
+  },
+  "integrity": {
+    "algorithm": "SHA-256 canonical file-list root",
+    "fileCount": 30,
+    "releaseRoot": "a51bd4979130cd2f0b9fe19749a61281171ad6e7ee6e5828654a9381dce10158"
+  },
+  "exclusions": [
+    "release/ (self-referential generated output)",
+    "wrangler.jsonc and wrangler.staging.jsonc (private resource bindings)",
+    ".dev.vars, .env, node_modules, .wrangler, caches, logs, and databases",
+    "participant identity, Azure SAS values, Entra secrets, and Turnstile secrets"
+  ],
+  "claimBoundaries": [
+    "This is an ordinary-software portal release, not a CNS model release.",
+    "Human submissions remain untrusted until the repository importer and review pass.",
+    "Pilot submissions do not establish unrestricted MSA parser readiness."
+  ],
+  "files": [
+    {
+      "path": ".github/workflows/import-msa-adjudication.yml",
+      "bytes": 4805,
+      "sha256": "6df1174aaaf710b8cffa68b60020af61aa175cfbb39db17701e4977ce3b76c30"
+    },
+    {
+      "path": ".github/workflows/msa-adjudication-portal-security.yml",
+      "bytes": 3487,
+      "sha256": "b6704360b6a17cb981db89bef0aa82b28d8e60d53834fc1479d01775c887cd0f"
+    },
+    {
+      "path": ".gitignore",
+      "bytes": 321,
+      "sha256": "0812c32f0937f4d6bbb805ab6f4341a19f37c8449c81158e928e5d737aca25fc"
+    },
+    {
+      "path": "EVALUATION-NOTICE.md",
+      "bytes": 279,
+      "sha256": "52830dba005f4832cdfd4f4e5145ebb0400a028c2cc83dace549508468a23b96"
+    },
+    {
+      "path": "README.md",
+      "bytes": 5850,
+      "sha256": "f49174714af0f3861bfb2ec45900e624774df2bed640f3366c3a3d3d992fffa7"
+    },
+    {
+      "path": "SECURITY.md",
+      "bytes": 313,
+      "sha256": "7c0cbe2155506ca22eca9dbd9b37c80f73da72b294ef135586a65810b3e28b11"
+    },
+    {
+      "path": "scripts/arabic-text/import-msa-portal-submission.mjs",
+      "bytes": 3125,
+      "sha256": "095aed8b6cc81555b59d7c6ff5e92065d9a4f31025b5838d1c40744f0c68b5a0"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/.dev.vars.example",
+      "bytes": 204,
+      "sha256": "1ecba26435948b79231fa828b2f43fb78c79aaf138c85ee66cecfa3435f4d470"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/DEPLOYMENT.md",
+      "bytes": 2750,
+      "sha256": "00e8655fd890e19036b5c6e06170eb9897960dc8d474fba2a400f14395212cf1"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/PRIVACY.md",
+      "bytes": 3278,
+      "sha256": "d530ff70a035d9e514d8f8ba1c5568a6fc16b56dfc6adf536bd0076b5886b308"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/README.md",
+      "bytes": 3906,
+      "sha256": "a64cf59beaf1fca5d366b77c6b6895286663874b0849fe98c317292cfcd89adb"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/SECURITY.md",
+      "bytes": 2572,
+      "sha256": "423314c51e3b314e375882672ba10ce5d42bb79549fee81d2ffbaee33b9b619f"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/migrations/0001_passkeys.sql",
+      "bytes": 1463,
+      "sha256": "4a6874a7208f2a54ad7e53841671a10a67726658ff05882731e7983bfe063373"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/migrations/0002_admin_progress.sql",
+      "bytes": 1385,
+      "sha256": "f6927ad473c5ef861247494364772d3426f0e53fd917f659bdc17a82fff5e143"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/package-lock.json",
+      "bytes": 59585,
+      "sha256": "8e7640b62aa8f339cbef7521ec09b5edbd448fbcbc09492817d3b94320b5f9f7"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/package.json",
+      "bytes": 605,
+      "sha256": "ff3086ea494ace5a87837c237d7543ef465144eabb838b64956a78e25c9d66d8"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/public/404.html",
+      "bytes": 609,
+      "sha256": "1f9584c796b248dbddd272109d1d17921c8c90141b6885f4e1756e59db36ada8"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/public/admin/admin.css",
+      "bytes": 5444,
+      "sha256": "541817cf2aeb1802b60d879d912ba188d4131c40d5c0e78357fab85790b59a85"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/public/admin/admin.js",
+      "bytes": 11507,
+      "sha256": "b807c56952174e6791d4bbb3adc8b0873fdc6231801b0ee33ccfd054d4b7be2c"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/public/admin/index.html",
+      "bytes": 5349,
+      "sha256": "5c516d58d1daf3138a14492fdb42c7431f34625a3aa6f2ed7bbb5cb827b70231"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/public/app.js",
+      "bytes": 58110,
+      "sha256": "c8180af43dab7f81b1424883f7ecd6d3b2ad1794a5f4a913a658f88f36311cd9"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/public/data/pilot-packet.json",
+      "bytes": 3471,
+      "sha256": "85221c2e846ec3e8aa25bf6e863558de121fb118ba9101d17a830f5ff156669e"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/public/index.html",
+      "bytes": 36110,
+      "sha256": "72f906782abd3efbdd614376d71ddf8632edc41697ff2a3b14861029695d00e7"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/public/protocol.js",
+      "bytes": 9414,
+      "sha256": "6201d2d82253604e34f631464d57fb309c67744184f9ce26f66d6388a55e6055"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/public/styles.css",
+      "bytes": 21588,
+      "sha256": "a85279d777bda5500316162bde43a7c0d2eed1b00d74d64cf8dfc6b0bdf077f4"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/scripts/generate-release-manifest.mjs",
+      "bytes": 4722,
+      "sha256": "8b0c25894f09d2e56cb73cce99248f6a172487dda9c10987c06aa506ced2cf6f"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/src/index.js",
+      "bytes": 67924,
+      "sha256": "66809f2cf29b5064614a40d75d5b5c8af989ec1293c35961e91c3c5616552db4"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/tests/protocol.test.mjs",
+      "bytes": 1611,
+      "sha256": "2478b7d4e39d2eae02f8dd8a73f2e6a55f74931aebfb227c1ff58bec7793a377"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/tests/worker.test.mjs",
+      "bytes": 5944,
+      "sha256": "09150b988766f35263156e39b4ce9477fcc67c71b2a4b5d47e97b64e29d071e9"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/wrangler.example.jsonc",
+      "bytes": 1422,
+      "sha256": "d0cf8b77d8cace347f9811b52a3e957948f42771c1c7e552a0eec6ea0d1503d1"
+    }
+  ]
+}

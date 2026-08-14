@@ -62,6 +62,20 @@ npm run dev
 The public static assets are under `public\`; the Worker API is
 `src\index.js`.
 
+## Release integrity
+
+`release\portal-14.2.0.json` binds the sanitized portal, importer, workflows,
+tests, and documentation with canonical LF-normalized SHA-256 records. Regenerate
+it deterministically from a clean clone with:
+
+```powershell
+npm run release:manifest
+```
+
+The security workflow rejects a stale or untracked release manifest. Private
+Wrangler bindings, local environment files, identities, and credentials are
+explicitly outside this ordinary-software release boundary.
+
 ## Authoritative evaluation
 
 Browser validation improves usability, but the .NET evaluator remains the
