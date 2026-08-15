@@ -1,0 +1,53 @@
+name: Synchronize MSA adjudication tasks
+
+on:
+  pull_request:
+    paths:
+      - "human-evidence/tasks/**"
+      - "tools/msa-adjudication-workbench/public/protocol.js"
+      - "tools/msa-adjudication-workbench/scripts/sync-repository-tasks.mjs"
+  push:
+    branches: [main]
+    paths:
+      - "human-evidence/tasks/**"
+      - "tools/msa-adjudication-workbench/public/protocol.js"
+      - "tools/msa-adjudication-workbench/scripts/sync-repository-tasks.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: msa-adjudication-task-sync
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Validate immutable task manifests
+        run: >-
+          node
+          tools/msa-adjudication-workbench/scripts/sync-repository-tasks.mjs
+          --validate-only
+
+  synchronize:
+    if: github.event_name != 'pull_request'
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: msa-adjudication-production
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Send signed task catalog to the portal
+        env:
+          ADG_PORTAL_TASK_SYNC_URL: ${{ vars.ADG_PORTAL_TASK_SYNC_URL || 'https://adg.sbay.sa/api/repository/tasks/sync' }}
+          ADG_REPOSITORY_RECEIPT_HMAC: ${{ secrets.ADG_REPOSITORY_RECEIPT_HMAC }}
+        run: >-
+          node
+          tools/msa-adjudication-workbench/scripts/sync-repository-tasks.mjs
+

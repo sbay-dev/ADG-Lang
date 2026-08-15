@@ -1,9 +1,8 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import postgres from "postgres";
 import {
   DEFAULT_CONNECTION_STRING_ENV,
-  DEFAULT_SCHEMA_PATH,
   projectRoot,
   resolveConnectionString
 } from "./postgres-operator-utils.mjs";
@@ -13,7 +12,11 @@ const argv = process.argv.slice(2);
 if (argv.includes("--help") || argv.includes("-h")) {
   process.stdout.write([
     "Usage:",
-    "  node scripts/apply-postgres-schema.mjs [--file <postgres/0001_portal_v15.sql>] [--connection-string-env POSTGRES_CONNECTION_STRING]",
+    "  node scripts/apply-postgres-schema.mjs "
+      + "[--file <postgres/migration.sql>] "
+      + "[--connection-string-env POSTGRES_CONNECTION_STRING]",
+    "",
+    "Without --file, every numbered postgres/*.sql migration is applied in order.",
     "",
     "Environment:",
     `  ${DEFAULT_CONNECTION_STRING_ENV}`
@@ -23,7 +26,19 @@ if (argv.includes("--help") || argv.includes("-h")) {
 
 const options = parseArguments(argv);
 const connectionString = resolveConnectionString(options.connectionStringEnv);
-const schemaPath = path.resolve(projectRoot, options.filePath);
+const schemaPaths = options.filePath
+  ? [path.resolve(projectRoot, options.filePath)]
+  : readdirSync(path.join(projectRoot, "postgres"), {
+    withFileTypes: true
+  })
+    .filter(entry =>
+      entry.isFile() && /^\d+.*\.sql$/u.test(entry.name)
+    )
+    .map(entry => path.join(projectRoot, "postgres", entry.name))
+    .sort((left, right) => left.localeCompare(right, "en"));
+if (schemaPaths.length === 0) {
+  throw new Error("No PostgreSQL migration files were found.");
+}
 const sql = postgres(connectionString, {
   max: 1,
   prepare: false,
@@ -35,11 +50,14 @@ const sql = postgres(connectionString, {
 });
 
 try {
-  const schemaText = readFileSync(schemaPath, "utf8");
-  await sql.unsafe(schemaText);
+  for (const schemaPath of schemaPaths) {
+    await sql.unsafe(readFileSync(schemaPath, "utf8"));
+  }
   process.stdout.write(JSON.stringify({
     applied: true,
-    schemaFile: path.relative(projectRoot, schemaPath),
+    schemaFiles: schemaPaths.map(schemaPath =>
+      path.relative(projectRoot, schemaPath)
+    ),
     connectionStringEnv: options.connectionStringEnv
   }, null, 2) + "\n");
 } finally {
@@ -47,7 +65,7 @@ try {
 }
 
 function parseArguments(values) {
-  let filePath = path.relative(projectRoot, DEFAULT_SCHEMA_PATH);
+  let filePath = null;
   let connectionStringEnv = DEFAULT_CONNECTION_STRING_ENV;
   for (let index = 0; index < values.length; index += 1) {
     const value = values[index];

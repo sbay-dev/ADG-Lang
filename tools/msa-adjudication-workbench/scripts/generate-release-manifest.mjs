@@ -20,8 +20,10 @@ const outputPath = resolve(releaseDirectory, `${releaseId}.json`);
 
 const repositoryFiles = [
   ".gitignore",
+  ".github/CODEOWNERS",
   ".github/workflows/import-msa-adjudication.yml",
   ".github/workflows/msa-adjudication-portal-security.yml",
+  ".github/workflows/sync-msa-adjudication-tasks.yml",
   "EVALUATION-NOTICE.md",
   "README.md",
   "SECURITY.md",
@@ -31,6 +33,7 @@ const repositoryFiles = [
   "examples/arabic-text/msa-adjudication-pilot-v1/annotation-b.synthetic.json",
   "examples/arabic-text/msa-adjudication-pilot-v1/human-usability-evaluation.template.json",
   "examples/arabic-text/msa-adjudication-pilot-v1/packet.json",
+  "human-evidence/tasks/msa-adjudication-pilot-v1.task.json",
   "scripts/arabic-text/import-msa-portal-submission.mjs",
   "scripts/arabic-text/render-msa-github-evidence.mjs"
 ];
@@ -88,6 +91,7 @@ const manifest = {
     "This is an ordinary-software portal release, not a CNS model release.",
     "Human submissions remain untrusted until the repository importer and review pass.",
     "Operational tests are assisted, do not occupy consensus roles, and cannot establish readiness.",
+    "Repository task manifests contain blind packets only; reviewer identities and completed local exports are excluded.",
     "Pilot submissions do not establish unrestricted MSA parser readiness."
   ],
   files

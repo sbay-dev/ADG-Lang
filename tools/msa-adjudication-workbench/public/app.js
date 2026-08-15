@@ -9,6 +9,7 @@ import {
   decisionNeedsResolution,
   sha256Json,
   tokenDecisionKey,
+  unpackPortalFile,
   validatePacket,
   validateRatificationBinding,
   validateSubmissionBinding
@@ -117,6 +118,7 @@ const state = {
   annotationA: null,
   annotationB: null,
   primaryArtifact: null,
+  currentTaskVersionId: null,
   config: {
     submissionEnabled: false,
     maxSubmissionBytes: 900000,
@@ -147,6 +149,9 @@ const state = {
     taskStatus: null
   },
   autosaveTimer: null,
+  draftSavePromise: null,
+  workspaceRevision: 0,
+  serverDraftRevision: -1,
   draftSaving: false,
   turnstileWidgetId: null
 };
@@ -189,6 +194,12 @@ const saveDraftButton = document.querySelector("#save-draft");
 const draftStatus = document.querySelector("#draft-status");
 const savedDrafts = document.querySelector("#saved-drafts");
 const draftList = document.querySelector("#draft-list");
+const taskList = document.querySelector("#task-list");
+const taskInboxStatus = document.querySelector("#task-inbox-status");
+const refreshTasksButton = document.querySelector("#refresh-tasks");
+const recoveryFile = document.querySelector("#recovery-file");
+const recoveryStatus = document.querySelector("#recovery-status");
+const manualTaskTools = document.querySelector("#manual-task-tools");
 const shareWhatsapp = document.querySelector("#share-whatsapp");
 const shareX = document.querySelector("#share-x");
 const copyInvitationButton = document.querySelector("#copy-invitation");
@@ -249,29 +260,36 @@ emailCodeInput.addEventListener("keydown", event => {
 });
 emailCodeInput.addEventListener("input", renderEmailVerificationState);
 saveDraftButton.addEventListener("click", saveDraft);
+refreshTasksButton.addEventListener("click", refreshTaskInbox);
+recoveryFile.addEventListener("change", restoreRecoveryFile);
 copyInvitationButton.addEventListener("click", copyInvitation);
 submitDiscussionButton.addEventListener("click", submitDiscussionComment);
 cancelReplyButton.addEventListener("click", clearDiscussionReply);
 submitAppealButton.addEventListener("click", submitConsensusAppeal);
 workspace.addEventListener("input", () => {
+  state.workspaceRevision += 1;
   updateCompletion();
+  persistCurrentDraftLocally();
   scheduleAutosave();
 });
 workspace.addEventListener("change", event => {
   if (event.target.matches(".irab-category")) {
     syncIrabHead(event.target);
   }
+  state.workspaceRevision += 1;
   updateCompletion();
+  persistCurrentDraftLocally();
   scheduleAutosave();
 });
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "hidden"
-      && state.step === 4
-      && state.account.authenticated
+      && [4, 5].includes(state.step)
       && state.packet) {
+    persistCurrentDraftLocally();
     void saveDraft({ silent: true });
   }
 });
+window.addEventListener("pagehide", flushDraftOnPageHide);
 
 configureSharing();
 initialize();
@@ -300,6 +318,8 @@ async function copyInvitation() {
 async function initialize() {
   applyRoleFromQuery();
   syncRoleControls();
+  manualTaskTools.hidden =
+    new URL(location.href).searchParams.get("legacy-files") !== "1";
   try {
     const response = await fetch("/api/config", {
       headers: { accept: "application/json" }
@@ -311,6 +331,9 @@ async function initialize() {
     // Local-file use remains available without a backend.
   }
   await restoreAccount();
+  if (state.account.authenticated) {
+    await refreshTaskInbox();
+  }
   await configureTurnstile();
   const discussionReceipt =
     new URL(location.href).searchParams.get("discussion");
@@ -351,10 +374,11 @@ async function goNext() {
           "سجّل مفتاح المرور أو ادخل إلى حسابك قبل اختيار المهمة."
         );
       }
-      await refreshDraftList();
+      await Promise.all([refreshDraftList(), refreshTaskInbox()]);
     } else if (state.step === 3) {
       await prepareCase();
     } else if (state.step === 4) {
+      await flushDraftSave();
       await validateWorkspace();
       renderReview();
     } else {
@@ -366,8 +390,11 @@ async function goNext() {
   }
 }
 
-function goPrevious() {
+async function goPrevious() {
   clearStatus();
+  if (state.step === 5 && state.packet) {
+    await flushDraftSave();
+  }
   if (state.step > 1) showStep(state.step - 1);
 }
 
@@ -390,6 +417,9 @@ function showStep(step) {
     void ensureTurnstileWidget().catch(error => {
       showStatus(error.message, true);
     });
+  }
+  if (step === 3 && state.account.authenticated) {
+    void refreshTaskInbox();
   }
   document.querySelector("#adjudication").scrollIntoView({
     behavior: "smooth",
@@ -1105,6 +1135,347 @@ async function apiJson(path, options = {}) {
   return payload;
 }
 
+async function refreshTaskInbox() {
+  taskList.replaceChildren();
+  taskInboxStatus.textContent = "";
+  taskInboxStatus.className = "status";
+  if (!state.account.authenticated) {
+    taskInboxStatus.textContent =
+      "سجّل الدخول لعرض المهام المفتوحة أو المسندة إلى بريدك.";
+    return;
+  }
+  refreshTasksButton.disabled = true;
+  try {
+    const taskQuery = OPERATIONAL_TEST_REQUESTED
+      ? "?mode=operational-test"
+      : "";
+    const result = await apiJson(`/api/tasks${taskQuery}`);
+    const tasks = result.tasks || [];
+    if (tasks.length === 0) {
+      taskInboxStatus.textContent =
+        "لا توجد مهمة جاهزة لهذا الحساب الآن. "
+        + "ستظهر المهمة هنا عند نشرها أو إسنادها.";
+      return;
+    }
+    tasks.forEach(task => taskList.append(repositoryTaskCard(task)));
+  } catch (error) {
+    taskInboxStatus.textContent = error.message;
+    taskInboxStatus.className = "status error";
+  } finally {
+    refreshTasksButton.disabled = false;
+  }
+}
+
+function repositoryTaskCard(task) {
+  const card = document.createElement("article");
+  card.className = "task-card";
+  const main = document.createElement("div");
+  main.className = "task-card-main";
+  const heading = document.createElement("div");
+  heading.className = "task-card-heading";
+  const title = document.createElement("h5");
+  title.textContent = task.title;
+  heading.append(title);
+  if (task.lane === "operational-test") {
+    heading.append(taskBadge("اختبار تشغيلي", "waiting"));
+  }
+  if (task.new) heading.append(taskBadge("جديدة"));
+  if (!task.ready) {
+    heading.append(taskBadge("بانتظار المرحلة السابقة", "waiting"));
+  }
+  if (task.status === "submitted") {
+    heading.append(taskBadge("مكتملة", "complete"));
+  }
+  const summary = document.createElement("p");
+  summary.textContent = task.summary;
+  const meta = document.createElement("div");
+  meta.className = "task-card-meta";
+  const role = document.createElement("small");
+  role.textContent = task.role
+    ? `الدور: ${roleLabel(task.clientRole)}`
+    : "الدور يثبت عند الاستلام";
+  const packet = document.createElement("small");
+  packet.textContent = `الحزمة: ${task.packetId}`;
+  const source = document.createElement("small");
+  source.textContent =
+    `المصدر: ${task.source.repository}@${task.source.commitSha.slice(0, 8)}`;
+  meta.append(role, packet, source);
+  if (task.draft) {
+    const draft = document.createElement("small");
+    draft.textContent =
+      `مسودة محفوظة: ${task.draft.progressPercent}% · `
+      + formatDate(task.draft.updatedAtUtc);
+    meta.append(draft);
+  }
+  main.append(heading, summary, meta);
+
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "button primary compact";
+  button.disabled = !task.ready || task.status === "submitted";
+  button.textContent = task.status === "claimed"
+    ? "متابعة المهمة"
+    : task.status === "submitted"
+      ? "أُنجزت"
+      : task.ready
+        ? "استلام وبدء"
+        : "غير جاهزة";
+  button.addEventListener("click", () => openRepositoryTask(task, button));
+  card.append(main, button);
+  return card;
+}
+
+function taskBadge(text, modifier = "") {
+  const badge = document.createElement("span");
+  badge.className = `task-badge${modifier ? ` ${modifier}` : ""}`;
+  badge.textContent = text;
+  return badge;
+}
+
+async function openRepositoryTask(task, button) {
+  clearStatus();
+  button.disabled = true;
+  try {
+    const payload = task.status === "claimed"
+      ? await apiJson(
+        `/api/tasks/load?${new URLSearchParams({
+          taskVersionId: task.taskVersionId,
+          ...(OPERATIONAL_TEST_REQUESTED
+            ? { mode: "operational-test" }
+            : {})
+        })}`
+      )
+      : await apiJson("/api/tasks/claim", {
+        method: "POST",
+        body: {
+          taskVersionId: task.taskVersionId,
+          ...(OPERATIONAL_TEST_REQUESTED
+            ? { mode: "operational-test" }
+            : {})
+        }
+      });
+    await hydrateRepositoryTask(payload);
+  } catch (error) {
+    showStatus(error.message, true);
+    button.disabled = false;
+    await refreshTaskInbox();
+  }
+}
+
+async function hydrateRepositoryTask(payload) {
+  validatePacket(payload.packet);
+  const roleControl = document.querySelector(
+    `input[name="role"][value="${payload.clientRole}"]`
+  );
+  if (!roleControl) throw new Error("الدور المسند غير مدعوم في هذه الواجهة.");
+  roleControl.checked = true;
+  syncRoleControls();
+  state.currentTaskVersionId = payload.taskVersionId;
+  state.packet = payload.packet;
+  state.annotationA = payload.annotationA ?? null;
+  state.annotationB = payload.annotationB ?? null;
+  state.primaryArtifact = payload.primaryArtifact ?? null;
+
+  if (payload.clientRole === "adjudication") {
+    await validateSubmissionBinding(state.packet, state.annotationA);
+    await validateSubmissionBinding(state.packet, state.annotationB);
+    renderAdjudication();
+  } else if (payload.clientRole === "ratification") {
+    if (!state.primaryArtifact
+        || state.primaryArtifact.kind !== "adjudication-package") {
+      throw new Error("مدخلات المراجعة النهائية غير مكتملة.");
+    }
+    await renderRatification();
+  } else {
+    renderAnnotation();
+  }
+  state.workspaceRevision = 0;
+  state.serverDraftRevision = -1;
+  await applyBestAvailableDraft(payload.packet, payload.clientRole);
+  renderPacketSummary("مهمة موثقة من المستودع");
+  updateCompletion();
+  showStep(4);
+}
+
+async function applyBestAvailableDraft(packet, role) {
+  let serverDraft = null;
+  let serverUpdatedAt = 0;
+  try {
+    const query = new URLSearchParams({
+      packetId: packet.packetId,
+      role
+    });
+    const result = await apiJson(`/api/draft?${query}`);
+    if (result.found
+        && result.draft?.schema === "adg-msa-portal-draft-v1") {
+      serverDraft = result.draft;
+      serverUpdatedAt = Date.parse(result.updatedAtUtc) || 0;
+    }
+  } catch (error) {
+    if (error.status !== 404) {
+      setDraftStatus(
+        "تعذر جلب نسخة الخادم؛ ستبقى نسخة الاسترداد على هذا الجهاز.",
+        true
+      );
+    }
+  }
+  const local = readLocalDraft(packet.packetId, role);
+  const localUpdatedAt = Date.parse(local?.savedAtUtc || "") || 0;
+  const selected = localUpdatedAt > serverUpdatedAt ? local : serverDraft;
+  if (!selected) return;
+  applyWorkspace(selected.fields);
+  state.participantId = selected.participantId || state.participantId;
+  state.workspaceRevision += 1;
+  if (selected === local) {
+    setDraftStatus(
+      `استُعيدت أحدث نسخة من هذا الجهاز (${formatDate(local.savedAtUtc)}).`,
+      false
+    );
+  } else {
+    setDraftStatus(
+      `استُعيدت نسخة الخادم (${formatDate(serverUpdatedAt)}).`,
+      false
+    );
+  }
+}
+
+async function restoreRecoveryFile() {
+  recoveryStatus.textContent = "";
+  recoveryStatus.className = "status";
+  try {
+    const loaded = await readJson(
+      recoveryFile.files[0],
+      "نسخة الاسترداد"
+    );
+    const unpacked = unpackPortalFile(loaded);
+    if (unpacked.kind === "annotation-artifact") {
+      validatePacket(unpacked.packet);
+      await validateSubmissionBinding(
+        unpacked.packet,
+        unpacked.annotation
+      );
+      const roleControl = document.querySelector(
+        `input[name="role"][value="${unpacked.role}"]`
+      );
+      if (!roleControl) throw new Error("دور نسخة الاسترداد غير مدعوم.");
+      roleControl.checked = true;
+      syncRoleControls();
+      state.currentTaskVersionId = null;
+      state.packet = unpacked.packet;
+      state.annotationA = null;
+      state.annotationB = null;
+      state.primaryArtifact = null;
+      renderAnnotation();
+      applyWorkspace(annotationWorkspaceFields(unpacked.annotation));
+      state.workspaceRevision += 1;
+      renderPacketSummary("نسخة محلية مستردة");
+      updateCompletion();
+      showStep(4);
+      await saveDraft({ silent: false });
+      recoveryStatus.textContent =
+        "استُعيدت جميع القرارات اللغوية وحُفظت كمسودة جديدة. "
+        + "ستُنشأ التعهدات من جلستك الحالية عند الإرسال.";
+      recoveryStatus.className = "status success";
+      return;
+    }
+    if (unpacked.kind === "draft") {
+      await restoreDraftObject(unpacked.draft, "نسخة استرداد محلية");
+      await saveDraft({ silent: false });
+      recoveryStatus.textContent =
+        "استُعيدت المسودة وحُفظت من جديد على الحساب.";
+      recoveryStatus.className = "status success";
+      return;
+    }
+    if (unpacked.kind === "adjudication-artifact") {
+      validatePacket(unpacked.packet);
+      const roleControl = document.querySelector(
+        'input[name="role"][value="ratification"]'
+      );
+      roleControl.checked = true;
+      syncRoleControls();
+      state.currentTaskVersionId = null;
+      state.packet = unpacked.packet;
+      state.annotationA = null;
+      state.annotationB = null;
+      state.primaryArtifact = unpacked.artifact;
+      await renderRatification();
+      state.workspaceRevision += 1;
+      renderPacketSummary("حزمة J1 مستردة");
+      updateCompletion();
+      showStep(4);
+      await saveDraft({ silent: false });
+      recoveryStatus.textContent = "استُعيدت حزمة J1 للمراجعة النهائية.";
+      recoveryStatus.className = "status success";
+      return;
+    }
+    if (unpacked.kind === "ratification-artifact") {
+      validatePacket(unpacked.packet);
+      await computeRatificationMerkleRoot(
+        unpacked.primaryArtifact,
+        unpacked.ratification
+      );
+      const roleControl = document.querySelector(
+        'input[name="role"][value="ratification"]'
+      );
+      roleControl.checked = true;
+      syncRoleControls();
+      state.currentTaskVersionId = null;
+      state.packet = unpacked.packet;
+      state.annotationA = null;
+      state.annotationB = null;
+      state.primaryArtifact = unpacked.primaryArtifact;
+      await renderRatification();
+      applyWorkspace([{
+        kind: "ratification",
+        primaryReceiptId: unpacked.ratification.primaryReceiptId,
+        decision: unpacked.ratification.decision,
+        rationale: unpacked.ratification.rationale
+      }]);
+      state.workspaceRevision += 1;
+      renderPacketSummary("نسخة J2 مستردة");
+      updateCompletion();
+      showStep(4);
+      await saveDraft({ silent: false });
+      recoveryStatus.textContent =
+        "استُعيد قرار J2 وحُفظ كمسودة جديدة. "
+        + "سيُنشأ التعهّد من جلستك الحالية عند الإرسال.";
+      recoveryStatus.className = "status success";
+      return;
+    }
+    throw new Error(
+      "الملف لا يحتوي تصديرًا أو مسودة صالحة للاسترداد."
+    );
+  } catch (error) {
+    recoveryStatus.textContent = error.message;
+    recoveryStatus.className = "status error";
+  } finally {
+    recoveryFile.value = "";
+  }
+}
+
+function annotationWorkspaceFields(annotation) {
+  return annotation.sentences.map(sentence => ({
+    sentenceId: sentence.sentenceId,
+    structural: String(sentence.structurallyAcceptable),
+    predicate: String(sentence.completePredicate),
+    sentenceResolution: "",
+    tokens: sentence.tokens.map(token => ({
+      tokenId: token.tokenId,
+      upos: token.universalPartOfSpeech,
+      head: String(token.headTokenId),
+      relation: token.dependencyRelation,
+      irabCategory: token.irabNotApplicable
+        ? "_"
+        : token.irabCategory,
+      irabHead: token.irabHeadTokenId == null
+        ? ""
+        : String(token.irabHeadTokenId),
+      note: token.note ?? "",
+      resolution: ""
+    }))
+  }));
+}
+
 async function loadPilot() {
   clearStatus();
   try {
@@ -1126,7 +1497,8 @@ async function loadPilot() {
 async function loadPacketFile() {
   clearStatus();
   try {
-    state.packet = await readJson(packetFile.files[0], "حزمة النص");
+    const loaded = await readJson(packetFile.files[0], "حزمة النص");
+    state.packet = unpackPortalFile(loaded).packet;
     validatePacket(state.packet);
     renderPacketSummary("حزمة منسق التقييم");
   } catch (error) {
@@ -1157,14 +1529,16 @@ async function prepareCase() {
   const role = selectedRole();
   if (role === "adjudication") {
     state.primaryArtifact = null;
-    state.annotationA = await readJson(
+    const loadedA = await readJson(
       annotationAFile.files[0],
       "ملف المعلّق A"
     );
-    state.annotationB = await readJson(
+    const loadedB = await readJson(
       annotationBFile.files[0],
       "ملف المعلّق B"
     );
+    state.annotationA = unpackPortalFile(loadedA).annotation;
+    state.annotationB = unpackPortalFile(loadedB).annotation;
     await validateSubmissionBinding(state.packet, state.annotationA);
     await validateSubmissionBinding(state.packet, state.annotationB);
     if (state.annotationA.annotatorSlot === state.annotationB.annotatorSlot) {
@@ -1208,58 +1582,177 @@ async function prepareCase() {
 
 async function saveDraft(options = {}) {
   const silent = options?.silent === true;
-  if (state.draftSaving) return;
   if (!silent) setDraftStatus("", false);
+  if (!state.packet) {
+    if (!silent) setDraftStatus("لا توجد مهمة محمّلة لحفظها.", true);
+    return false;
+  }
+  const revision = state.workspaceRevision;
+  const draft = createDraftSnapshot();
+  persistLocalDraft(draft);
+  if (!state.account.authenticated) {
+    setDraftStatus(
+      "حُفظت نسخة استرداد على هذا الجهاز. سجّل الدخول لمزامنتها مشفّرةً.",
+      false
+    );
+    return true;
+  }
+  if (state.draftSavePromise) {
+    await state.draftSavePromise;
+    return state.serverDraftRevision >= revision;
+  }
+  state.draftSaving = true;
+  saveDraftButton.disabled = true;
+  state.draftSavePromise = apiJson("/api/draft", {
+    method: "PUT",
+    body: {
+      packetId: state.packet.packetId,
+      role: selectedRole(),
+      draft
+    }
+  });
   try {
-    if (!state.account.authenticated) {
-      throw new Error("سجّل الدخول قبل حفظ المسودة.");
-    }
-    if (!state.packet) {
-      throw new Error("لا توجد مهمة محمّلة لحفظها.");
-    }
-    state.draftSaving = true;
-    saveDraftButton.disabled = true;
-    const result = await apiJson("/api/draft", {
-      method: "PUT",
-      body: {
-        packetId: state.packet.packetId,
-        role: selectedRole(),
-        draft: {
-          schema: "adg-msa-portal-draft-v1",
-          savedAtUtc: new Date().toISOString(),
-          participantId: state.participantId,
-          role: selectedRole(),
-          packet: state.packet,
-          annotationA: state.annotationA,
-          annotationB: state.annotationB,
-          primaryArtifact: state.primaryArtifact,
-          fields: captureWorkspace()
-        }
-      }
-    });
+    const result = await state.draftSavePromise;
+    state.serverDraftRevision = Math.max(
+      state.serverDraftRevision,
+      revision
+    );
     setDraftStatus(
       `${silent ? "حفظ تلقائي" : "حُفظت المسودة بأمان"} · `
-        + `${result.progressPercent}% · ${formatDate(result.updatedAtUtc)}.`,
+        + `${result.progressPercent}% · ${formatDate(result.updatedAtUtc)}`
+        + `${result.revisionPreserved ? " · حُفظت النسخة السابقة" : ""}.`,
       false
     );
     if (!silent) await refreshDraftList();
+    return true;
   } catch (error) {
-    setDraftStatus(error.message, true);
+    setDraftStatus(
+      `حُفظت نسخة الاسترداد على هذا الجهاز، وتعذرت مزامنة الخادم: `
+        + error.message,
+      true
+    );
+    return false;
   } finally {
+    state.draftSavePromise = null;
     state.draftSaving = false;
     saveDraftButton.disabled = false;
   }
 }
 
+function createDraftSnapshot(savedAtUtc = new Date().toISOString()) {
+  return {
+    schema: "adg-msa-portal-draft-v1",
+    savedAtUtc,
+    participantId: state.participantId,
+    role: selectedRole(),
+    packet: state.packet,
+    annotationA: state.annotationA,
+    annotationB: state.annotationB,
+    primaryArtifact: state.primaryArtifact,
+    fields: captureWorkspace()
+  };
+}
+
 function scheduleAutosave() {
   if (state.autosaveTimer) clearTimeout(state.autosaveTimer);
-  if (!state.account.authenticated || !state.packet || state.step !== 4) {
+  if (!state.packet || ![4, 5].includes(state.step)) {
     return;
   }
   state.autosaveTimer = setTimeout(() => {
     state.autosaveTimer = null;
     void saveDraft({ silent: true });
-  }, 10000);
+  }, 5000);
+}
+
+async function flushDraftSave() {
+  if (!state.packet) return;
+  if (state.autosaveTimer) {
+    clearTimeout(state.autosaveTimer);
+    state.autosaveTimer = null;
+  }
+  persistCurrentDraftLocally();
+  if (state.draftSavePromise) {
+    await state.draftSavePromise.catch(() => null);
+  }
+  if (state.serverDraftRevision < state.workspaceRevision) {
+    await saveDraft({ silent: true });
+  }
+}
+
+function flushDraftOnPageHide() {
+  if (!state.packet || ![4, 5].includes(state.step)) return;
+  const draft = createDraftSnapshot();
+  persistLocalDraft(draft);
+  if (!state.account.authenticated) return;
+  const body = JSON.stringify({
+    packetId: state.packet.packetId,
+    role: selectedRole(),
+    draft
+  });
+  void fetch("/api/draft", {
+    method: "PUT",
+    credentials: "same-origin",
+    headers: {
+      accept: "application/json",
+      "content-type": "application/json"
+    },
+    body,
+    keepalive: true
+  });
+}
+
+function persistCurrentDraftLocally() {
+  if (!state.packet || !workspace.children.length) return;
+  persistLocalDraft(createDraftSnapshot());
+}
+
+function persistLocalDraft(draft) {
+  try {
+    localStorage.setItem(
+      localDraftKey(draft.packet.packetId, draft.role),
+      JSON.stringify(draft)
+    );
+  } catch {
+    // The server draft remains the primary durable copy.
+  }
+}
+
+function readLocalDraft(packetId, role) {
+  try {
+    const value = localStorage.getItem(localDraftKey(packetId, role));
+    if (!value) return null;
+    const draft = JSON.parse(value);
+    return draft?.schema === "adg-msa-portal-draft-v1"
+      ? draft
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function listLocalDrafts() {
+  const owner = localDraftOwner();
+  const prefix = `adg-portal-draft-v1:${owner}:`;
+  const drafts = [];
+  try {
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index);
+      if (!key?.startsWith(prefix)) continue;
+      const draft = JSON.parse(localStorage.getItem(key));
+      if (draft?.schema === "adg-msa-portal-draft-v1") drafts.push(draft);
+    }
+  } catch {
+    return [];
+  }
+  return drafts;
+}
+
+function localDraftKey(packetId, role) {
+  return `adg-portal-draft-v1:${localDraftOwner()}:${packetId}:${role}`;
+}
+
+function localDraftOwner() {
+  return state.account.userId || state.participantId;
 }
 
 async function refreshDraftList() {
@@ -1270,7 +1763,32 @@ async function refreshDraftList() {
   }
   try {
     const result = await apiJson("/api/drafts");
-    const drafts = result.drafts || [];
+    const draftsByKey = new Map(
+      (result.drafts || []).map(draft => [
+        `${draft.packetId}:${draft.role}`,
+        { ...draft, source: "server" }
+      ])
+    );
+    for (const local of listLocalDrafts()) {
+      const key = `${local.packet.packetId}:${local.role}`;
+      const existing = draftsByKey.get(key);
+      if (!existing
+          || Date.parse(local.savedAtUtc) > Date.parse(existing.updatedAtUtc)) {
+        draftsByKey.set(key, {
+          packetId: local.packet.packetId,
+          role: local.role,
+          progressPercent: null,
+          revisionCount: 0,
+          updatedAtUtc: local.savedAtUtc,
+          source: "local",
+          draft: local
+        });
+      }
+    }
+    const drafts = [...draftsByKey.values()].sort(
+      (left, right) =>
+        Date.parse(right.updatedAtUtc) - Date.parse(left.updatedAtUtc)
+    );
     savedDrafts.hidden = drafts.length === 0;
     drafts.forEach(draft => {
       const card = document.createElement("div");
@@ -1284,6 +1802,12 @@ async function refreshDraftList() {
       if (Number.isFinite(draft.progressPercent)) {
         timestamp.textContent += ` · ${draft.progressPercent}%`;
       }
+      if (draft.revisionCount > 0) {
+        timestamp.textContent += ` · ${draft.revisionCount} نسخة سابقة`;
+      }
+      if (draft.source === "local") {
+        timestamp.textContent += " · محفوظة على هذا الجهاز";
+      }
       details.append(title, timestamp);
       const button = document.createElement("button");
       button.type = "button";
@@ -1291,7 +1815,9 @@ async function refreshDraftList() {
       button.textContent = "متابعة";
       button.addEventListener(
         "click",
-        () => resumeDraft(draft.packetId, draft.role)
+        () => draft.source === "local"
+          ? restoreDraftObject(draft.draft, "نسخة هذا الجهاز")
+          : resumeDraft(draft.packetId, draft.role)
       );
       card.append(details, button);
       draftList.append(card);
@@ -1310,52 +1836,55 @@ async function resumeDraft(packetId, role) {
     if (!result.found) {
       throw new Error("لم تعد هذه المسودة متاحة.");
     }
-    const draft = result.draft;
-    if (draft?.schema !== "adg-msa-portal-draft-v1"
-        || draft.role !== role) {
-      throw new Error("بنية المسودة المحفوظة غير صالحة.");
-    }
-    validatePacket(draft.packet);
-    const roleControl = document.querySelector(
-      `input[name="role"][value="${draft.role}"]`
-    );
-    if (!roleControl) {
-      throw new Error("دور المسودة غير مدعوم.");
-    }
-    roleControl.checked = true;
-    syncRoleControls();
-    state.participantId = draft.participantId || state.participantId;
-    state.packet = draft.packet;
-    state.annotationA = draft.annotationA ?? null;
-    state.annotationB = draft.annotationB ?? null;
-    state.primaryArtifact = draft.primaryArtifact ?? null;
-
-    if (draft.role === "adjudication") {
-      if (!state.annotationA || !state.annotationB) {
-        throw new Error("ملفا التحكيم غير موجودين في المسودة.");
-      }
-      await validateSubmissionBinding(state.packet, state.annotationA);
-      await validateSubmissionBinding(state.packet, state.annotationB);
-      renderAdjudication();
-    } else if (draft.role === "ratification") {
-      if (!state.primaryArtifact) {
-        throw new Error("حزمة J1 غير موجودة في المسودة.");
-      }
-      await renderRatification();
-    } else {
-      renderAnnotation();
-    }
-    applyWorkspace(draft.fields);
-    renderPacketSummary("مسودة محفوظة");
-    updateCompletion();
+    await restoreDraftObject(result.draft, "مسودة محفوظة", role);
     setDraftStatus(
       `استُعيدت المسودة المحفوظة في ${formatDate(result.updatedAtUtc)}.`,
       false
     );
-    showStep(4);
   } catch (error) {
     showStatus(error.message, true);
   }
+}
+
+async function restoreDraftObject(draft, sourceLabel, expectedRole = null) {
+  if (draft?.schema !== "adg-msa-portal-draft-v1"
+      || (expectedRole && draft.role !== expectedRole)) {
+    throw new Error("بنية المسودة المحفوظة غير صالحة.");
+  }
+  validatePacket(draft.packet);
+  const roleControl = document.querySelector(
+    `input[name="role"][value="${draft.role}"]`
+  );
+  if (!roleControl) throw new Error("دور المسودة غير مدعوم.");
+  roleControl.checked = true;
+  syncRoleControls();
+  state.currentTaskVersionId = null;
+  state.participantId = draft.participantId || state.participantId;
+  state.packet = draft.packet;
+  state.annotationA = draft.annotationA ?? null;
+  state.annotationB = draft.annotationB ?? null;
+  state.primaryArtifact = draft.primaryArtifact ?? null;
+
+  if (draft.role === "adjudication") {
+    if (!state.annotationA || !state.annotationB) {
+      throw new Error("مدخلا A وB غير موجودين في المسودة.");
+    }
+    await validateSubmissionBinding(state.packet, state.annotationA);
+    await validateSubmissionBinding(state.packet, state.annotationB);
+    renderAdjudication();
+  } else if (draft.role === "ratification") {
+    if (!state.primaryArtifact) {
+      throw new Error("حزمة J1 غير موجودة في المسودة.");
+    }
+    await renderRatification();
+  } else {
+    renderAnnotation();
+  }
+  applyWorkspace(draft.fields);
+  state.workspaceRevision += 1;
+  renderPacketSummary(sourceLabel);
+  updateCompletion();
+  showStep(4);
 }
 
 function captureWorkspace() {
@@ -2039,7 +2568,7 @@ async function submitEvaluation() {
       artifactType: artifact.kind,
       artifactSha256,
       artifact,
-      clientVersion: "adg-v15.0",
+      clientVersion: "adg-v15.1",
       turnstileToken
     };
     const body = JSON.stringify(payload);
@@ -2067,6 +2596,7 @@ async function submitEvaluation() {
         + "ستظهر النتيجة المجهّلة في المستودع بعد الفحص الآلي.",
     false);
     await loadDiscussion(result.receiptId);
+    await refreshTaskInbox();
   } catch (error) {
     showStatus(error.message, true);
   } finally {

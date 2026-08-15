@@ -22,6 +22,67 @@ const MARKDOWN_IMAGE_PATTERN = /!\[[^\]]*\]\s*\(/u;
 const UNSAFE_URL_PATTERN = /\b(?:javascript|data):/iu;
 const CONTROL_PATTERN = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u;
 
+export function unpackPortalFile(value) {
+  const unwrapped = value?.artifact ?? value;
+  if (unwrapped?.schema === "adg-msa-portal-draft-v1") {
+    return {
+      kind: "draft",
+      draft: unwrapped,
+      packet: unwrapped.packet ?? null,
+      role: unwrapped.role ?? null
+    };
+  }
+  if (unwrapped?.kind === "independent-annotation") {
+    return {
+      kind: "annotation-artifact",
+      artifact: unwrapped,
+      packet: unwrapped.packet ?? null,
+      annotation: unwrapped.annotation ?? null,
+      role: unwrapped.annotation?.annotatorSlot ?? null
+    };
+  }
+  if (unwrapped?.kind === "adjudication-package") {
+    return {
+      kind: "adjudication-artifact",
+      artifact: unwrapped,
+      packet: unwrapped.packet ?? null,
+      role: "ratification"
+    };
+  }
+  if (unwrapped?.kind === "ratification-package"
+      && unwrapped.primaryArtifact?.kind === "adjudication-package") {
+    return {
+      kind: "ratification-artifact",
+      artifact: unwrapped,
+      packet: unwrapped.primaryArtifact.packet ?? null,
+      primaryArtifact: unwrapped.primaryArtifact,
+      ratification: unwrapped.ratification ?? null,
+      role: "ratification"
+    };
+  }
+  if (unwrapped?.schema === PACKET_SCHEMA) {
+    return { kind: "packet", packet: unwrapped, role: null };
+  }
+  if (unwrapped?.schema === ANNOTATION_SCHEMA) {
+    return {
+      kind: "annotation",
+      annotation: unwrapped,
+      packet: value?.packet ?? null,
+      role: unwrapped.annotatorSlot ?? null
+    };
+  }
+  if (unwrapped?.packet?.schema === PACKET_SCHEMA) {
+    return {
+      kind: "container",
+      artifact: unwrapped,
+      packet: unwrapped.packet,
+      annotation: unwrapped.annotation ?? null,
+      role: unwrapped.annotation?.annotatorSlot ?? null
+    };
+  }
+  return { kind: "unknown", value: unwrapped, packet: null, role: null };
+}
+
 class CanonicalHashBuilder {
   #parts = [];
   #encoder = new TextEncoder();

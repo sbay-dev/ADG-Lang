@@ -90,8 +90,9 @@
   تواصلٍ ولا جهة؛ لا يصله إلّا ظرفٌ مجهّلٌ موقّعٌ بـ HMAC.
 - **التحقّق من البريد دون تخزين صريح:** يُرسَل الرمز عبر Microsoft 365 Graph من
   عنوانٍ خادميٍّ مقيَّد، ولا يُحفظ الرمز ولا البريد بصورتهما الصريحة؛ تُحفظ فقط
-  بصماتٌ غير قابلةٍ للعكس، مع حدٍّ للمحاولات ومهلةٍ لإعادة الإرسال، ثمّ تُحذف
-  سجلّات التحقّق القصيرة الأجل آليًّا.
+  بصمات HMAC غير قابلةٍ للعكس، وتُستخدم البصمة نفسها لربط إسناد المهمة بالحساب
+  الموثق، مع حدٍّ للمحاولات ومهلةٍ لإعادة الإرسال، ثمّ تُحذف سجلّات التحقّق
+  القصيرة الأجل آليًّا.
 - **تحكيمٌ أعمى:** لا تُعرض تنبّؤات المحلّل الآلي إطلاقًا.
 - **مفاتيح المرور:** تُحفظ في قاعدة D1 مفاتيحُها العامّة وعدّادُها ومعرّفٌ
   عشوائي فقط، بينما تبقى الملفّات والمسودّات مشفّرةً بـ EntityCrypt، ورموز
@@ -102,8 +103,9 @@
 - موافقةٌ صريحةٌ قبل الإرسال.
 - مدّة احتفاظٍ افتراضيةٌ قدرها 365 يومًا (قابلةٌ للضبط في إعداد النشر).
 - يمكن لصاحب الحساب تسجيل **طلب محوٍ** من داخل المنصّة؛ يُنفَّذ بعد إغلاق مهامّه
-  وانقضاء مدّة الاحتفاظ، فتُحذف مادّة الهوية من المخزن النشط وتبقى النتيجة العلمية
-  المجهّلة فقط.
+  وانقضاء مدّة الاحتفاظ، فتُحذف مادّة الهوية والمسودات ومراجعاتها ومطالبات
+  الاختبار التشغيلي من المخزن النشط، وتُزال صلة البريد والحساب من سجلات الإسناد،
+  وتبقى النتيجة العلمية المجهّلة فقط.
 - **تنويهٌ صريح:** في نمط الأرشفة على D1 قد تبقى لقطاتٌ تاريخيةٌ قابلةٌ للاسترجاع
   عبر D1 Time Travel حتّى انقضاء النافذة المضبوطة؛ فالإكمال يعني حذفًا من المخزن
   النشط لا محوًا ماديًّا فوريًّا من نسخ المزوّد.
@@ -146,9 +148,33 @@
 - وضع `operational-test` مسارٌ تشغيلي مُساعَد يختبر الإرسال إلى المستودع
   ويُنشر بتعهّدات صريحة: الاستقلال «لا»، والتعمية «لا»، والأصالة «نعم».
   ولا يشغل هذا المسار أدوار A أو B أو J1 أو J2، ولا يدخل آلة الإجماع.
+- الحزمة العمياء الخاصة بهذا الاختبار منشورة في
+  `human-evidence/tasks/` بوسم `lane: operational-test`، ولا يعرضها طلب
+  المهام العادي. لا يُنشر ملف الإجابات المحلي ولا المعرّف الشخصي الموجود في
+  غلاف التصدير.
 - هذه المنصّة حالةُ استخدامٍ بحثيةٌ للتحكيم، وليست خدمة تصحيحٍ لغويٍّ نهائية.
 
-## 11. التحقّق وإعادة الإنتاج
+## 11. تسليم المهام وحماية المسودات
+
+- تتحقق GitHub Actions من مخطط كل حزمة ومسارها والحقول المحظورة وجذر Merkle،
+  ثم ترسل دليل المهام إلى المنصة بغلاف HMAC مؤقت. لا يقبل الخادم تغيير محتوى
+  هوية حزمة سبق تثبيتها.
+- يثبّت الخادم كذلك العنوان والملخص ونمط الإسناد والمسار والمستودع عند أول
+  مزامنة؛ والتغيير اللاحق الوحيد المسموح هو السحب الأحادي الاتجاه، بلا إعادة
+  تنشيطٍ صامتة.
+- تظهر للمحكّم قائمة مهام مرتبطة بحسابه. ويمكن إسناد الدور إلى بريد موثّق؛
+  يحتفظ المخزن ببصمة غير عكوسة وبنسخة EntityCrypt مشفّرة من البريد، ولا يدخل
+  البريد إلى الدليل العام.
+- يستلم J1 نتيجتي A وB من الحالة السلطوية للمنصة، ويستلم J2 حزمة J1 منها؛
+  فلا يحتاج المحكّمون إلى تبادل ملفات JSON في المسار المعتاد.
+- يحفظ كل تحديث للمسودة النسخة المشفّرة السابقة قبل الاستبدال، ويحتفظ المتصفح
+  بنسخة استرداد محلية عند تعذر الشبكة. ويظل رفع ملف واحد خيار طوارئ يعيد
+  القرارات اللغوية فقط، ثم ينشئ التعهّدات من الجلسة الحالية.
+- بعد اكتمال A وB يُحال انخفاض الاتفاق أو التعارض مباشرةً إلى J1 في الجولة
+  نفسها، مع بقاء القياسات والأدلة محفوظة؛ ولا تعاد جولة A/B لمجرد انخفاض
+  الاتفاق.
+
+## 12. التحقّق وإعادة الإنتاج
 
 من نسخةٍ نظيفة، داخل `tools/msa-adjudication-workbench`:
 
@@ -158,7 +184,7 @@ npm run check
 npm test
 ```
 
-تُثبِّت `release/portal-15.0.0.json` سلامةَ الأصول عبر جذر `SHA-256` قانونيٍّ
+تُثبِّت `release/portal-15.1.0.json` سلامةَ الأصول عبر جذر `SHA-256` قانونيٍّ
 مُطبَّعٍ بنهايات أسطر `LF`. يُعاد توليده حتميًّا بالأمر:
 
 ```powershell
@@ -168,7 +194,7 @@ npm run release:manifest
 ويرفض سير عمل الأمان أيّ بيان إصدارٍ قديمٍ أو غير مُتتبَّع. الارتباطات الخاصّة
 وملفّات البيئة والهُويّات والاعتمادات مستثناةٌ صراحةً من حدود هذا الإصدار.
 
-## 12. الوثائق التفصيلية
+## 13. الوثائق التفصيلية
 
 | الوثيقة | الموضوع |
 | --- | --- |
@@ -198,7 +224,8 @@ adjudication portal at **https://adg.sbay.sa** (source under
   command-line knowledge required. Automated parser predictions are never shown
   (blind adjudication).
 - **Process.** Four independent accounts (`A`, `B`, `J1`, `J2`) annotate
-  independently, agreement is measured before discussion, `J1` adjudicates,
+  independently, agreement is measured before discussion, disagreement is
+  routed directly to `J1` in the same round, `J1` adjudicates,
   `J2` ratifies the same root; `approved` is provisional for a 14-day appeal
   window and only becomes `published` after a signed repository receipt. GitHub
   is an evidence mirror, not the authoritative state store.
@@ -218,6 +245,11 @@ adjudication portal at **https://adg.sbay.sa** (source under
 - **Security.** Strict CSP (no inline scripts/styles, no external fonts),
   `nosniff`, `frame-ancestors 'none'`, HMAC-signed internal envelopes with
   timestamp/nonce replay protection. Report privately to `team@sbay.sa`.
+- **Task delivery and recovery.** CODEOWNERS-protected repository manifests are
+  schema/Merkle validated and HMAC-synchronized into an authenticated task
+  inbox. J1/J2 inputs are hydrated from stored evidence. Draft updates preserve
+  the previous encrypted revision and the browser keeps a local recovery copy;
+  file import is an emergency path only.
 - **Claim boundaries.** The encrypted journal plus periodic KV backup support
   accepted-write recovery and point-in-time rebuild, but do **not** promise
   zero loss under simultaneous D1 and container failure. The developer-visible
@@ -227,6 +259,6 @@ adjudication portal at **https://adg.sbay.sa** (source under
   case, not a final proofreading service.
 - **Reproduce.** From a clean clone, inside `tools/msa-adjudication-workbench`:
   `npm ci`, `npm run check`, `npm test`. Release integrity is bound by
-  `release/portal-15.0.0.json` (canonical LF SHA-256 root), regenerated with
+  `release/portal-15.1.0.json` (canonical LF SHA-256 root), regenerated with
   `npm run release:manifest` and enforced by the GitHub Actions security
   workflow.

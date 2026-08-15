@@ -14,7 +14,8 @@ function migratedDatabase() {
     "migrations/0006_cpoly_backup_contract.sql",
     "migrations/0007_cpoly_recovery_state.sql",
     "migrations/0008_cpoly_backup_metadata_hash.sql",
-      "migrations/0009_cpoly_backup_kv_lane.sql"
+    "migrations/0009_cpoly_backup_kv_lane.sql",
+    "migrations/0010_repository_task_catalog.sql"
   ]) {
     database.exec(readFileSync(path, "utf8"));
   }
@@ -132,6 +133,54 @@ test("consensus migration binds discussions and held evidence to task rounds", (
   ).get().sql;
   assert.match(outboxSql, /'held'/);
   assert.match(outboxSql, /'cancelled'/);
+});
+
+test("repository task migration isolates operational claims and draft history", () => {
+  const database = migratedDatabase();
+  const tables = new Set(database.prepare(
+    `SELECT name
+       FROM sqlite_master
+      WHERE type = 'table'`
+  ).all().map(row => row.name));
+  for (const name of [
+    "repository_task_packets",
+    "task_assignments",
+    "operational_task_claims",
+    "repository_task_syncs",
+    "draft_revisions"
+  ]) {
+    assert.ok(tables.has(name), `missing ${name}`);
+  }
+  const taskColumns = new Set(database.prepare(
+    "PRAGMA table_info(repository_task_packets)"
+  ).all().map(column => column.name));
+  assert.ok(taskColumns.has("lane"));
+  assert.ok(taskColumns.has("immutable_manifest_sha256"));
+  const draftColumns = new Set(database.prepare(
+    "PRAGMA table_info(drafts)"
+  ).all().map(column => column.name));
+  assert.ok(draftColumns.has("content_sha256"));
+  const operationalSql = database.prepare(
+    `SELECT sql
+       FROM sqlite_master
+      WHERE type = 'table' AND name = 'operational_task_claims'`
+  ).get().sql;
+  assert.match(operationalSql, /'claimed', 'submitted'/);
+});
+
+test("CPOLY migration ConfigMap ships every PostgreSQL schema step", () => {
+  const kustomization = readFileSync(
+    "infrastructure/cpoly-postgres/kustomization.yaml",
+    "utf8"
+  );
+  assert.match(
+    kustomization,
+    /0001_portal_v15\.sql=migrations\/postgresql\/0001_portal_v15\.sql/
+  );
+  assert.match(
+    kustomization,
+    /0002_repository_task_catalog\.sql=migrations\/postgresql\/0002_repository_task_catalog\.sql/
+  );
 });
 
 test("CPOLY recovery migrations create bounded backup, descriptor, and journal tables", () => {

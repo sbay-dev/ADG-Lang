@@ -297,14 +297,22 @@ function renderGovernance() {
   for (const task of state.governance.tasks || []) {
     const row = document.createElement("tr");
     row.append(
-      textCell(`${task.packetId} · v${task.taskVersion}`),
+      textCell(
+        task.repositoryTask
+          ? `${task.repositoryTask.title} · ${task.packetId}`
+          : `${task.packetId} · v${task.taskVersion}`
+      ),
       textCell(task.state),
       textCell(String(task.round)),
       textCell(
-        task.githubIssueNumber
-          ? `${task.repositoryStatus} · #${task.githubIssueNumber}`
-          : task.repositoryStatus
+        task.repositoryTask
+          ? `${task.repositoryTask.repository}@`
+            + task.repositoryTask.commitSha.slice(0, 8)
+          : task.githubIssueNumber
+            ? `${task.repositoryStatus} · #${task.githubIssueNumber}`
+            : task.repositoryStatus
       ),
+      taskAssignmentCell(task),
       taskReissueCell(task)
     );
     governanceTasksBody.append(row);
@@ -342,6 +350,85 @@ function renderGovernance() {
     );
     governanceCommentsBody.append(row);
   }
+}
+
+function taskAssignmentCell(task) {
+  const cell = document.createElement("td");
+  if (!task.repositoryTask) {
+    cell.textContent = "غير مسجلة من دليل مهام المستودع";
+    cell.className = "muted";
+    return cell;
+  }
+  if (task.repositoryTask.lane === "operational-test") {
+    cell.textContent =
+      "اختبار تشغيلي معزول؛ يظهر فقط عبر ?mode=operational-test "
+      + "ولا يحجز أدوار الإجماع.";
+    cell.className = "muted";
+    return cell;
+  }
+  const assignments = document.createElement("div");
+  assignments.className = "task-assignment-list";
+  for (const assignment of task.assignments || []) {
+    const item = document.createElement("span");
+    item.textContent =
+      `${assignment.role} · ${assignment.email} · `
+      + assignmentStatusLabel(assignment.status);
+    assignments.append(item);
+  }
+  if (!task.assignments?.length) {
+    const empty = document.createElement("span");
+    empty.className = "muted";
+    empty.textContent = task.repositoryTask.assignmentMode === "open"
+      ? "المهمة مفتوحة للاستلام."
+      : "لا يوجد إسناد بعد.";
+    assignments.append(empty);
+  }
+
+  const role = document.createElement("select");
+  for (const value of ["A", "B", "J1", "J2"]) {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = value;
+    role.append(option);
+  }
+  const email = document.createElement("input");
+  email.type = "email";
+  email.autocomplete = "off";
+  email.placeholder = "reviewer@example.com";
+  email.maxLength = 254;
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "button primary compact";
+  button.textContent = "إسناد وإرسال الدعوة";
+  button.addEventListener("click", () => {
+    void runGovernanceAction(button, async () => {
+      if (!email.validity.valid || !email.value.trim()) {
+        throw new Error("أدخل بريدًا إلكترونيًا صالحًا.");
+      }
+      await api("/api/admin/tasks/assign", {
+        method: "POST",
+        body: {
+          taskVersionId: task.taskVersionId,
+          role: role.value,
+          email: email.value.trim()
+        }
+      });
+    });
+  });
+  const form = document.createElement("div");
+  form.className = "task-assignment-form";
+  form.append(role, email, button);
+  cell.append(assignments, form);
+  return cell;
+}
+
+function assignmentStatusLabel(status) {
+  return {
+    invited: "دعوة جديدة",
+    claimed: "استلم المهمة",
+    submitted: "أرسل النتيجة",
+    cancelled: "ملغى"
+  }[status] || status;
 }
 
 function taskReissueCell(task) {

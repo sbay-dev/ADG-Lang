@@ -9,6 +9,7 @@ import worker, {
   decryptEntityCryptForTest,
   encryptEntityCrypt
 } from "../src/index.js";
+import { computePacketMerkleRoot } from "../public/protocol.js";
 import {
   buildCpolyCanonicalText,
   hmacSha256Hex,
@@ -596,6 +597,103 @@ test("repository receipts and evidence receipts work through Hyperdrive PostgreS
     assert.equal(submissionOutbox.status, "sent");
   } finally {
     recoveryDb.database.close();
+    await fixture.close();
+  }
+});
+
+test("repository task synchronization is atomic through Hyperdrive PostgreSQL", {
+  skip: !dockerAvailable
+}, async () => {
+  const fixture = await createPostgresFixture("repository-task-sync");
+  const recoveryDb = new D1RecoveryDatabase();
+  const packet = JSON.parse(readFileSync(
+    path.resolve(
+      __dirname,
+      "../../../examples/arabic-text/msa-adjudication-pilot-v1/packet.json"
+    ),
+    "utf8"
+  ));
+  const packetMerkleRoot = await computePacketMerkleRoot(packet);
+  const sourcePath =
+    "human-evidence/tasks/msa-adjudication-pilot-v1.task.json";
+  const manifest = {
+    schema: "adg-msa-repository-task-v1",
+    titleAr: "اختبار مزامنة مهمة المستودع",
+    summaryAr:
+      "حزمة موثقة لاختبار التثبيت الذري عبر محول PostgreSQL.",
+    assignmentMode: "open",
+    lane: "operational-test",
+    status: "active",
+    sourcePath,
+    packetMerkleRoot,
+    packet
+  };
+  const env = {
+    DB: recoveryDb,
+    HYPERDRIVE: {
+      connectionString: fixture.connectionString
+    },
+    CPOLY_BACKUP_MASTER_KEY: recoveryMasterKey,
+    GITHUB_REPOSITORY: repository,
+    REPOSITORY_RECEIPT_HMAC_SECRET_NAME: "repository-receipt-test",
+    REPOSITORY_RECEIPT_HMAC_KEY: repositoryHmacKey
+  };
+  try {
+    const firstCommit = "1".repeat(40);
+    const firstEnvelope = {
+      schema: "adg-msa-repository-task-sync-v1",
+      repository,
+      sourceCommitSha: firstCommit,
+      nonce: "11111111-2222-4333-8444-555555555555",
+      requestedAtUtc: new Date().toISOString(),
+      tasks: [manifest]
+    };
+    const firstResponse = await worker.fetch(
+      new Request(`${origin}/api/repository/tasks/sync`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          ...firstEnvelope,
+          hmacSha256: createHmac("sha256", repositoryHmacKey)
+            .update(JSON.stringify(firstEnvelope))
+            .digest("hex")
+        })
+      }),
+      env
+    );
+    assert.equal(firstResponse.status, 202, await firstResponse.text());
+
+    const secondEnvelope = {
+      ...firstEnvelope,
+      sourceCommitSha: "2".repeat(40),
+      nonce: "22222222-3333-4444-8555-666666666666",
+      requestedAtUtc: new Date().toISOString(),
+      tasks: [{ ...manifest, status: "withdrawn" }]
+    };
+    const secondResponse = await worker.fetch(
+      new Request(`${origin}/api/repository/tasks/sync`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          ...secondEnvelope,
+          hmacSha256: createHmac("sha256", repositoryHmacKey)
+            .update(JSON.stringify(secondEnvelope))
+            .digest("hex")
+        })
+      }),
+      env
+    );
+    assert.equal(secondResponse.status, 202, await secondResponse.text());
+    const rows = await fixture.sql`
+      SELECT status, source_commit_sha, immutable_manifest_sha256
+        FROM adjudication.repository_task_packets
+       WHERE packet_id = ${packet.packetId}
+    `;
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].status, "withdrawn");
+    assert.equal(rows[0].source_commit_sha, firstCommit);
+    assert.match(rows[0].immutable_manifest_sha256, /^[a-f0-9]{64}$/);
+  } finally {
     await fixture.close();
   }
 });

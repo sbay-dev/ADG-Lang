@@ -49,7 +49,8 @@ class D1TestDatabase {
       "migrations/0006_cpoly_backup_contract.sql",
       "migrations/0007_cpoly_recovery_state.sql",
       "migrations/0008_cpoly_backup_metadata_hash.sql",
-      "migrations/0009_cpoly_backup_kv_lane.sql"
+      "migrations/0009_cpoly_backup_kv_lane.sql",
+      "migrations/0010_repository_task_catalog.sql"
     ]) {
       this.database.exec(readFileSync(path, "utf8"));
     }
@@ -81,7 +82,7 @@ test("email code is sent, verified, and bound to registration", async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (input, init = {}) => {
     const url = String(input);
-    if (url.includes("login.microsoftonline.com")) {
+    if (new URL(url).hostname === "login.microsoftonline.com") {
       return Response.json({
         access_token: "test-token",
         expires_in: 3600
@@ -347,4 +348,3 @@ test("email verification surfaces Microsoft Graph delivery failures honestly", a
   ).get();
   assert.equal(count.count, 0);
 });
-

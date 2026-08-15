@@ -67,7 +67,8 @@ class D1TestDatabase {
       "migrations/0006_cpoly_backup_contract.sql",
       "migrations/0007_cpoly_recovery_state.sql",
       "migrations/0008_cpoly_backup_metadata_hash.sql",
-      "migrations/0009_cpoly_backup_kv_lane.sql"
+      "migrations/0009_cpoly_backup_kv_lane.sql",
+      "migrations/0010_repository_task_catalog.sql"
     ]) {
       this.database.exec(readFileSync(path, "utf8"));
     }
@@ -282,6 +283,26 @@ test("operational pilot test imports without occupying consensus roles", async (
       ...values.artifactA,
       annotation
     };
+    await registerRepositoryTask(
+      fixture,
+      values.packet,
+      "operational-test",
+      "A"
+    );
+    const standardTasks = await accountJson(
+      fixture,
+      "A",
+      "/api/tasks"
+    );
+    assert.equal(standardTasks.tasks.length, 0);
+    const operationalTasks = await accountJson(
+      fixture,
+      "A",
+      "/api/tasks?mode=operational-test"
+    );
+    assert.equal(operationalTasks.tasks.length, 1);
+    assert.equal(operationalTasks.tasks[0].lane, "operational-test");
+    assert.equal(operationalTasks.tasks[0].status, "claimed");
     const result = await submitOperationalTest(
       fixture,
       "A",
@@ -306,6 +327,16 @@ test("operational pilot test imports without occupying consensus roles", async (
     assert.equal(stored.round_id, null);
     assert.equal(stored.consensus_role, "TEST");
     assert.equal(stored.repository_status, "pending-validation");
+    const operationalClaim = fixture.db.database.prepare(
+      `SELECT status, submission_receipt_id
+         FROM operational_task_claims
+        WHERE task_version_id = ? AND user_id = ?`
+    ).get(
+      `${values.packet.taskId}:v${values.packet.taskVersion}`,
+      account.userId
+    );
+    assert.equal(operationalClaim.status, "submitted");
+    assert.equal(operationalClaim.submission_receipt_id, result.receiptId);
     assert.equal(
       fixture.db.database.prepare(
         "SELECT COUNT(*) AS count FROM task_participations"
@@ -392,18 +423,290 @@ test("operational pilot test imports without occupying consensus roles", async (
       fixture,
       "A",
       values.participantIds.A,
-      values.artifactA
+      values.artifactA,
+      { expectedStatus: 409 }
     );
-    assert.equal(
-      independent.repositoryImportStatus,
-      "held-for-independent-quorum"
-    );
+    assert.match(independent.message, /تشغيلية معزولة/);
     const participations = fixture.db.database.prepare(
       "SELECT role, status FROM task_participations"
     ).all();
-    assert.equal(participations.length, 1);
-    assert.equal(participations[0].role, "A");
-    assert.equal(participations[0].status, "submitted");
+    assert.equal(participations.length, 0);
+  } finally {
+    fixture.restoreFetch();
+  }
+});
+
+test("repository task sync is atomic, immutable, and withdrawal-only", async () => {
+  const fixture = await createFixture("repository-sync");
+  try {
+    const values = await independentArtifacts();
+    await registerRepositoryTask(
+      fixture,
+      values.packet,
+      "standard",
+      "A"
+    );
+    const stored = fixture.db.database.prepare(
+      `SELECT manifest_json, source_commit_sha
+         FROM repository_task_packets
+        WHERE packet_id = ?`
+    ).get(values.packet.packetId);
+    const manifest = JSON.parse(stored.manifest_json);
+    const changed = {
+      ...manifest,
+      titleAr: "عنوان بديل غير مسموح بعد تثبيت المهمة"
+    };
+    const rejected = await sendRepositoryTaskSync(
+      fixture,
+      [changed],
+      "cccccccccccccccccccccccccccccccccccccccc",
+      409
+    );
+    assert.match(rejected.message, /بياناتها المثبتة/);
+    const unchanged = fixture.db.database.prepare(
+      `SELECT manifest_json, source_commit_sha
+         FROM repository_task_packets
+        WHERE packet_id = ?`
+    ).get(values.packet.packetId);
+    assert.equal(
+      JSON.parse(unchanged.manifest_json).titleAr,
+      manifest.titleAr
+    );
+    assert.equal(unchanged.source_commit_sha, stored.source_commit_sha);
+
+    const secondPacket = structuredClone(values.packet);
+    secondPacket.taskId = `${values.packet.taskId}-atomic`;
+    secondPacket.packetId = `${values.packet.packetId}-atomic`;
+    secondPacket.holdoutId = `${values.packet.holdoutId}-atomic`;
+    const secondRoot = await computePacketMerkleRoot(secondPacket);
+    const secondManifest = {
+      ...manifest,
+      titleAr: "مهمة ثانية لا يجوز تثبيتها جزئيًا",
+      sourcePath:
+        `human-evidence/tasks/${secondPacket.packetId}.standard.task.json`,
+      packetMerkleRoot: secondRoot,
+      packet: secondPacket
+    };
+    await sendRepositoryTaskSync(
+      fixture,
+      [secondManifest, changed],
+      "dddddddddddddddddddddddddddddddddddddddd",
+      409
+    );
+    assert.equal(
+      fixture.db.database.prepare(
+        "SELECT COUNT(*) AS count FROM task_versions WHERE packet_id = ?"
+      ).get(secondPacket.packetId).count,
+      0
+    );
+    assert.equal(
+      fixture.db.database.prepare(
+        `SELECT COUNT(*) AS count
+           FROM repository_task_packets
+          WHERE packet_id = ?`
+      ).get(secondPacket.packetId).count,
+      0
+    );
+
+    const withdrawn = { ...manifest, status: "withdrawn" };
+    await sendRepositoryTaskSync(
+      fixture,
+      [withdrawn],
+      "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    );
+    assert.equal(
+      fixture.db.database.prepare(
+        "SELECT status FROM repository_task_packets WHERE packet_id = ?"
+      ).get(values.packet.packetId).status,
+      "withdrawn"
+    );
+    const reactivation = await sendRepositoryTaskSync(
+      fixture,
+      [manifest],
+      "ffffffffffffffffffffffffffffffffffffffff",
+      409
+    );
+    assert.match(reactivation.message, /إعادة تنشيط/);
+  } finally {
+    fixture.restoreFetch();
+  }
+});
+
+test("repository tasks route A/B disagreement directly to J1", async () => {
+  const fixture = await createFixture("repository-task-routing");
+  try {
+    const values = await independentArtifacts();
+    const taskVersionId =
+      `${values.packet.taskId}:v${values.packet.taskVersion}`;
+    await registerRepositoryTask(
+      fixture,
+      values.packet,
+      "standard",
+      "A"
+    );
+    await claimRepositoryTask(fixture, "B", taskVersionId);
+    await submitArtifact(
+      fixture,
+      "A",
+      values.participantIds.A,
+      values.artifactA
+    );
+    const changedAnnotationB = structuredClone(
+      values.artifactB.annotation
+    );
+    for (const sentence of changedAnnotationB.sentences) {
+      sentence.structurallyAcceptable =
+        !sentence.structurallyAcceptable;
+    }
+    await submitArtifact(
+      fixture,
+      "B",
+      values.participantIds.B,
+      {
+        ...values.artifactB,
+        annotation: changedAnnotationB
+      }
+    );
+
+    const task = fixture.db.database.prepare(
+      `SELECT state, current_round
+         FROM task_versions
+        WHERE id = ?`
+    ).get(taskVersionId);
+    assert.deepEqual(
+      { ...task },
+      { state: "discussion", current_round: 1 }
+    );
+    const metrics = fixture.db.database.prepare(
+      `SELECT policy_passed
+         FROM consensus_metrics
+        WHERE task_version_id = ?`
+    ).get(taskVersionId);
+    assert.equal(metrics.policy_passed, 0);
+    assert.equal(
+      fixture.db.database.prepare(
+        `SELECT COUNT(*) AS count
+           FROM consensus_rounds
+          WHERE task_version_id = ?`
+      ).get(taskVersionId).count,
+      1
+    );
+
+    const j1Task = await claimRepositoryTask(
+      fixture,
+      "J1",
+      taskVersionId
+    );
+    assert.equal(j1Task.role, "J1");
+    assert.equal(j1Task.clientRole, "adjudication");
+    assert.equal(j1Task.annotationA.annotatorSlot, "A");
+    assert.equal(j1Task.annotationB.annotatorSlot, "B");
+    assert.equal(j1Task.lane, "standard");
+
+    const adjudication = readJson("adjudication.synthetic.json");
+    const j1ParticipantId = "33333333-3333-4333-8333-333333333333";
+    adjudication.adjudicatorPseudonym =
+      `human-${j1ParticipantId.slice(0, 12)}-J1`;
+    adjudication.annotationAMerkleRoot =
+      await computeAnnotationMerkleRoot(
+        values.packet,
+        values.artifactA.annotation
+      );
+    adjudication.annotationBMerkleRoot =
+      await computeAnnotationMerkleRoot(
+        values.packet,
+        changedAnnotationB
+      );
+    for (const sentence of adjudication.sentences) {
+      sentence.resolutionNote =
+        "اختير قرار A بعد مراجعة مستقلة لاختلاف سلامة التركيب.";
+    }
+    const primary = await submitArtifact(
+      fixture,
+      "J1",
+      j1ParticipantId,
+      {
+        schema: "adg-msa-portal-artifact-v1",
+        kind: "adjudication-package",
+        packet: values.packet,
+        annotationA: values.artifactA.annotation,
+        annotationB: changedAnnotationB,
+        adjudication
+      }
+    );
+    assert.ok(primary.receiptId);
+    const j2Task = await claimRepositoryTask(
+      fixture,
+      "J2",
+      taskVersionId
+    );
+    assert.equal(j2Task.role, "J2");
+    assert.equal(j2Task.clientRole, "ratification");
+    assert.equal(j2Task.primaryArtifact.kind, "adjudication-package");
+  } finally {
+    fixture.restoreFetch();
+  }
+});
+
+test("draft replacement preserves the previous encrypted revision", async () => {
+  const fixture = await createFixture("draft-revisions");
+  try {
+    const values = await independentArtifacts();
+    const first = {
+      schema: "adg-msa-portal-draft-v1",
+      savedAtUtc: "2026-08-15T01:00:00.000Z",
+      participantId: values.participantIds.A,
+      role: "A",
+      packet: values.packet,
+      annotationA: null,
+      annotationB: null,
+      primaryArtifact: null,
+      fields: []
+    };
+    const second = {
+      ...first,
+      savedAtUtc: "2026-08-15T01:01:00.000Z",
+      fields: [{
+        sentenceId: "pilot-01",
+        structural: "true",
+        predicate: "true",
+        tokens: []
+      }]
+    };
+    const firstSave = await putDraft(fixture, "A", first);
+    assert.equal(firstSave.revisionPreserved, false);
+    const secondSave = await putDraft(fixture, "A", second);
+    assert.equal(secondSave.revisionPreserved, true);
+
+    const revision = fixture.db.database.prepare(
+      `SELECT ciphertext
+         FROM draft_revisions
+        WHERE user_id = ? AND packet_id = ? AND role = 'A'`
+    ).get(
+      fixture.accounts.get("A").userId,
+      values.packet.packetId
+    );
+    const preserved = JSON.parse(await decryptEntityCryptForTest(
+      revision.ciphertext,
+      fixture.secrets.master
+    ));
+    assert.deepEqual(preserved, first);
+
+    const current = fixture.db.database.prepare(
+      `SELECT ciphertext
+         FROM drafts
+        WHERE user_id = ? AND packet_id = ? AND role = 'A'`
+    ).get(
+      fixture.accounts.get("A").userId,
+      values.packet.packetId
+    );
+    const currentDraft = JSON.parse(await decryptEntityCryptForTest(
+      current.ciphertext,
+      fixture.secrets.master
+    ));
+    assert.deepEqual(currentDraft, second);
+    const listed = await accountJson(fixture, "A", "/api/drafts");
+    assert.equal(listed.drafts[0].revisionCount, 1);
   } finally {
     fixture.restoreFetch();
   }
@@ -715,6 +1018,59 @@ test("identity erasure removes contact linkage after retention", async () => {
   const fixture = await createFixture("erasure");
   try {
     const account = fixture.accounts.get("A");
+    const values = await independentArtifacts();
+    const taskVersionId =
+      `${values.packet.taskId}:v${values.packet.taskVersion}`;
+    await registerRepositoryTask(
+      fixture,
+      values.packet,
+      "operational-test",
+      "A"
+    );
+    const round = fixture.db.database.prepare(
+      `SELECT id
+         FROM consensus_rounds
+        WHERE task_version_id = ? AND round_number = 1`
+    ).get(taskVersionId);
+    const verifiedEmailHash = fixture.db.database.prepare(
+      "SELECT verified_email_hash FROM users WHERE id = ?"
+    ).get(account.userId).verified_email_hash;
+    fixture.db.database.prepare(
+      `INSERT INTO drafts
+        (user_id, packet_id, role, ciphertext, updated_at)
+       VALUES (?, ?, 'A', 'current-draft', ?)`
+    ).run(account.userId, values.packet.packetId, Date.now());
+    fixture.db.database.prepare(
+      `INSERT INTO draft_revisions
+        (id, user_id, packet_id, role, ciphertext, content_sha256,
+         completion_percent, completed_fields, total_fields, saved_at)
+       VALUES (?, ?, ?, 'A', 'prior-draft', ?, 50, 18, 36, ?)`
+    ).run(
+      crypto.randomUUID(),
+      account.userId,
+      values.packet.packetId,
+      "a".repeat(64),
+      Date.now() - 1000
+    );
+    fixture.db.database.prepare(
+      `INSERT INTO task_assignments
+        (id, task_version_id, round_id, holdout_id, role, email_hash,
+         email_ciphertext, user_id, status, invited_at, updated_at)
+       VALUES (?, ?, ?, ?, 'B', ?, ?, ?, 'invited', ?, ?)`
+    ).run(
+      crypto.randomUUID(),
+      taskVersionId,
+      round.id,
+      values.packet.holdoutId,
+      verifiedEmailHash,
+      await encryptEntityCrypt(
+        account.profile.email,
+        fixture.secrets.master
+      ),
+      account.userId,
+      Date.now(),
+      Date.now()
+    );
     const response = await worker.fetch(
       new Request(`${origin}/api/account/privacy/erasure`, {
         method: "POST",
@@ -763,6 +1119,40 @@ test("identity erasure removes contact linkage after retention", async () => {
         "SELECT COUNT(*) AS count FROM sessions WHERE user_id = ?"
       ).get(account.userId).count,
       0
+    );
+    assert.equal(
+      fixture.db.database.prepare(
+        "SELECT COUNT(*) AS count FROM drafts WHERE user_id = ?"
+      ).get(account.userId).count,
+      0
+    );
+    assert.equal(
+      fixture.db.database.prepare(
+        "SELECT COUNT(*) AS count FROM draft_revisions WHERE user_id = ?"
+      ).get(account.userId).count,
+      0
+    );
+    assert.equal(
+      fixture.db.database.prepare(
+        `SELECT COUNT(*) AS count
+           FROM operational_task_claims
+          WHERE user_id = ?`
+      ).get(account.userId).count,
+      0
+    );
+    const erasedAssignment = fixture.db.database.prepare(
+      `SELECT email_hash, email_ciphertext, user_id
+         FROM task_assignments
+        WHERE task_version_id = ? AND role = 'B'`
+    ).get(taskVersionId);
+    assert.equal(erasedAssignment.user_id, null);
+    assert.notEqual(erasedAssignment.email_hash, verifiedEmailHash);
+    assert.equal(
+      await decryptEntityCryptForTest(
+        erasedAssignment.email_ciphertext,
+        fixture.secrets.master
+      ),
+      "هوية ممحوة"
     );
     assert.equal(
       fixture.db.database.prepare(
@@ -881,6 +1271,7 @@ async function createFixture(tag) {
     master: `master-key-${tag}-with-sufficient-entropy`,
     submission: `submission-hmac-${tag}`,
     repositoryReceipt: `repository-receipt-hmac-${tag}`,
+    emailVerification: `email-verification-hmac-${tag}`,
     identitySas:
       "https://storage.example.test/identities?sp=rd&sig=test"
   };
@@ -888,12 +1279,13 @@ async function createFixture(tag) {
     master: `master-${tag}`,
     submission: `submission-${tag}`,
     repositoryReceipt: `repository-${tag}`,
+    emailVerification: `email-verification-${tag}`,
     identitySas: `identity-sas-${tag}`
   };
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (input, init) => {
     const url = String(input);
-    if (url.includes("login.microsoftonline.com")) {
+    if (new URL(url).hostname === "login.microsoftonline.com") {
       return Response.json({
         access_token: `azure-token-${tag}`,
         expires_in: 3600
@@ -907,6 +1299,7 @@ async function createFixture(tag) {
         [secretNames.master, secrets.master],
         [secretNames.submission, secrets.submission],
         [secretNames.repositoryReceipt, secrets.repositoryReceipt],
+        [secretNames.emailVerification, secrets.emailVerification],
         [secretNames.identitySas, secrets.identitySas]
       ]);
       assert.ok(values.has(name), `Unexpected secret: ${name}`);
@@ -931,6 +1324,8 @@ async function createFixture(tag) {
     SUBMISSION_HMAC_SECRET_NAME: secretNames.submission,
     REPOSITORY_RECEIPT_HMAC_SECRET_NAME:
       secretNames.repositoryReceipt,
+    EMAIL_VERIFICATION_HMAC_SECRET_NAME:
+      secretNames.emailVerification,
     IDENTITY_SAS_SECRET_NAME: secretNames.identitySas,
     IDENTITY_RETENTION_DAYS: "30",
     AZURE_TENANT_ID: "tenant",
@@ -968,7 +1363,9 @@ async function createFixture(tag) {
         futureContact: false,
         discussionNotifications: false
       }),
-      createHash("sha256").update(profile.email).digest("hex"),
+      createHmac("sha256", secrets.emailVerification)
+        .update(`email-v1:${profile.email}`)
+        .digest("hex"),
       Date.now(),
       Date.now()
     );
@@ -1198,6 +1595,147 @@ async function submitOperationalTest(
   );
   const result = await response.json();
   assert.equal(response.status, expectedStatus, JSON.stringify(result));
+  return result;
+}
+
+async function registerRepositoryTask(
+  fixture,
+  packet,
+  lane,
+  accountRole
+) {
+  const packetMerkleRoot = await computePacketMerkleRoot(packet);
+  const manifest = {
+    schema: "adg-msa-repository-task-v1",
+    titleAr: lane === "operational-test"
+      ? "اختبار تشغيلي للحزمة التجريبية"
+      : "مهمة تحكيم معيارية",
+    summaryAr:
+      "حزمة موثقة من المستودع لاختبار التسليم الآمن وإدارة المهمة.",
+    assignmentMode: "open",
+    lane,
+    status: "active",
+    sourcePath:
+      `human-evidence/tasks/${packet.packetId}.${lane}.task.json`,
+    packetMerkleRoot,
+    packet
+  };
+  await sendRepositoryTaskSync(
+    fixture,
+    [manifest],
+    lane === "operational-test"
+      ? "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  );
+  return claimRepositoryTask(
+    fixture,
+    accountRole,
+    `${packet.taskId}:v${packet.taskVersion}`,
+    lane
+  );
+}
+
+async function sendRepositoryTaskSync(
+  fixture,
+  tasks,
+  sourceCommitSha,
+  expectedStatus = 202
+) {
+  const envelope = {
+    schema: "adg-msa-repository-task-sync-v1",
+    repository,
+    sourceCommitSha,
+    nonce: crypto.randomUUID(),
+    requestedAtUtc: new Date().toISOString(),
+    tasks
+  };
+  const signed = {
+    ...envelope,
+    hmacSha256: createHmac(
+      "sha256",
+      fixture.secrets.repositoryReceipt
+    ).update(JSON.stringify(envelope)).digest("hex")
+  };
+  const syncResponse = await worker.fetch(
+    new Request(`${origin}/api/repository/tasks/sync`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(signed)
+    }),
+    fixture.env
+  );
+  const result = await syncResponse.json();
+  assert.equal(
+    syncResponse.status,
+    expectedStatus,
+    JSON.stringify(result)
+  );
+  return result;
+}
+
+async function claimRepositoryTask(
+  fixture,
+  accountRole,
+  taskVersionId,
+  lane = "standard"
+) {
+  const account = fixture.accounts.get(accountRole);
+  const claimResponse = await worker.fetch(
+    new Request(`${origin}/api/tasks/claim`, {
+      method: "POST",
+      headers: {
+        origin,
+        cookie: `adg_session=${account.token}`,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        taskVersionId,
+        ...(lane === "operational-test"
+          ? { mode: "operational-test" }
+          : {})
+      })
+    }),
+    fixture.env
+  );
+  const claim = await claimResponse.json();
+  assert.equal(claimResponse.status, 200, JSON.stringify(claim));
+  assert.equal(claim.lane, lane);
+  return claim;
+}
+
+async function accountJson(fixture, accountRole, path) {
+  const account = fixture.accounts.get(accountRole);
+  const response = await worker.fetch(
+    new Request(`${origin}${path}`, {
+      headers: { cookie: `adg_session=${account.token}` }
+    }),
+    fixture.env
+  );
+  const result = await response.json();
+  assert.equal(response.status, 200, JSON.stringify(result));
+  return result;
+}
+
+async function putDraft(fixture, accountRole, draft) {
+  const account = fixture.accounts.get(accountRole);
+  const response = await worker.fetch(
+    new Request(`${origin}/api/draft`, {
+      method: "PUT",
+      headers: {
+        origin,
+        cookie: `adg_session=${account.token}`,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        packetId: draft.packet.packetId,
+        role: draft.role,
+        draft
+      })
+    }),
+    fixture.env
+  );
+  const result = await response.json();
+  assert.equal(response.status, 200, JSON.stringify(result));
   return result;
 }
 

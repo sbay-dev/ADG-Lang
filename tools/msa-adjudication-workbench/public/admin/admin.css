@@ -259,6 +259,31 @@
   white-space: pre-wrap;
 }
 
+.task-assignment-list {
+  display: grid;
+  gap: 0.3rem;
+  margin-bottom: 0.7rem;
+}
+
+.task-assignment-list > span {
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  color: var(--fg-muted);
+  background: var(--canvas-subtle);
+  font-size: 0.76rem;
+}
+
+.task-assignment-form {
+  display: grid;
+  grid-template-columns: 80px minmax(210px, 1fr);
+  gap: 0.45rem;
+}
+
+.task-assignment-form .button {
+  grid-column: 1 / -1;
+}
+
 .participant-name strong,
 .participant-name a,
 .participant-name span,
