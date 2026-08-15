@@ -14,7 +14,7 @@
   "integrity": {
     "algorithm": "SHA-256 canonical file-list root",
     "fileCount": 174,
-    "releaseRoot": "7bb19be1b26ba714aff3e168496cb18b9d3bcccbf474d74b3f245330f254390a"
+    "releaseRoot": "d2139ea3c4df902569ce9c4e83f14c1c8552e29ca9f9429d7ef2011713fc2f03"
   },
   "exclusions": [
     "release/ (self-referential generated output)",
@@ -25,6 +25,7 @@
   "claimBoundaries": [
     "This is an ordinary-software portal release, not a CNS model release.",
     "Human submissions remain untrusted until the repository importer and review pass.",
+    "Operational tests are assisted, do not occupy consensus roles, and cannot establish readiness.",
     "Pilot submissions do not establish unrestricted MSA parser readiness."
   ],
   "files": [
@@ -95,8 +96,8 @@
     },
     {
       "path": "scripts/arabic-text/render-msa-github-evidence.mjs",
-      "bytes": 16444,
-      "sha256": "06a6117ba1b3a2a30de59cd72bea657bfbfd7be03d0f86328172e59034671765"
+      "bytes": 16582,
+      "sha256": "43f042f433d809cd5e0046de4cd98863ce7421b832424d999556da087a28eb26"
     },
     {
       "path": "tools/msa-adjudication-workbench/.dev.vars.example",
@@ -120,8 +121,8 @@
     },
     {
       "path": "tools/msa-adjudication-workbench/README.md",
-      "bytes": 17503,
-      "sha256": "46a6796a7fb10a1caa9753ab9e9cf253878105465e8be02843e82bbe949f7477"
+      "bytes": 18155,
+      "sha256": "21c2d64213c39ec28a1b4844709f0b40ba00a7f6af164549191d60323a8c7593"
     },
     {
       "path": "tools/msa-adjudication-workbench/SECURITY.md",
@@ -130,8 +131,8 @@
     },
     {
       "path": "tools/msa-adjudication-workbench/TRANSPARENCY.md",
-      "bytes": 16626,
-      "sha256": "bd99aa343c63289661651b7d86071c6d67829f3bc0572f223ba67a905115d9a1"
+      "bytes": 17132,
+      "sha256": "e23c1503c62ece7c479e39f671bcbf9024132a30764d4daf3fd9572e3385f946"
     },
     {
       "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/.gitattributes",
@@ -715,8 +716,8 @@
     },
     {
       "path": "tools/msa-adjudication-workbench/public/app.js",
-      "bytes": 95316,
-      "sha256": "845df61b3bb42efa3053cbce53de0fbc0250a22c168824566f103c8ba5f4640d"
+      "bytes": 98482,
+      "sha256": "4e6f6771108664ab2bf0c57822bf63511ebbfa6ba785c1765be4600660a89518"
     },
     {
       "path": "tools/msa-adjudication-workbench/public/data/pilot-packet.json",
@@ -725,8 +726,8 @@
     },
     {
       "path": "tools/msa-adjudication-workbench/public/index.html",
-      "bytes": 48427,
-      "sha256": "704d3fede059731448632bf55c0cdd8c116e757f32b2fb5a281a6fc023b11e76"
+      "bytes": 48629,
+      "sha256": "e0d79957c9659f3882d98812ad239874198ebe21f0fcf88833f164d48c1c8f51"
     },
     {
       "path": "tools/msa-adjudication-workbench/public/protocol.js",
@@ -750,8 +751,8 @@
     },
     {
       "path": "tools/msa-adjudication-workbench/scripts/generate-release-manifest.mjs",
-      "bytes": 5400,
-      "sha256": "b9aaefbedf9abf3a8831802e9bcada5b39bb5bca58062a0b4179ceb2509cddb0"
+      "bytes": 5502,
+      "sha256": "85cb438bf98dccafff01c075b71896a0a5002e95ff76bd9592a41557b4369192"
     },
     {
       "path": "tools/msa-adjudication-workbench/scripts/migrate-d1-export-to-postgres.mjs",
@@ -800,13 +801,13 @@
     },
     {
       "path": "tools/msa-adjudication-workbench/src/index.js",
-      "bytes": 208846,
-      "sha256": "4d4a99e07945984f3d6ad395a4a7e38f201f9771f707ac6848201311cfa3f488"
+      "bytes": 217872,
+      "sha256": "f760ee351c359faa3c4a6f0a17e2ab426ffe2f28d9eb50d481b52a592c4197f8"
     },
     {
       "path": "tools/msa-adjudication-workbench/tests/consensus-worker.test.mjs",
-      "bytes": 31208,
-      "sha256": "2b3fcd645734d41cd13c0214e37e1db53d2baceee9ef16091f6ee7f3ae2a30f3"
+      "bytes": 37479,
+      "sha256": "fb1954b51b929b4dfe2b01492db05c0cbcf79baf55de1ce21da2f1b80603f512"
     },
     {
       "path": "tools/msa-adjudication-workbench/tests/consensus.test.mjs",
@@ -855,8 +856,8 @@
     },
     {
       "path": "tools/msa-adjudication-workbench/tests/github-import.test.mjs",
-      "bytes": 18352,
-      "sha256": "dbae075f1d5691516a0035affd5de6f711ed37f602ec378043b22fc193fac164"
+      "bytes": 19560,
+      "sha256": "e9e9d781aef574bfc37284c8ab00a6dc332ecd822dcbf742160b4a17bfde4bc7"
     },
     {
       "path": "tools/msa-adjudication-workbench/tests/migrations.test.mjs",

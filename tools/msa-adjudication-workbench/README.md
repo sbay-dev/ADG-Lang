@@ -33,6 +33,22 @@ X/Twitter invitation actions.
    evidence, follow the consensus state, and appeal a provisional result
    within its 14-day window.
 
+### Assisted operational test
+
+Operators can exercise the complete browser-to-repository publication path
+without claiming independent adjudication by opening:
+
+```text
+https://adg.sbay.sa/?mode=operational-test
+```
+
+This lane is accepted only for a `pilotOnly`, developer-visible packet and an
+annotation role. It publishes `Independent: No`, `Blind: No`, and
+`Authentic: Yes`, uses the normal signed GitHub import queue, and renders a
+clearly labelled operational-test result. It does not create a consensus task,
+occupy A/B/J1/J2, alter the user's account, or change the existing encrypted
+draft key. Each account may run it once per pilot packet.
+
 The separate `/admin/` progress dashboard uses Microsoft Entra only. It is
 not part of participant registration and fails closed unless the signed-in
 organization member has authoritative Global Administrator proof.

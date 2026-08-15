@@ -80,6 +80,8 @@ const IRAB = [
 ];
 
 const PUBLIC_PORTAL_URL = "https://adg.sbay.sa/";
+const OPERATIONAL_TEST_REQUESTED =
+  new URL(location.href).searchParams.get("mode") === "operational-test";
 const INVITATION_TEXT =
   "دعوة موجَّهة إلى معلّمي اللغة العربية وخبرائها للمشاركة في التحكيم "
   + "اللغوي المستقل لمحلّل ADG-Lang. لا يُشترط أي إلمام تقني، ويمكن حفظ "
@@ -192,6 +194,7 @@ const shareX = document.querySelector("#share-x");
 const copyInvitationButton = document.querySelector("#copy-invitation");
 const shareStatus = document.querySelector("#share-status");
 const discussionPanel = document.querySelector("#discussion");
+const discussionComposer = document.querySelector("#discussion-composer");
 const previousResults = document.querySelector("#previous-results");
 const discussionThread = document.querySelector("#discussion-thread");
 const discussionTarget = document.querySelector("#discussion-target");
@@ -213,6 +216,12 @@ const taskConsensusStatus =
 const appealPanel = document.querySelector("#appeal-panel");
 const appealEvidence = document.querySelector("#appeal-evidence");
 const submitAppealButton = document.querySelector("#submit-appeal");
+const attestIndependentLabel =
+  document.querySelector("#attest-independent-label");
+const attestBlindLabel =
+  document.querySelector("#attest-blind-label");
+const attestAuthenticLabel =
+  document.querySelector("#attest-authentic-label");
 const appealStatus = document.querySelector("#appeal-status");
 
 document.querySelectorAll('input[name="role"]').forEach(control => {
@@ -1775,6 +1784,7 @@ async function collectRatification(finalize) {
 
 async function collectAnnotation(finalize) {
   const slot = selectedRole();
+  const operationalTest = operationalTestMode();
   const sentences = [...workspace.querySelectorAll(".sentence")]
     .map(section => ({
       sentenceId: section.dataset.sentenceId,
@@ -1802,8 +1812,9 @@ async function collectAnnotation(finalize) {
     isHuman: true,
     isSynthetic: false,
     independentFromImplementationTeam:
-      finalize && checked("attest-independent"),
-    blindToParserInternals: finalize && checked("attest-blind"),
+      operationalTest ? false : finalize && checked("attest-independent"),
+    blindToParserInternals:
+      operationalTest ? false : finalize && checked("attest-blind"),
     parserPredictionsViewed: false,
     sentences
   };
@@ -1921,20 +1932,47 @@ function collectToken(card, adjudicated) {
 
 function renderReview() {
   const role = selectedRole();
+  const operationalTest = operationalTestMode();
+  if (OPERATIONAL_TEST_REQUESTED && !operationalTest) {
+    throw new Error(
+      "وضع الاختبار التشغيلي متاح للحزمة التجريبية ولدوري A أو B فقط."
+    );
+  }
   const tokenCount = state.packet.sentences
     .reduce((sum, sentence) => sum + sentence.tokens.length, 0);
+  attestIndependentLabel.textContent = operationalTest
+    ? "أقرّ بأن هذه تجربة تشغيلية مُساعَدة وليست تحكيمًا مستقلًا."
+    : "أنجزتُ التقييم باستقلال عن فريق تطوير المحلّل.";
+  attestBlindLabel.textContent = operationalTest
+    ? "أقرّ بأنني استعنت بمراجعة مرجعية، ولذلك لا تُعد النتيجة معماة."
+    : "لم أطّلع على مُخرَجات المحلّل أو إجاباته قبل الإكمال.";
+  attestAuthenticLabel.textContent = operationalTest
+    ? "القيم المسجَّلة هي التي أريد استخدامها لاختبار مسار النشر."
+    : "القرارات المسجَّلة تمثّل حكمي اللغوي الحقيقي.";
   reviewSummary.innerHTML = `
     <dl>
-      <div><dt>الدور</dt><dd>${escapeHtml(roleLabel(role))}</dd></div>
+      <div><dt>الدور</dt><dd>${escapeHtml(
+        operationalTest ? roleLabel("operational-test") : roleLabel(role)
+      )}</dd></div>
       <div><dt>الجمل</dt><dd>${state.packet.sentences.length}</dd></div>
       <div><dt>الوحدات</dt><dd>${tokenCount}</dd></div>
-      <div><dt>طريقة النشر</dt><dd>نتيجة مجهّلة</dd></div>
+      <div><dt>طريقة النشر</dt><dd>${
+        operationalTest
+          ? "تجربة مجهّلة لا تدخل الإجماع"
+          : "نتيجة مجهّلة"
+      }</dd></div>
     </dl>
     <p>
       راجع التعهدات أدناه. سيُحفظ اسمك وبريدك وحسابات التواصل التي
       أضفتها في Azure منفصلة، بينما تُرسل القرارات اللغوية إلى قناة
       الاستيراد الخاصة بالمستودع.
-    </p>`;
+    </p>
+    ${operationalTest
+      ? `<p class="flash-banner warning">
+          لن يشغل هذا الاختبار مقعد A أو B، ولن يُستخدم دليلًا على
+          الجاهزية اللغوية.
+        </p>`
+      : ""}`;
 }
 
 function validateAttestations() {
@@ -1974,6 +2012,7 @@ async function submitEvaluation() {
     const artifact = await buildArtifactBundle();
     const artifactSha256 = await sha256Json(artifact);
     const turnstileToken = getTurnstileToken();
+    const operationalTest = operationalTestMode();
     if (!state.config.submissionEnabled) {
       throw new Error(
         "الإرسال المركزي غير مفعّل بعد. احفظ نسخة الجهاز وأرسلها لمنسق "
@@ -1990,14 +2029,17 @@ async function submitEvaluation() {
       profile: accountProfile(),
       consent: accountConsent(),
       attestation: {
-        independent: checked("attest-independent"),
-        blind: checked("attest-blind"),
+        independent: operationalTest
+          ? false
+          : checked("attest-independent"),
+        blind: operationalTest ? false : checked("attest-blind"),
         authentic: checked("attest-authentic")
       },
+      submissionMode: operationalTest ? "operational-test" : "standard",
       artifactType: artifact.kind,
       artifactSha256,
       artifact,
-      clientVersion: "adg-v14.2",
+      clientVersion: "adg-v15.0",
       turnstileToken
     };
     const body = JSON.stringify(payload);
@@ -2006,20 +2048,24 @@ async function submitEvaluation() {
       throw new Error("حجم التقييم أكبر من الحد المسموح لهذه الجولة.");
     }
 
-    const response = await fetch("/api/submissions", {
+    const response = await fetch(
+      operationalTest ? "/api/operational-tests" : "/api/submissions",
+      {
       method: "POST",
       headers: { "content-type": "application/json" },
       body
-    });
+      }
+    );
     const result = await response.json().catch(() => ({}));
     if (!response.ok) {
       throw new Error(result.message || "تعذر إرسال التقييم.");
     }
-    showStatus(
-      `تم استلام تقييمك برقم ${result.receiptId}. `
-      + "ستظهر النتيجة المجهّلة في المستودع بعد الفحص الآلي.",
-      false
-    );
+    showStatus(operationalTest
+      ? `تم استلام الاختبار التشغيلي برقم ${result.receiptId}. `
+        + "سيظهر في المستودع موسومًا بأنه غير مستقل ولا يدخل الإجماع."
+      : `تم استلام تقييمك برقم ${result.receiptId}. `
+        + "ستظهر النتيجة المجهّلة في المستودع بعد الفحص الآلي.",
+    false);
     await loadDiscussion(result.receiptId);
   } catch (error) {
     showStatus(error.message, true);
@@ -2039,7 +2085,15 @@ async function loadDiscussion(receiptId) {
   renderPreviousResults(data);
   renderDiscussionThread(data.comments || []);
   populateDiscussionControls(data.results || []);
-  await loadTaskStatus(data.source.receiptId);
+  discussionComposer.hidden = data.operationalTest === true;
+  if (data.operationalTest) {
+    state.discussion.taskStatus = null;
+    taskConsensusStatus.textContent =
+      "تجربة تشغيلية معزولة؛ لا تشغل أي دور في آلة الإجماع.";
+    appealPanel.hidden = true;
+  } else {
+    await loadTaskStatus(data.source.receiptId);
+  }
   clearDiscussionReply();
   const currentUrl = new URL(location.href);
   currentUrl.searchParams.set("discussion", receiptId);
@@ -2217,7 +2271,11 @@ function createResultCard(result) {
   badges.className = "result-badges";
   badges.append(
     resultBadge(roleLabel(result.role)),
-    resultBadge(result.isFinal ? "نتيجة نهائية" : "تحكيم مستقل"),
+    resultBadge(
+      result.role === "operational-test"
+        ? "تجربة تشغيلية"
+        : result.isFinal ? "نتيجة نهائية" : "تحكيم مستقل"
+    ),
     resultBadge(
       result.githubStatus === "pending-validation"
         ? "قيد مراجعة GitHub"
@@ -2760,7 +2818,14 @@ function selectedRole() {
   return document.querySelector('input[name="role"]:checked')?.value ?? "A";
 }
 
+function operationalTestMode() {
+  return OPERATIONAL_TEST_REQUESTED
+    && state.packet?.pilotOnly === true
+    && ["A", "B"].includes(selectedRole());
+}
+
 function roleLabel(role) {
+  if (role === "operational-test") return "اختبار تشغيلي مُساعَد";
   if (role === "A") return "المعلّق المستقل A";
   if (role === "B") return "المعلّق المستقل B";
   if (role === "ratification") return "المراجع المستقل J2";

@@ -87,6 +87,7 @@ const manifest = {
   claimBoundaries: [
     "This is an ordinary-software portal release, not a CNS model release.",
     "Human submissions remain untrusted until the repository importer and review pass.",
+    "Operational tests are assisted, do not occupy consensus roles, and cannot establish readiness.",
     "Pilot submissions do not establish unrestricted MSA parser readiness."
   ],
   files

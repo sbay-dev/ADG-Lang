@@ -69,6 +69,32 @@ test("valid submission backward compatibility remains accepted by the CLI", asyn
   );
 });
 
+test("operational tests render explicit non-independent public evidence", async () => {
+  const envelope = await createSubmissionEnvelope();
+  envelope.submissionMode = "operational-test";
+  envelope.attestation = {
+    independent: false,
+    blind: false,
+    authentic: true
+  };
+  envelope.artifact.annotation.independentFromImplementationTeam = false;
+  envelope.artifact.annotation.blindToParserInternals = false;
+  envelope.artifactSha256 = await sha256Json(envelope.artifact);
+  envelope.claimBoundaries = [
+    "This is an assisted operational test, not independent adjudication.",
+    "This test does not occupy A, B, J1, or J2 and does not affect consensus."
+  ];
+  const signed = signEnvelope(envelope, hmacKey);
+
+  await assert.doesNotReject(() => validateSignedEnvelope(signed, hmacKey));
+  const markdown = await renderEvidenceMarkdown(signed);
+  assert.match(markdown, /operational-test/);
+  assert.match(markdown, /\| الاستقلال \/ Independent \| لا \/ no \|/);
+  assert.match(markdown, /\| التعمية \/ Blind \| لا \/ no \|/);
+  assert.match(markdown, /\| الأصالة \/ Authentic \| نعم \/ yes \|/);
+  assert.match(markdown, /does not occupy A, B, J1, or J2/);
+});
+
 test("valid signed comments validate, emit safe metadata, and render markdown", async t => {
   const dir = await createScratchDir(t, "comment-cli");
   const submission = await createSubmissionEnvelope();

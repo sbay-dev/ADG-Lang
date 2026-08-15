@@ -214,6 +214,11 @@ export default {
         enforceOrigin(request, runtimeEnv);
         return await receiveSubmission(request, runtimeEnv);
       }
+      if (url.pathname === "/api/operational-tests"
+          && request.method === "POST") {
+        enforceOrigin(request, runtimeEnv);
+        return await receiveOperationalTest(request, runtimeEnv);
+      }
 
       if (url.pathname.startsWith("/api/")) {
         return json({ message: "المسار المطلوب غير موجود." }, 404);
@@ -2441,6 +2446,21 @@ async function getCompletedResults(request, env, url) {
     );
   }
 
+  if (source.role === "operational-test") {
+    const result = publicResultRow(source, true);
+    return json({
+      source: publicResultRow(source, false),
+      revealedAtUtc: new Date().toISOString(),
+      results: [result],
+      comments: [],
+      operationalTest: true,
+      repository:
+        env.GITHUB_REPOSITORY || "sbay-dev/ADG-Lang",
+      publicationBoundary:
+        "هذه تجربة تشغيلية مجهّلة لا تدخل آلة الإجماع ولا تثبت الجاهزية."
+    });
+  }
+
   const now = Date.now();
   await env.DB.prepare(
     `INSERT OR IGNORE INTO result_access
@@ -3575,9 +3595,14 @@ async function findTaskSubmissions(
 }
 
 function publicResultRow(row, includeArtifact) {
+  const artifact = includeArtifact || row.role === "operational-test"
+    ? JSON.parse(row.artifact_json)
+    : null;
   const value = {
     receiptId: row.receipt_id,
-    packetId: row.packet_id,
+    packetId: row.role === "operational-test"
+      ? artifact.packet.packetId
+      : row.packet_id,
     role: row.role,
     participantPseudonym: row.participant_pseudonym,
     artifactType: row.artifact_type,
@@ -3587,7 +3612,7 @@ function publicResultRow(row, includeArtifact) {
     githubStatus: row.repository_status,
     submittedAtUtc: new Date(row.submitted_at).toISOString()
   };
-  if (includeArtifact) value.artifact = JSON.parse(row.artifact_json);
+  if (includeArtifact) value.artifact = artifact;
   return value;
 }
 
@@ -4513,6 +4538,212 @@ async function receiveSubmission(request, env) {
   }, 202);
 }
 
+async function receiveOperationalTest(request, env) {
+  if (String(env.SUBMISSION_ENABLED).toLowerCase() !== "true") {
+    throw new PublicError(
+      "قناة الإرسال متوقفة مؤقتًا، ويمكن حفظ نسخة محلية.",
+      503
+    );
+  }
+  const account = await requireSession(request, env);
+  if (!account.verified_email_hash) {
+    throw new PublicError(
+      "وثّق بريد الحساب قبل إرسال الاختبار التشغيلي.",
+      403
+    );
+  }
+  if (account.erasure_status === "pending") {
+    throw new PublicError(
+      "لا يمكن إنشاء اختبار جديد بعد تسجيل طلب محو الهوية.",
+      409
+    );
+  }
+
+  const maxBytes = Number(env.MAX_SUBMISSION_BYTES || 900000);
+  const contentLength = Number(request.headers.get("content-length") || 0);
+  if (contentLength > maxBytes) {
+    throw new PublicError("حجم الاختبار أكبر من الحد المسموح.", 413);
+  }
+  const text = await request.text();
+  if (new TextEncoder().encode(text).length > maxBytes) {
+    throw new PublicError("حجم الاختبار أكبر من الحد المسموح.", 413);
+  }
+
+  let submission;
+  try {
+    submission = JSON.parse(text);
+  } catch {
+    throw new PublicError("بيانات الاختبار غير صالحة.", 400);
+  }
+  validateSubmission(submission, { operationalTest: true });
+  await validateArtifactForServer(submission.artifact);
+
+  const turnstile = await verifyTurnstile(
+    submission.turnstileToken,
+    request.headers.get("CF-Connecting-IP"),
+    env
+  );
+  if (!turnstile.success) {
+    throw new PublicError("لم ينجح اختبار الحماية. أعد المحاولة.", 403);
+  }
+
+  const actualArtifactSha256 = await sha256Hex(
+    JSON.stringify(submission.artifact)
+  );
+  if (actualArtifactSha256 !== submission.artifactSha256) {
+    throw new PublicError("تغيّرت نتيجة الاختبار أثناء الإرسال.", 400);
+  }
+
+  const packet = submission.artifact.packet;
+  const internalPacketId = `${packet.packetId}:operational-test`;
+  const existingOperationalTest = await env.DB.prepare(
+    `SELECT receipt_id
+       FROM submissions
+      WHERE user_id = ? AND packet_id = ?`
+  ).bind(account.user_id, internalPacketId).first();
+  if (existingOperationalTest) {
+    throw new PublicError(
+      "سبق لهذا الحساب اختبار الحزمة نفسها.",
+      409
+    );
+  }
+  const entityCryptMasterKey = await getVaultSecret(
+    env.ENTITYCRYPT_MASTER_KEY_SECRET_NAME,
+    env
+  );
+  const storedProfile = JSON.parse(await decryptEntityCrypt(
+    account.profile_ciphertext,
+    entityCryptMasterKey
+  ));
+  const storedConsent = JSON.parse(account.consent_json);
+  const receiptId = crypto.randomUUID();
+  const participantPseudonym = `adg-${receiptId.slice(0, 12)}`;
+  const receivedAtUtc = new Date().toISOString();
+  const receivedAt = Date.parse(receivedAtUtc);
+  const privateIdentity = {
+    schema: "adg-msa-private-participant-identity-v1",
+    receiptId,
+    participantId: submission.participantId,
+    accountUserId: account.user_id,
+    receivedAtUtc,
+    profile: storedProfile,
+    consent: storedConsent,
+    artifactSha256: actualArtifactSha256,
+    clientVersion: submission.clientVersion,
+    submissionMode: "operational-test"
+  };
+  const publicEnvelope = {
+    schema: "adg-msa-github-inbox-v1",
+    receiptId,
+    participantPseudonym,
+    receivedAtUtc,
+    submissionMode: "operational-test",
+    artifactType: submission.artifactType,
+    artifactSha256: actualArtifactSha256,
+    attestation: submission.attestation,
+    artifact: submission.artifact,
+    claimBoundaries: [
+      "Participant identity is stored separately and is not present here.",
+      "This is an assisted operational test, not independent adjudication.",
+      "This test does not occupy A, B, J1, or J2 and does not affect consensus.",
+      "Pilot submissions cannot become final MSA readiness evidence."
+    ]
+  };
+  const hmacKey = await getVaultSecret(
+    env.SUBMISSION_HMAC_SECRET_NAME,
+    env
+  );
+  const signedEnvelope = {
+    ...publicEnvelope,
+    hmacSha256: await hmacSha256(
+      hmacKey,
+      JSON.stringify(publicEnvelope))
+  };
+  const encryptedIdentity = await encryptEntityCrypt(
+    JSON.stringify(privateIdentity),
+    entityCryptMasterKey
+  );
+  const identityEnvelope = {
+    schema: "adg-entitycrypt-data-room-envelope-v1",
+    entityCryptProfile: "Matryoshka.MK1.AES256.GCM.Randomized",
+    keySecretName: env.ENTITYCRYPT_MASTER_KEY_SECRET_NAME,
+    receiptId,
+    ciphertext: encryptedIdentity
+  };
+  const deliveryId = crypto.randomUUID();
+  let writeResults;
+  try {
+    writeResults = await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO submissions
+          (receipt_id, user_id, packet_id, role,
+           artifact_sha256, submitted_at, participant_pseudonym,
+           artifact_type, artifact_json, repository_status,
+           holdout_id, guideline_version, data_version, protocol_version,
+           consensus_role, consensus_round)
+         VALUES (?, ?, ?, 'operational-test', ?, ?, ?, ?, ?,
+                 'pending-validation', ?, ?, ?, ?, 'TEST', 0)`
+      ).bind(
+        receiptId,
+        account.user_id,
+        internalPacketId,
+        actualArtifactSha256,
+        receivedAt,
+        participantPseudonym,
+        submission.artifactType,
+        JSON.stringify(submission.artifact),
+        packet.holdoutId,
+        packet.guidelineVersion,
+        packet.dataVersion,
+        packet.protocolVersion
+      ),
+      env.DB.prepare(
+        `INSERT INTO evidence_outbox
+          (id, kind, task_version_id, related_id, public_blob_name,
+           identity_blob_name, public_payload_json, identity_payload_json,
+           dedupe_key, status, attempts, next_attempt_at, created_at)
+         VALUES (?, 'submission', NULL, ?, ?, ?, ?, ?, ?,
+                 'pending', 0, ?, ?)`
+      ).bind(
+        deliveryId,
+        receiptId,
+        `${receiptId}.json`,
+        `${receiptId}.json`,
+        JSON.stringify(signedEnvelope, null, 2) + "\n",
+        JSON.stringify(identityEnvelope, null, 2) + "\n",
+        `submission:${receiptId}`,
+        receivedAt,
+        receivedAt
+      )
+    ]);
+  } catch (error) {
+    const duplicate = await env.DB.prepare(
+      `SELECT receipt_id
+         FROM submissions
+        WHERE user_id = ? AND packet_id = ?`
+    ).bind(account.user_id, internalPacketId).first();
+    if (duplicate) {
+      throw new PublicError(
+        "سبق لهذا الحساب اختبار الحزمة نفسها.",
+        409
+      );
+    }
+    throw error;
+  }
+  if (Number(writeResults[0]?.meta?.changes || 0) !== 1
+      || Number(writeResults[1]?.meta?.changes || 0) !== 1) {
+    throw new PublicError("لم يُثبت الاختبار التشغيلي ذريًا.", 409);
+  }
+
+  return json({
+    accepted: true,
+    receiptId,
+    repositoryImportStatus: "pending-validation",
+    previousResultsAvailable: 1,
+    operationalTest: true
+  }, 202);
+}
+
 async function submissionTask(artifact) {
   const packet = artifact?.kind === "ratification-package"
     ? artifact?.primaryArtifact?.packet
@@ -4539,7 +4770,8 @@ async function submissionTask(artifact) {
   };
 }
 
-function validateSubmission(value) {
+function validateSubmission(value, options = {}) {
+  const operationalTest = options.operationalTest === true;
   if (!value || value.schema !== "adg-msa-portal-submission-v1"
       || !isUuid(value.participantId)
       || value.artifactType
@@ -4572,10 +4804,14 @@ function validateSubmission(value) {
 
   validateAccountProfile(value.profile);
 
-  if (value.consent?.identityStorage !== true
-      || value.attestation?.independent !== true
-      || value.attestation?.blind !== true
-      || value.attestation?.authentic !== true) {
+  const validAttestation = operationalTest
+    ? value.attestation?.independent === false
+      && value.attestation?.blind === false
+      && value.attestation?.authentic === true
+    : value.attestation?.independent === true
+      && value.attestation?.blind === true
+      && value.attestation?.authentic === true;
+  if (value.consent?.identityStorage !== true || !validAttestation) {
     throw new PublicError("الموافقات والتعهدات المطلوبة غير مكتملة.", 400);
   }
   if (!value.turnstileToken
@@ -4597,6 +4833,24 @@ function validateSubmission(value) {
       "ملف النتيجة يحتوي بيانات هوية أو تحليلًا محظورًا.",
       400
     );
+  }
+  if (operationalTest) {
+    const annotation = value.artifact.annotation;
+    if (value.submissionMode !== "operational-test"
+        || value.artifact.kind !== "independent-annotation"
+        || value.artifact.packet?.pilotOnly !== true
+        || value.artifact.packet?.developerVisible !== true
+        || annotation?.isHuman !== true
+        || annotation?.isSynthetic !== false
+        || annotation?.independentFromImplementationTeam !== false
+        || annotation?.blindToParserInternals !== false) {
+      throw new PublicError(
+        "وضع الاختبار التشغيلي غير مرتبط بحزمة تجريبية صالحة.",
+        400
+      );
+    }
+  } else if (value.submissionMode === "operational-test") {
+    throw new PublicError("أرسل الاختبار عبر مساره المخصص.", 400);
   }
 }
 

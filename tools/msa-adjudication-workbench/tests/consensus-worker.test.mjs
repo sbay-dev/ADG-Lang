@@ -250,6 +250,165 @@ test("independent evidence stays private until both roles are fixed", async () =
   }
 });
 
+test("operational pilot test imports without occupying consensus roles", async () => {
+  const fixture = await createFixture("operational-test");
+  try {
+    const values = await independentArtifacts();
+    const account = fixture.accounts.get("A");
+    const draftUpdatedAt = Date.now() - 1000;
+    fixture.db.database.prepare(
+      `INSERT INTO drafts
+        (user_id, packet_id, role, ciphertext, updated_at)
+       VALUES (?, ?, 'A', ?, ?)`
+    ).run(
+      account.userId,
+      values.packet.packetId,
+      "existing-encrypted-autosave",
+      draftUpdatedAt
+    );
+    const userBefore = fixture.db.database.prepare(
+      `SELECT profile_ciphertext, consent_json
+         FROM users
+        WHERE id = ?`
+    ).get(account.userId);
+    const annotation = {
+      ...values.artifactA.annotation,
+      isHuman: true,
+      isSynthetic: false,
+      independentFromImplementationTeam: false,
+      blindToParserInternals: false
+    };
+    const artifact = {
+      ...values.artifactA,
+      annotation
+    };
+    const result = await submitOperationalTest(
+      fixture,
+      "A",
+      values.participantIds.A,
+      artifact
+    );
+
+    assert.equal(result.repositoryImportStatus, "pending-validation");
+    assert.equal(result.operationalTest, true);
+    const stored = fixture.db.database.prepare(
+      `SELECT role, packet_id, task_version_id, round_id,
+              consensus_role, repository_status
+         FROM submissions
+        WHERE receipt_id = ?`
+    ).get(result.receiptId);
+    assert.equal(stored.role, "operational-test");
+    assert.equal(
+      stored.packet_id,
+      `${artifact.packet.packetId}:operational-test`
+    );
+    assert.equal(stored.task_version_id, null);
+    assert.equal(stored.round_id, null);
+    assert.equal(stored.consensus_role, "TEST");
+    assert.equal(stored.repository_status, "pending-validation");
+    assert.equal(
+      fixture.db.database.prepare(
+        "SELECT COUNT(*) AS count FROM task_participations"
+      ).get().count,
+      0
+    );
+
+    const queued = fixture.db.database.prepare(
+      `SELECT status, public_payload_json
+         FROM evidence_outbox
+        WHERE related_id = ?`
+    ).get(result.receiptId);
+    assert.equal(queued.status, "pending");
+    const publicEnvelope = JSON.parse(queued.public_payload_json);
+    assert.equal(publicEnvelope.submissionMode, "operational-test");
+    assert.deepEqual(publicEnvelope.attestation, {
+      independent: false,
+      blind: false,
+      authentic: true
+    });
+    assert.match(
+      publicEnvelope.claimBoundaries.join("\n"),
+      /does not occupy A, B, J1, or J2/
+    );
+    const draftAfter = fixture.db.database.prepare(
+      `SELECT ciphertext, updated_at
+         FROM drafts
+        WHERE user_id = ? AND packet_id = ? AND role = 'A'`
+    ).get(account.userId, values.packet.packetId);
+    assert.equal(draftAfter.ciphertext, "existing-encrypted-autosave");
+    assert.equal(draftAfter.updated_at, draftUpdatedAt);
+    const userAfter = fixture.db.database.prepare(
+      `SELECT profile_ciphertext, consent_json
+         FROM users
+        WHERE id = ?`
+    ).get(account.userId);
+    assert.equal(userAfter.profile_ciphertext, userBefore.profile_ciphertext);
+    assert.equal(userAfter.consent_json, userBefore.consent_json);
+
+    const duplicate = await submitOperationalTest(
+      fixture,
+      "A",
+      values.participantIds.A,
+      artifact,
+      409
+    );
+    assert.match(duplicate.message, /سبق لهذا الحساب/);
+    assert.equal(
+      fixture.db.database.prepare(
+        `SELECT COUNT(*) AS count
+           FROM submissions
+          WHERE user_id = ? AND role = 'operational-test'`
+      ).get(account.userId).count,
+      1
+    );
+    assert.equal(
+      fixture.db.database.prepare(
+        `SELECT COUNT(*) AS count
+           FROM evidence_outbox
+          WHERE related_id = ?`
+      ).get(result.receiptId).count,
+      1
+    );
+
+    const previewResponse = await worker.fetch(
+      new Request(
+        `${origin}/api/results?receiptId=${result.receiptId}`,
+        {
+          headers: {
+            cookie: `adg_session=${account.token}`
+          }
+        }
+      ),
+      fixture.env
+    );
+    assert.equal(previewResponse.status, 200);
+    const preview = await previewResponse.json();
+    assert.equal(preview.operationalTest, true);
+    assert.equal(preview.results.length, 1);
+    assert.equal(preview.results[0].role, "operational-test");
+    assert.equal(preview.source.packetId, artifact.packet.packetId);
+
+    const independent = await submitArtifact(
+      fixture,
+      "A",
+      values.participantIds.A,
+      values.artifactA
+    );
+    assert.equal(
+      independent.repositoryImportStatus,
+      "held-for-independent-quorum"
+    );
+    const participations = fixture.db.database.prepare(
+      "SELECT role, status FROM task_participations"
+    ).all();
+    assert.equal(participations.length, 1);
+    assert.equal(participations[0].role, "A");
+    assert.equal(participations[0].status, "submitted");
+  } finally {
+    fixture.restoreFetch();
+  }
+});
+
 test("D1 archive mode persists only encrypted identity payloads for submitted evidence", async () => {
   const fixture = await createFixture("d1-archive");
   fixture.env.EVIDENCE_ARCHIVE_MODE = "d1";
@@ -995,6 +1154,53 @@ async function submitArtifact(
   return result;
 }
 
+async function submitOperationalTest(
+  fixture,
+  role,
+  participantId,
+  artifact,
+  expectedStatus = 202
+) {
+  const account = fixture.accounts.get(role);
+  const payload = {
+    schema: "adg-msa-portal-submission-v1",
+    participantId,
+    profile: account.profile,
+    consent: {
+      identityStorage: true,
+      futureContact: false,
+      discussionNotifications: false
+    },
+    attestation: {
+      independent: false,
+      blind: false,
+      authentic: true
+    },
+    submissionMode: "operational-test",
+    turnstileToken: `turnstile-operational-${role}`,
+    clientVersion: "consensus-worker-test-v1",
+    artifactType: artifact.kind,
+    artifactSha256: await sha256Json(artifact),
+    artifact
+  };
+  const response = await worker.fetch(
+    new Request(`${origin}/api/operational-tests`, {
+      method: "POST",
+      headers: {
+        origin,
+        cookie: `adg_session=${account.token}`,
+        "content-type": "application/json",
+        "CF-Connecting-IP": "203.0.113.44"
+      },
+      body: JSON.stringify(payload)
+    }),
+    fixture.env
+  );
+  const result = await response.json();
+  assert.equal(response.status, expectedStatus, JSON.stringify(result));
+  return result;
+}
+
 async function independentArtifacts() {
   const packet = readJson("packet.json");
   const annotationA = readJson("annotation-a.synthetic.json");
@@ -1030,4 +1236,3 @@ async function independentArtifacts() {
 function readJson(name) {
   return JSON.parse(readFileSync(new URL(name, exampleRoot), "utf8"));
 }
-
