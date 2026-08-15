@@ -14,7 +14,7 @@
   "integrity": {
     "algorithm": "SHA-256 canonical file-list root",
     "fileCount": 172,
-    "releaseRoot": "d991cacd2e2c36cd0ccf949237ee86df02b7415f947447c8c5510ae5e1016d12"
+    "releaseRoot": "5d190593caa8de800462c3df0b64499765928d6d1d6949c5be47c62aefd0266e"
   },
   "exclusions": [
     "release/ (self-referential generated output)",
@@ -31,7 +31,7 @@
     {
       "path": ".github/workflows/import-msa-adjudication.yml",
       "bytes": 28735,
-      "sha256": "ed9ef501f57e50b06425a75118c40c61736e184a8ac6b0add651ef3f3617449f"
+      "sha256": "53d51afb5158af1873775d9ebeccb93378d6497c4ce31b8076358f90d5dc7698"
     },
     {
       "path": ".github/workflows/msa-adjudication-portal-security.yml",

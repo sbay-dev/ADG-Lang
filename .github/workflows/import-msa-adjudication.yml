@@ -70,8 +70,8 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           $importSource = [string]$env:IMPORT_SOURCE
-          if ($importSource -eq "portal-api"
-              -and "${{ steps.portal_api_guard.outputs.skip }}" -eq "true") {
+          if ($importSource -eq "portal-api" -and
+              "${{ steps.portal_api_guard.outputs.skip }}" -eq "true") {
             "count=0" | Out-File $env:GITHUB_OUTPUT -Append
             exit 0
           }
@@ -505,8 +505,8 @@ jobs:
           }
           $jsonFiles = @($files | Where-Object { $_ -match '\.json$' })
           $markdownFiles = @($files | Where-Object { $_ -match '\.md$' })
-          if ($jsonFiles.Count -eq 0
-              -or $jsonFiles.Count -ne $markdownFiles.Count) {
+          if ($jsonFiles.Count -eq 0 -or
+              $jsonFiles.Count -ne $markdownFiles.Count) {
             throw "Import PR must contain matching JSON and Markdown evidence."
           }
           foreach ($path in $jsonFiles) {
