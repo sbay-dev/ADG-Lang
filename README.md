@@ -1,8 +1,10 @@
 # ADG-Lang
 
-ADG-Lang is a type-safe Arabic grammatical language inspired by the early grammar core attributed to Abu al-Aswad al-Du'ali.
+**لغة النحو العربي المتحقَّق منه**
 
-The project goal is to make Arabic grammatical logic inspectable, testable, and eventually executable:
+**ADG-Lang** لغة برمجية عربية آمِنة الأنواع (type-safe)، تستلهم نواتها من أصول النحو العربي المنسوبة إلى أبي الأسود الدُّؤَلي، واضِعِ أوائل هذا العلم وناقطِ المصحف.
+
+وغاية المشروع أن يجعل المنطق النحوي العربي قابلًا للفحص والاختبار، ثم للتنفيذ في نهاية المطاف:
 
 ```text
 Arabic-inflected .adg source (i'rab-typed)
@@ -12,7 +14,9 @@ Arabic-inflected .adg source (i'rab-typed)
   => compiler/backend
 ```
 
-## Native Proof Principle
+## مبدأ البرهان الأصيل (Native Proof)
+
+لا يصدر أي ناتج تنفيذي إلا بعد برهان نحوي صحيح؛ فالخطأ يُردُّ تشخيصًا قبل توليد أي شيفرة:
 
 ```text
 Valid ADG AST
@@ -26,62 +30,63 @@ Invalid ADG AST
   => No Native Executable
 ```
 
-## Repository Purpose
+## سبب التسمية
 
-This public repository is the official community-facing language repository for:
+- **ADG-Lang** — تنتسب التسمية إلى النحو المنسوب إلى **أبي الأسود الدُّؤَلي**؛ ومن ثَمَّ سُمِّي جدول القواعد المرجعي الذي يرتكز عليه المحلِّل باسم «قواعد ADG-Duali». ويفصل المشروع بوضوح بين ما هو منقول متواتر عن هذا الأصل وبين الاستدلال التشغيلي الحديث في المترجم.
+- **ADS — استوديو تحكيم العربية (Arabic Adjudication Studio)** — هو الطبقة البشرية للمشروع: مساحة عمل منضبطة يراجع فيها المحكِّمون من المعلِّمين واللغويين مخرجات المحلِّل النحوي ويفصلون فيها، لإنتاج «بيانات ذهبية» موثَّقة وموقَّعة تُغذِّي ADG-Lang. وسُمِّيت «استوديو» لأنها بيئة محكومة للصناعة اللغوية الدقيقة، لا مجرد نموذج إدخال. عنوانها الرسمي **https://adg.sbay.sa**، والعنوان السابق `ads.sbay.sa` يحوِّل إليه.
 
-1. The ADG-Lang rule model.
-2. Public AST examples.
-3. The public reference compiler release.
-4. Parser and compiler design notes.
-5. Community verification and research tasks.
+فليعلم المحكِّم قبل أن يشرع: أنه يدخل استوديو تحكيم لغوي لا اختبارًا آليًّا؛ ودوره أن يزن الحكم النحوي بخبرته، وأن يُسهم حكمه — بعد التحقق — في بناء مرجعية عربية مفتوحة.
 
-## Human Arabic Adjudication
+## الغاية من المستودع
 
-Arabic teachers and linguists can evaluate the parser without GitHub or
-command-line knowledge at:
+هذا المستودع العمومي هو المرجع الرسمي الموجَّه للمجتمع، ويضم:
+
+1. نموذج قواعد ADG-Lang.
+2. أمثلة الأشجار المجردة (AST) العمومية.
+3. إصدار المترجم المرجعي العمومي.
+4. مذكرات تصميم المحلِّل والمترجم.
+5. مهام التحقق والبحث المجتمعية.
+
+## التحكيم اللغوي البشري (منصة ADS)
+
+يستطيع المعلِّمون واللغويون تقييم المحلِّل النحوي دون حاجة إلى معرفة GitHub أو سطر الأوامر عبر:
 
 **https://adg.sbay.sa**
 
-The Arabic-first portal explains every criterion, hides parser predictions,
-keeps participant identity encrypted outside GitHub, and is designed to import
-only signed, pseudonymous linguistic evidence through a review pull request.
-Passkey accounts, encrypted draft resumption, optional private social
-usernames, and central submission are live. Ready-made WhatsApp and X/Twitter
-buttons help invite other experts. Every submitted artifact still enters the
-repository through an automated validation and review pull request. Its source
-and security model are under `tools\msa-adjudication-workbench`.
+المنصة عربية أولًا: تشرح كل معيار، وتُخفي تنبؤات المحلِّل حتى لا تتأثر أحكام المحكِّم، وتحفظ هوية المشارك مشفَّرة خارج GitHub، ولا تُدخل إلى المستودع إلا أدلة لغوية موقَّعة ومُعمّاة الهوية عبر طلب مراجعة (pull request). وتتوفر حسابات Passkey، واستئناف المسودات المشفَّرة، والأسماء الاجتماعية الخاصة الاختيارية، والإرسال المركزي. وتُعين أزرار الدعوة الجاهزة عبر واتساب وX على استقطاب خبراء آخرين. ويبقى كل أثر مُرسَل داخلًا إلى المستودع عبر تحقق آلي وطلب مراجعة.
 
-## Start Here
+وواجهة المنصة مصمَّمة على طابع GitHub، متاحة بالوضعين الفاتح والمظلم، واتجاهها من اليمين إلى اليسار. وللاطلاع على إفصاح عمومي مبسَّط عن آلية عملها، والبيانات التي تجمعها، وكيف تُحمى، وحدود ما تدّعيه، انظر `tools\msa-adjudication-workbench\TRANSPARENCY.md`. ومصدرها ونموذجها الأمني تحت `tools\msa-adjudication-workbench`.
 
-| Document | Purpose |
+## ابدأ من هنا
+
+| الوثيقة | الغرض |
 | --- | --- |
-| `docs\ADG-Duali-Rules.md` | The single cleaned rule table that anchors the parser. |
-| `docs\Academic-Reading-Key.md` | Color/evidence key for academic review of the rule table. |
-| `docs\Mermaid-Rule-Maps.md` | Mermaid diagrams that apply the academic reading key visually. |
-| `docs\Compiler-Components.md` | Components of the public reference compiler. |
-| `docs\Project-Model.md` | File extensions and ADG application project layout. |
-| `docs\Portability-and-Targets.md` | What "compiled" means across operating systems, native targets, and WebAssembly. |
-| `docs\Release-Testing.md` | How to verify and test the public release. |
-| `docs\Release-v0.1.0.md` | Release notes for the first public testable version. |
-| `docs\Repository-Policy.md` | What public releases include and exclude. |
-| `docs\Language-Overview.md` | Public overview of ADG-Lang as a programming-language interface. |
-| `docs\Verification-Model.md` | How ADG moves from AST to verification and native-proof gates. |
-| `docs\ADG-Wikipedia-Intro-Function.md` | Wikipedia-attributed Abu al-Aswad executable-function demo. |
-| `docs\directives\ADG-WIKIPEDIA-INTRO-DIRECTIVES.md` | Code-linked implementation directives for the Wikipedia demo. |
-| `docs\Community-Roadmap.md` | Open development tracks for contributors. |
-| `examples\README.md` | Valid and invalid AST examples for investigation. |
-| `CONTRIBUTING.md` | How to propose rules, examples, diagnostics, and implementations. |
+| `docs\ADG-Duali-Rules.md` | جدول القواعد المنقَّى الأوحد الذي يرتكز عليه المحلِّل. |
+| `docs\Academic-Reading-Key.md` | مفتاح الألوان والأدلة للمراجعة الأكاديمية لجدول القواعد. |
+| `docs\Mermaid-Rule-Maps.md` | مخططات Mermaid تطبِّق مفتاح القراءة الأكاديمية بصريًّا. |
+| `docs\Compiler-Components.md` | مكوِّنات المترجم المرجعي العمومي. |
+| `docs\Project-Model.md` | امتدادات الملفات وبنية مشروع تطبيقات ADG. |
+| `docs\Portability-and-Targets.md` | معنى «المُترجَم» عبر أنظمة التشغيل والأهداف الأصيلة وWebAssembly. |
+| `docs\Release-Testing.md` | كيفية التحقق من الإصدار العمومي واختباره. |
+| `docs\Release-v0.1.0.md` | ملاحظات أول إصدار عمومي قابل للاختبار. |
+| `docs\Repository-Policy.md` | ما تتضمنه الإصدارات العمومية وما تستثنيه. |
+| `docs\Language-Overview.md` | نظرة عامة على ADG-Lang بوصفه واجهة لغة برمجة. |
+| `docs\Verification-Model.md` | كيف ينتقل ADG من الشجرة المجردة إلى التحقق وبوابات البرهان الأصيل. |
+| `docs\ADG-Wikipedia-Intro-Function.md` | عرض دالة تنفيذية عن أبي الأسود منسوب إلى ويكيبيديا. |
+| `docs\directives\ADG-WIKIPEDIA-INTRO-DIRECTIVES.md` | توجيهات التنفيذ المرتبطة بالشيفرة لعرض ويكيبيديا. |
+| `docs\Community-Roadmap.md` | مسارات التطوير المفتوحة للمساهمين. |
+| `examples\README.md` | أمثلة أشجار مجردة صحيحة وغير صحيحة للفحص. |
+| `CONTRIBUTING.md` | كيفية اقتراح القواعد والأمثلة والتشخيصات والتنفيذ. |
 
-## Public Reference Compiler
+## المترجم المرجعي العمومي
 
-The public release includes a testable reference compiler:
+يتضمن الإصدار العمومي مترجمًا مرجعيًّا قابلًا للاختبار:
 
 ```text
 src\Adg.Compiler
 ```
 
-Run:
+للتشغيل:
 
 ```powershell
 dotnet run --project src\Adg.Compiler -- --self-test
@@ -89,17 +94,15 @@ dotnet run --project src\Adg.Compiler -- test-matrix
 powershell -ExecutionPolicy Bypass -File scripts\Verify-AdgRelease.ps1
 ```
 
-If LLVM `clang` is unavailable:
+عند عدم توفر LLVM `clang`:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\Verify-AdgRelease.ps1 -SkipNative
 ```
 
-## Application File Extension
+## امتداد ملفات التطبيقات
 
-Author ADG-Lang applications in **Arabic-inflected `.adg` source**. This is the canonical
-language surface: Arabic grammatical statements whose i'rab (case marking) is enforced as a
-compile-time contract before any LLVM IR is emitted.
+تُكتب تطبيقات ADG-Lang بمصدر عربي معرَب بامتداد **`.adg`**، وهو السطح اللغوي القانوني: جمل نحوية عربية يُفرَض إعرابها عقدًا في زمن الترجمة قبل توليد أي LLVM IR.
 
 ```adg
 اتجاهُ النصِّ: RTL
@@ -111,45 +114,41 @@ program "hello-adg"
 جملةٌ فعليةٌ "شغّلَ" فاعلُها "النظامُ" مرفوعٌ مفعولُها "البرنامجَ" منصوبٌ
 ```
 
-A `فاعل` (subject) must be `مرفوع` (nominative) and a `مفعول` (object) must be `منصوب`
-(accusative); any violation is rejected as a compile-time diagnostic. Executable functions
-use the same Arabic `.adg` surface with `دالةٌ` / `استدعاءٌ`.
+فالفاعل لا بد أن يكون `مرفوعًا` والمفعول `منصوبًا`؛ وأي مخالفة تُردُّ تشخيصًا في زمن الترجمة. وتستعمل الدوال التنفيذية السطح العربي `.adg` نفسه عبر `دالةٌ` و`استدعاءٌ`.
 
-`.adg.json` is the equivalent low-level typed AST that the compiler builds from the Arabic
-source. It stays available for tooling that emits or inspects the AST directly, but it is not
-the language you author by hand.
+أما `.adg.json` فهو الشجرة المجردة المنمَّطة منخفضة المستوى المكافئة التي يبنيها المترجم من المصدر العربي؛ تبقى متاحة للأدوات التي تولِّد الشجرة أو تفحصها مباشرةً، لكنها ليست اللغة التي تُكتب باليد.
 
-Minimal app project:
+أدنى بنية لمشروع تطبيق:
 
 ```text
 examples\apps\hello-adg
   adg.project.json
-  src\main.adg          # canonical Arabic-inflected source (entrypoint)
-  src\main.adg.json     # equivalent low-level typed AST
+  src\main.adg          # المصدر العربي المعرَب القانوني (نقطة الدخول)
+  src\main.adg.json     # الشجرة المجردة المكافئة منخفضة المستوى
   scripts\verify.ps1
   scripts\build.ps1
   scripts\run.ps1
 ```
 
-Function demo:
+نموذج دالة:
 
 ```text
 examples\apps\hello-adg\src\abu-al-aswad-wikipedia-intro.adg
 ```
 
-## Current Rule Layers
+## طبقات القواعد الحالية
 
-ADG-Lang separates historical attribution from modern compiler design:
+يفصل ADG-Lang بين النسبة التاريخية وتصميم المترجم الحديث:
 
-1. **Textual core:** transmitted definitions such as `Ism`, `Fi'l`, and `Harf`.
-2. **Attributed chapters:** Fa'il, Maf'ul, Idafa, case/operator chapters, and exclamation.
-3. **Notation layer:** early dot/diacritic metadata.
-4. **Operational inference:** parser-safe rules derived from the attributed core.
-5. **Historical guardrails:** what must not be back-projected into Abu al-Aswad's work.
+1. **النواة النصية:** التعريفات المنقولة مثل `Ism` و`Fi'l` و`Harf`.
+2. **الأبواب المنسوبة:** الفاعل، والمفعول، والإضافة، وأبواب الإعراب والعوامل، والتعجب.
+3. **طبقة التدوين:** بيانات النقط والتشكيل المبكرة.
+4. **الاستدلال التشغيلي:** قواعد آمنة للمحلِّل مشتقة من النواة المنسوبة.
+5. **الضوابط التاريخية:** ما لا يجوز إسقاطه على عمل أبي الأسود.
 
-## Development Status
+## حالة التطوير
 
-ADG-Lang Native Proof v0.1 passed the release verification audit:
+اجتاز ADG-Lang Native Proof v0.1 تدقيق التحقق من الإصدار:
 
 ```text
 Total checks: 59
@@ -158,4 +157,8 @@ Failed: 0
 Result: PASS
 ```
 
-The public repository is now prepared for community review of the rule table, examples, diagnostics, and future implementation tracks.
+والمستودع العمومي مهيَّأ الآن لمراجعة المجتمع لجدول القواعد والأمثلة والتشخيصات ومسارات التنفيذ القادمة.
+
+---
+
+*English: ADG-Lang is a type-safe Arabic grammatical language inspired by the grammar core attributed to Abū al-Aswad al-Duʾalī. This landing page is authored in Arabic by design; English-speaking contributors can start from the documents under `docs\` and from the adjudication studio (ADS) sources under `tools\msa-adjudication-workbench`.*

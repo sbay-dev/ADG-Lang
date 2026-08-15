@@ -4,6 +4,13 @@
 designed for experienced Arabic teachers who should not need GitHub, JSON, or
 command-line knowledge.
 
+The reviewer interface uses an accessible, GitHub-flavored design with
+right-to-left Arabic, light and dark themes, and professional official-register
+copy, while keeping the flow simple enough to finish in one pass. For a
+plain-language public disclosure of how the platform works, what data it
+collects, how it is protected, and its claim boundaries, see
+[`TRANSPARENCY.md`](TRANSPARENCY.md).
+
 The previous `ads.sbay.sa` address redirects to the canonical domain so old
 invitations remain usable. The public page includes ready-made WhatsApp and
 X/Twitter invitation actions.
@@ -12,15 +19,17 @@ X/Twitter invitation actions.
 
 1. Read the Arabic criteria and parser summary.
 2. Record private contact details and consent.
-3. Register a discoverable Passkey; no organization account or password is
+3. Verify the email address with a one-time code sent to the reviewer's inbox
+   before continuing.
+4. Register a discoverable Passkey; no organization account or password is
    required for an external adjudicator.
-4. Read the worked example, then use the assigned independent role:
+5. Read the worked example, then use the assigned independent role:
    annotator A, annotator B, primary adjudicator J1, or ratifier J2.
-5. Load the built-in pilot or an organizer packet.
-6. Complete the guided linguistic decisions. Encrypted drafts are saved
+6. Load the built-in pilot or an organizer packet.
+7. Complete the guided linguistic decisions. Encrypted drafts are saved
    manually and after edits so the adjudicator can return later.
-7. Save a local anonymized copy or submit through the protected API.
-8. After submitting, inspect pseudonymous prior results, discuss bound
+8. Save a local anonymized copy or submit through the protected API.
+9. After submitting, inspect pseudonymous prior results, discuss bound
    evidence, follow the consensus state, and appeal a provisional result
    within its 14-day window.
 
@@ -79,7 +88,7 @@ organization member has authoritative Global Administrator proof.
   window expires.
 - PADT/PUD-derived packets and unknown analysis fields are rejected.
 
-See `CONSENSUS-PROTOCOL.md`, `PRIVACY.md`, `SECURITY.md`, and `DEPLOYMENT.md`.
+See `TRANSPARENCY.md`, `CONSENSUS-PROTOCOL.md`, `PRIVACY.md`, `SECURITY.md`, and `DEPLOYMENT.md`.
 
 ## Local development
 
