@@ -133,6 +133,9 @@ async function renderSubmission(envelope, metadata) {
     `| الحزمة / Packet | \`${escapePublicText(metadata.packetId)}\` |`,
     `| الاسم المستعار / Pseudonym | \`${escapePublicText(envelope.participantPseudonym)}\` |`,
     `| وقت الاستلام / Received at | \`${escapePublicText(envelope.receivedAtUtc)}\` |`,
+    `| نمط الإرسال / Submission mode | \`${escapePublicText(
+      envelope.submissionMode || "consensus-evidence"
+    )}\` |`,
     `| نوع الأثر / Artifact kind | \`${escapePublicText(envelope.artifactType)}\` |`,
     `| بصمة الأثر / Artifact SHA-256 | \`${escapePublicText(envelope.artifactSha256)}\` |`,
     "",

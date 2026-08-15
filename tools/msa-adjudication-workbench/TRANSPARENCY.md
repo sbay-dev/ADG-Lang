@@ -143,6 +143,9 @@
   الفقد إذا تعطّل Cloudflare D1 وحاوية `CPOLY` معًا في الوقت نفسه.
 - الحزمة التجريبية المؤلَّفة مرئيةٌ للمطوّرين وتصلح لاختبار سهولة الاستخدام،
   لكنّها **لا** تُثبت جاهزية المحلّل النهائية ولا تفي بأبواب الحسم المختومة.
+- وضع `operational-test` مسارٌ تشغيلي مُساعَد يختبر الإرسال إلى المستودع
+  ويُنشر بتعهّدات صريحة: الاستقلال «لا»، والتعمية «لا»، والأصالة «نعم».
+  ولا يشغل هذا المسار أدوار A أو B أو J1 أو J2، ولا يدخل آلة الإجماع.
 - هذه المنصّة حالةُ استخدامٍ بحثيةٌ للتحكيم، وليست خدمة تصحيحٍ لغويٍّ نهائية.
 
 ## 11. التحقّق وإعادة الإنتاج
@@ -218,8 +221,10 @@ adjudication portal at **https://adg.sbay.sa** (source under
 - **Claim boundaries.** The encrypted journal plus periodic KV backup support
   accepted-write recovery and point-in-time rebuild, but do **not** promise
   zero loss under simultaneous D1 and container failure. The developer-visible
-  pilot cannot establish final parser readiness. This is a research
-  adjudication use case, not a final proofreading service.
+  pilot cannot establish final parser readiness. The `operational-test` lane
+  is explicitly assisted (`Independent: No`, `Blind: No`, `Authentic: Yes`)
+  and never occupies a consensus role. This is a research adjudication use
+  case, not a final proofreading service.
 - **Reproduce.** From a clean clone, inside `tools/msa-adjudication-workbench`:
   `npm ci`, `npm run check`, `npm test`. Release integrity is bound by
   `release/portal-15.0.0.json` (canonical LF SHA-256 root), regenerated with
