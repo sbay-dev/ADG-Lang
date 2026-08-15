@@ -14,7 +14,7 @@
   "integrity": {
     "algorithm": "SHA-256 canonical file-list root",
     "fileCount": 172,
-    "releaseRoot": "5d190593caa8de800462c3df0b64499765928d6d1d6949c5be47c62aefd0266e"
+    "releaseRoot": "1442c852e79554ed6154c6923cb9e0b091e898300d9c6772e6af4a79f5d8dc42"
   },
   "exclusions": [
     "release/ (self-referential generated output)",
@@ -150,8 +150,8 @@
     },
     {
       "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/cloudflare/README.md",
-      "bytes": 3014,
-      "sha256": "524e29f226c024dd6c0da6f691487b5bc48fbcb0c049ab20e2fd23222b8d0761"
+      "bytes": 3015,
+      "sha256": "7fbd2cd1657e9160229184a087ead3af9d98ac3f6f2e39625d65700a8840fc15"
     },
     {
       "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/cloudflare/bridge/server.mjs",
@@ -306,7 +306,7 @@
     {
       "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/integrity.sha256",
       "bytes": 9731,
-      "sha256": "7dd09b1fe25407e010f52e19579c154ba1f3109b3aa82d570e330bb2cd0b2773"
+      "sha256": "b0a9508d2ac169aa3c7ab679631c18ef9b95bb09f31dd70335baf03256179e97"
     },
     {
       "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/kubernetes/CPOLY-WORKBENCH-PATH.md",
@@ -885,8 +885,8 @@
     },
     {
       "path": "tools/msa-adjudication-workbench/wrangler.example.jsonc",
-      "bytes": 4690,
-      "sha256": "95497948df313616c4f01682296ed216efd721d93c55575da1f77cd267a41af8"
+      "bytes": 4693,
+      "sha256": "fd8b40df9eb8d7d038a561d55f783710498fc45c27004d6ec1c18b43cf407399"
     }
   ]
 }
