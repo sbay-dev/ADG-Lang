@@ -336,16 +336,18 @@ npm run postgres:migrate:d1-export -- --source .\path\to\wrangler-d1-export.sql 
 ```
 
 `npm run postgres:schema` applies every numbered `postgres\*.sql` migration in
-order and is idempotent. The migration CLI defaults to dry-run, imports each source
-application table in its own transaction when `--apply` is present, preserves
-source column names/types/values for tables shared with the v15 schema, uses
-parameterized inserts with `ON CONFLICT DO NOTHING` replay protection where the
-source table has a primary key or unique index, skips the D1-only CPOLY
-recovery tables, and emits only JSON count/hash reports. It stages the Wrangler
-export in a project-local plaintext SQLite file under `.migration-work\`,
-deletes that staging file on ordinary success/failure paths, never deletes the
-source `.sql` export, and never logs row contents or secrets. If the process is
-force-killed, remove any leftover
+order and is idempotent. The Cloudflare Container startup runs the same
+checksum-guarded numbered migration set before opening the runtime bridge on
+both new and existing PostgreSQL disks. The migration CLI defaults to dry-run,
+imports each source application table in its own transaction when `--apply` is
+present, preserves source column names/types/values for tables shared with the
+v15 schema, uses parameterized inserts with `ON CONFLICT DO NOTHING` replay
+protection where the source table has a primary key or unique index, skips the
+D1-only CPOLY recovery tables, and emits only JSON count/hash reports. It stages
+the Wrangler export in a project-local plaintext SQLite file under
+`.migration-work\`, deletes that staging file on ordinary success/failure
+paths, never deletes the source `.sql` export, and never logs row contents or
+secrets. If the process is force-killed, remove any leftover
 `.migration-work\*.sqlite` file manually before sharing the working tree.
 
 Do not remove D1 or Azure rollback bindings until import, receipt, export,
@@ -354,7 +356,7 @@ provider image plus any chosen Hyperdrive rollback binding.
 
 ## Release integrity
 
-`release\portal-15.1.0.json` binds the sanitized portal, importer, workflows,
+`release\portal-15.1.1.json` binds the sanitized portal, importer, workflows,
 tests, and documentation with canonical LF-normalized SHA-256 records. Regenerate
 it deterministically from a clean clone with:
 
