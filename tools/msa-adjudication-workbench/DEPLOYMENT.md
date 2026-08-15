@@ -146,6 +146,12 @@ Required secrets:
 `CPOLY_BACKUP_MASTER_KEY` is the dedicated D1 write-journal recovery key. Do
 **not** reuse `ENTITYCRYPT_MASTER_KEY` or any mail/HMAC secret for it.
 
+The Cloudflare Container entrypoint applies every numbered PostgreSQL
+migration before starting the runtime bridge on both fresh and existing
+durable disks. Already-recorded migrations are checksum-verified and skipped;
+a changed checksum or failed new migration stops startup instead of serving
+against a partial schema.
+
 Optional non-secret bounds:
 
 - `CPOLY_BACKUP_RETENTION_HOURS`

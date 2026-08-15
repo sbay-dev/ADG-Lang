@@ -191,8 +191,9 @@ main() {
   if [ "$new_cluster" = "true" ]; then
     POSTGRES_USER=postgres \
     /bin/sh /docker-entrypoint-initdb.d/10-bootstrap-roles.sh
-    apply_migrations
   fi
+
+  apply_migrations
 
   export PGHOST=/var/run/postgresql
   export PGDATABASE=adg_adjudication

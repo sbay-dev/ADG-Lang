@@ -332,7 +332,7 @@ test("container helper exposes only expected env keys and path allowlist", () =>
   assert.equal(cpolyPostgresProviderPathAllowed("/api/config"), false);
 });
 
-test("Cloudflare entrypoint recreates volatile runtime directories before dropping privileges", () => {
+test("Cloudflare entrypoint recreates runtime directories and migrates every boot", () => {
   const dockerfile = readFileSync(
     "infrastructure/cpoly-postgres/cloudflare/Dockerfile",
     "utf8"
@@ -348,6 +348,14 @@ test("Cloudflare entrypoint recreates volatile runtime directories before droppi
   assert.match(entrypoint, /\/run\/cpoly\/secrets/u);
   assert.match(entrypoint, /\/run\/secrets\/roles/u);
   assert.match(entrypoint, /exec gosu postgres "\$0" "\$@"/u);
+  const mainBody = entrypoint.match(/main\(\) \{(?<body>[\s\S]*?)\n\}/u)
+    ?.groups?.body;
+  assert.ok(mainBody);
+  assert.match(
+    mainBody,
+    /if \[ "\$new_cluster" = "true" \]; then[\s\S]*?\n  fi\s*\n\s*apply_migrations\s*\n\s*export PGHOST/u
+  );
+  assert.equal(mainBody.match(/\bapply_migrations\b/gu)?.length, 1);
 });
 
 test("dynamic traffic is gated while the CPOLY PostgreSQL container is not ready", async () => {

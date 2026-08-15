@@ -184,7 +184,7 @@ npm run check
 npm test
 ```
 
-تُثبِّت `release/portal-15.1.0.json` سلامةَ الأصول عبر جذر `SHA-256` قانونيٍّ
+تُثبِّت `release/portal-15.1.1.json` سلامةَ الأصول عبر جذر `SHA-256` قانونيٍّ
 مُطبَّعٍ بنهايات أسطر `LF`. يُعاد توليده حتميًّا بالأمر:
 
 ```powershell
@@ -259,6 +259,6 @@ adjudication portal at **https://adg.sbay.sa** (source under
   case, not a final proofreading service.
 - **Reproduce.** From a clean clone, inside `tools/msa-adjudication-workbench`:
   `npm ci`, `npm run check`, `npm test`. Release integrity is bound by
-  `release/portal-15.1.0.json` (canonical LF SHA-256 root), regenerated with
+  `release/portal-15.1.1.json` (canonical LF SHA-256 root), regenerated with
   `npm run release:manifest` and enforced by the GitHub Actions security
   workflow.
