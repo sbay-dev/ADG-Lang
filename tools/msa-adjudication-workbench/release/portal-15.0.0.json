@@ -13,8 +13,8 @@
   },
   "integrity": {
     "algorithm": "SHA-256 canonical file-list root",
-    "fileCount": 172,
-    "releaseRoot": "1442c852e79554ed6154c6923cb9e0b091e898300d9c6772e6af4a79f5d8dc42"
+    "fileCount": 174,
+    "releaseRoot": "7bb19be1b26ba714aff3e168496cb18b9d3bcccbf474d74b3f245330f254390a"
   },
   "exclusions": [
     "release/ (self-referential generated output)",
@@ -50,8 +50,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 5850,
-      "sha256": "f49174714af0f3861bfb2ec45900e624774df2bed640f3366c3a3d3d992fffa7"
+      "bytes": 10401,
+      "sha256": "4b1e39cb8265ae18eb843a9ddba64bc0bfeb7ace817d22f6de915f25e77e954a"
     },
     {
       "path": "SECURITY.md",
@@ -120,13 +120,18 @@
     },
     {
       "path": "tools/msa-adjudication-workbench/README.md",
-      "bytes": 16988,
-      "sha256": "8637792c9a53a1412af20365ac885e9c3b10f878c07994325f7f1007e3b946f7"
+      "bytes": 17503,
+      "sha256": "46a6796a7fb10a1caa9753ab9e9cf253878105465e8be02843e82bbe949f7477"
     },
     {
       "path": "tools/msa-adjudication-workbench/SECURITY.md",
       "bytes": 2572,
       "sha256": "423314c51e3b314e375882672ba10ce5d42bb79549fee81d2ffbaee33b9b619f"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/TRANSPARENCY.md",
+      "bytes": 16626,
+      "sha256": "bd99aa343c63289661651b7d86071c6d67829f3bc0572f223ba67a905115d9a1"
     },
     {
       "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/.gitattributes",
@@ -665,8 +670,8 @@
     },
     {
       "path": "tools/msa-adjudication-workbench/package.json",
-      "bytes": 1724,
-      "sha256": "4143d02c39688cda1205ada97ac8b9d92cd0b96b0c4ea36a475ebd51ba9ee13d"
+      "bytes": 1756,
+      "sha256": "3de30c591d7f6ce7000857aeec34eae2ea9e145beab9c1d507ebaad6773fc806"
     },
     {
       "path": "tools/msa-adjudication-workbench/postgres/0001_portal_v15.sql",
@@ -695,8 +700,8 @@
     },
     {
       "path": "tools/msa-adjudication-workbench/public/admin/admin.css",
-      "bytes": 5759,
-      "sha256": "72e8b8597437ea668f3c229065249581140757d9a16dcfd67e04178331ad70df"
+      "bytes": 7832,
+      "sha256": "bd9ccb8b9795f96ed71b6da29de156f9596bd55f38b075d5e2f8a3596353a03f"
     },
     {
       "path": "tools/msa-adjudication-workbench/public/admin/admin.js",
@@ -705,13 +710,13 @@
     },
     {
       "path": "tools/msa-adjudication-workbench/public/admin/index.html",
-      "bytes": 7085,
-      "sha256": "a7dc0994674be73a1813af7d84c06586d21924f1830f730ecebb6e53b2793af5"
+      "bytes": 9384,
+      "sha256": "e881a8fa99b04a432d46c16ef8df3fa44e669943b0bf6d9cfb5f646bda1e7a79"
     },
     {
       "path": "tools/msa-adjudication-workbench/public/app.js",
-      "bytes": 95292,
-      "sha256": "8d43a1d7113e32a582ad52edab969bfab7fc1715d40ad40946bf1b11beb821bb"
+      "bytes": 95316,
+      "sha256": "845df61b3bb42efa3053cbce53de0fbc0250a22c168824566f103c8ba5f4640d"
     },
     {
       "path": "tools/msa-adjudication-workbench/public/data/pilot-packet.json",
@@ -720,8 +725,8 @@
     },
     {
       "path": "tools/msa-adjudication-workbench/public/index.html",
-      "bytes": 45491,
-      "sha256": "3c91b7c92fd37a140589c0eb622c4fba9ef6acad8269c8c10426845fed5857d3"
+      "bytes": 48427,
+      "sha256": "704d3fede059731448632bf55c0cdd8c116e757f32b2fb5a281a6fc023b11e76"
     },
     {
       "path": "tools/msa-adjudication-workbench/public/protocol.js",
@@ -730,8 +735,13 @@
     },
     {
       "path": "tools/msa-adjudication-workbench/public/styles.css",
-      "bytes": 26272,
-      "sha256": "aaf7ca004b38574bfa10a570916dd7c224040da8b1a01912a1462f7717044513"
+      "bytes": 43638,
+      "sha256": "c5b3d3112fc7b5b4cc5936b300bf073d93db7ea45031e0e4ea64f1530f257cf7"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/public/theme.js",
+      "bytes": 2153,
+      "sha256": "5e3788cc16fb395510061f03f18e359fb52345fa128fc15258c42499c6e6c9fb"
     },
     {
       "path": "tools/msa-adjudication-workbench/scripts/apply-postgres-schema.mjs",
