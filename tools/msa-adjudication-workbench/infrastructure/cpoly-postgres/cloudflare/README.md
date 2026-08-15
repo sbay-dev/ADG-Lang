@@ -58,7 +58,7 @@ approves a new environment.
 
 ## Backup/lifecycle
 
-The Worker cron invokes the provider backup trigger every six hours. The
+The Worker cron invokes the provider backup trigger every 15 minutes. The
 container also performs a bounded backup on SIGTERM before stopping. PGDATA is
 ephemeral; only a completed KV backup plus D1 descriptor/journal/gate state is
 durable recovery evidence.

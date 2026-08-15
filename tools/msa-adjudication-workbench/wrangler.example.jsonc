@@ -83,7 +83,7 @@
     }
   ],
   "triggers": {
-    "crons": ["* * * * *"]
+    "crons": ["*/15 * * * *"]
   },
   "vars": {
     "ALLOWED_ORIGIN": "https://adg.sbay.sa",
