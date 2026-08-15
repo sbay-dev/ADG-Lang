@@ -68,7 +68,7 @@ export function escapePublicText(value) {
 
 function escapeTableCell(value) {
   return displayValue(value)
-    .replace(/\|/g, "\\|")
+    .replace(/\|/g, "&#124;")
     .replace(/\r?\n/g, "<br>");
 }
 

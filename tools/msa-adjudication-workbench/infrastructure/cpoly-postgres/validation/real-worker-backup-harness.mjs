@@ -236,10 +236,9 @@ const server = createServer(async (incoming, outgoing) => {
     const responseBody = Buffer.from(await response.arrayBuffer());
     outgoing.setHeader("content-length", String(responseBody.length));
     outgoing.end(responseBody);
-  } catch (error) {
+  } catch {
     const body = Buffer.from(JSON.stringify({
-      message: "Harness request failed.",
-      detail: String(error?.message || error)
+      message: "Harness request failed."
     }));
     outgoing.statusCode = 500;
     outgoing.setHeader("content-type", "application/json");

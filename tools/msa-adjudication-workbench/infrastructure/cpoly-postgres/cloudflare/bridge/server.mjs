@@ -538,10 +538,12 @@ function requireSchema(body, schema) {
 }
 
 function authorized(request) {
-  const match = /^Bearer\s+(.+)$/iu.exec(
-    String(request.headers.authorization || "").trim()
-  );
-  return Boolean(match && constantTimeEqual(match[1], token));
+  const authorization = String(request.headers.authorization || "");
+  if (authorization.length <= 7
+      || authorization.slice(0, 7).toLowerCase() !== "bearer ") {
+    return false;
+  }
+  return constantTimeEqual(authorization.slice(7), token);
 }
 
 function constantTimeEqual(left, right) {

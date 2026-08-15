@@ -14,7 +14,7 @@
   "integrity": {
     "algorithm": "SHA-256 canonical file-list root",
     "fileCount": 172,
-    "releaseRoot": "ce98e715e950e47e382dcf880c11b8d7f6c1f57df9a10d3990cce6b489f82467"
+    "releaseRoot": "d991cacd2e2c36cd0ccf949237ee86df02b7415f947447c8c5510ae5e1016d12"
   },
   "exclusions": [
     "release/ (self-referential generated output)",
@@ -95,8 +95,8 @@
     },
     {
       "path": "scripts/arabic-text/render-msa-github-evidence.mjs",
-      "bytes": 16441,
-      "sha256": "3b24d790d0a9f87374a1ff520de3b03fd2ab9da9bf8394a47fe15e85a6e10201"
+      "bytes": 16444,
+      "sha256": "06a6117ba1b3a2a30de59cd72bea657bfbfd7be03d0f86328172e59034671765"
     },
     {
       "path": "tools/msa-adjudication-workbench/.dev.vars.example",
@@ -155,8 +155,8 @@
     },
     {
       "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/cloudflare/bridge/server.mjs",
-      "bytes": 19018,
-      "sha256": "f250b32a6bf6e3b7b1ef33e15858e5a98c6d799d57f218af21c4b38e1a082790"
+      "bytes": 19101,
+      "sha256": "16e6f1eda921d1c6e265deec34e73ba5628ca5be8be9f1c126911ce21beede15"
     },
     {
       "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/cloudflare/contract/database-bridge.v1.json",
@@ -306,7 +306,7 @@
     {
       "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/integrity.sha256",
       "bytes": 9731,
-      "sha256": "b4e36dad5da074d0460e2d71ff72c641a43fa33f17443ae19630c163e4087e16"
+      "sha256": "7dd09b1fe25407e010f52e19579c154ba1f3109b3aa82d570e330bb2cd0b2773"
     },
     {
       "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/kubernetes/CPOLY-WORKBENCH-PATH.md",
@@ -575,8 +575,8 @@
     },
     {
       "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/validation/real-worker-backup-harness.mjs",
-      "bytes": 9852,
-      "sha256": "6df86175d62a927fa71b8bd6410b3af357ee64c1510e24678b566579697744c7"
+      "bytes": 9797,
+      "sha256": "49d0ea9fa6c8cf7f74469b5a45e134ffe34b7e25853b61ffe2ce21fdf8b65f85"
     },
     {
       "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/validation/smoke-cloudflare-container.ps1",
