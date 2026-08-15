@@ -57,7 +57,8 @@ class D1TestDatabase {
       "migrations/0006_cpoly_backup_contract.sql",
       "migrations/0007_cpoly_recovery_state.sql",
       "migrations/0008_cpoly_backup_metadata_hash.sql",
-      "migrations/0009_cpoly_backup_kv_lane.sql"
+      "migrations/0009_cpoly_backup_kv_lane.sql",
+      "migrations/0010_repository_task_catalog.sql"
     ]) {
       this.database.exec(readFileSync(path, "utf8"));
     }
@@ -529,7 +530,7 @@ test("Azure evidence outbox fallback still uploads public and identity blobs", a
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (input, init = {}) => {
     const url = String(input);
-    if (url.includes("login.microsoftonline.com")) {
+    if (new URL(url).hostname === "login.microsoftonline.com") {
       return Response.json({
         access_token: "azure-token",
         expires_in: 3600
@@ -752,4 +753,3 @@ function seedSubmissionEvidence(db, {
     Date.now()
   );
 }
-

@@ -6,8 +6,10 @@ on:
       - "tools/msa-adjudication-workbench/**"
       - "scripts/arabic-text/import-msa-portal-submission.mjs"
       - "scripts/arabic-text/render-msa-github-evidence.mjs"
+      - "human-evidence/tasks/**"
       - ".github/workflows/import-msa-adjudication.yml"
       - ".github/workflows/msa-adjudication-portal-security.yml"
+      - ".github/workflows/sync-msa-adjudication-tasks.yml"
   workflow_dispatch:
 
 permissions:

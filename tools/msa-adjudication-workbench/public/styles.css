@@ -1004,7 +1004,9 @@ input[type="radio"] {
 .account-card,
 .worked-example,
 .task-instructions,
+.task-inbox,
 .saved-drafts,
+.recovery-panel,
 .field-guide,
 .guide-card,
 .consent-box,
@@ -1355,6 +1357,111 @@ label small {
   padding: 1rem;
   background: var(--accent-subtle);
   border-color: var(--accent-emphasis);
+}
+
+.task-inbox {
+  margin-bottom: 1rem;
+  padding: 1rem;
+}
+
+.inbox-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.task-list {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0.9rem;
+}
+
+.task-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--canvas-subtle);
+}
+
+.task-card-main {
+  min-width: 0;
+}
+
+.task-card-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.3rem;
+}
+
+.task-card h5 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.task-card p,
+.task-card small {
+  display: block;
+  margin: 0;
+  color: var(--fg-muted);
+}
+
+.task-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.8rem;
+  margin-top: 0.55rem;
+  font-size: 0.8rem;
+}
+
+.task-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.55rem;
+  border: 1px solid var(--accent-emphasis);
+  border-radius: var(--radius-pill);
+  color: var(--accent-fg);
+  background: var(--accent-subtle);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.task-badge.waiting {
+  border-color: var(--attention-emphasis);
+  color: var(--attention-fg);
+  background: var(--attention-subtle);
+}
+
+.task-badge.complete {
+  border-color: var(--success-emphasis);
+  color: var(--success-fg);
+  background: var(--success-subtle);
+}
+
+.recovery-panel {
+  margin-top: 1rem;
+  padding: 0.9rem 1rem;
+  background: var(--canvas-subtle);
+}
+
+.recovery-panel summary {
+  cursor: pointer;
+  color: var(--fg-default);
+  font-weight: 600;
+}
+
+.recovery-panel[open] summary {
+  margin-bottom: 0.65rem;
+}
+
+.recovery-panel p {
+  color: var(--fg-muted);
 }
 
 .draft-list {
@@ -2025,6 +2132,10 @@ footer {
   }
 
   .role-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .task-card {
     grid-template-columns: 1fr;
   }
 

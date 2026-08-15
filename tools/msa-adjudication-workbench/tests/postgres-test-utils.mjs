@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { createServer } from "node:net";
 import path from "node:path";
 import postgres from "postgres";
@@ -8,7 +8,14 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, "..");
-const schemaPath = path.join(projectRoot, "postgres", "0001_portal_v15.sql");
+const schemaPaths = readdirSync(path.join(projectRoot, "postgres"), {
+  withFileTypes: true
+})
+  .filter(entry =>
+    entry.isFile() && /^\d+.*\.sql$/u.test(entry.name)
+  )
+  .map(entry => path.join(projectRoot, "postgres", entry.name))
+  .sort((left, right) => left.localeCompare(right, "en"));
 
 export const dockerAvailable = spawnSync("docker", ["--version"], {
   stdio: "ignore"
@@ -58,7 +65,9 @@ export async function createPostgresFixture(tag) {
 
   try {
     await waitForReadiness(connectionString);
-    await sql.unsafe(readFileSync(schemaPath, "utf8"));
+    for (const schemaPath of schemaPaths) {
+      await sql.unsafe(readFileSync(schemaPath, "utf8"));
+    }
   } catch (error) {
     await safeEnd(sql);
     stopContainer(containerName);

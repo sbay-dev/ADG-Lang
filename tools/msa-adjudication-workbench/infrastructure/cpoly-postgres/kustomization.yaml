@@ -32,6 +32,7 @@ configMapGenerator:
     namespace: adg-data-plane
     files:
       - 0001_portal_v15.sql=migrations/postgresql/0001_portal_v15.sql
+      - 0002_repository_task_catalog.sql=migrations/postgresql/0002_repository_task_catalog.sql
 generatorOptions:
   disableNameSuffixHash: true
   labels:

@@ -575,48 +575,29 @@
             <section class="step-panel" data-step="3" hidden>
               <div class="panel-heading">
                 <span>الخطوة الثالثة</span>
-                <h3>اختر دورك وحمّل حالة التقييم</h3>
+                <h3>اختر مهمة من قائمتك</h3>
                 <p>
-                  إن أرسل إليك المنسق اسم الدور أو ملفات محددة فاتبع
-                  تعليماته. للاختبار الأول اختر A وحمّل العينة
-                  التجريبية.
+                  تظهر هنا المهام المفتوحة لك أو المسندة إلى بريد حسابك.
+                  سيحمّل النظام الحزمة ويحدد الدور وينقل أدلة المراحل
+                  السابقة تلقائيًا.
                 </p>
               </div>
-              <fieldset class="role-grid">
-                <legend>الدور في هذه الجولة</legend>
-                <label class="choice-card">
-                  <input type="radio" name="role" value="A" checked>
-                  <strong>المعلّق المستقل A</strong>
-                  <span>
-                    ابدأ من النص وحده. الحرف A مجرد رمز لفصل نسختك
-                    عن نسخة معلّق مستقل آخر.
-                  </span>
-                </label>
-                <label class="choice-card">
-                  <input type="radio" name="role" value="B">
-                  <strong>المعلّق المستقل B</strong>
-                  <span>
-                    المهمة نفسها تمامًا، لكن لمن عيّنه المنسق بوصفه
-                    المعلّق الثاني. لا تطّلع على ملف A.
-                  </span>
-                </label>
-                <label class="choice-card">
-                  <input type="radio" name="role" value="adjudication">
-                  <strong>المحكّم الأول J1</strong>
-                  <span>
-                    لا تختره إلا إذا تسلمت الحزمة وملفي A وB؛ ستقارن
-                    القرارين وتكتب سبب الحسم عند الخلاف.
-                  </span>
-                </label>
-                <label class="choice-card">
-                  <input type="radio" name="role" value="ratification">
-                  <strong>المراجع المستقل J2</strong>
-                  <span>
-                    يراجع الجذر النهائي الذي أعده J1 ويوافق عليه أو
-                    يعترض أو يتنحى. لا يجوز أن يكون A أو B أو J1.
-                  </span>
-                </label>
-              </fieldset>
+
+              <section id="task-inbox" class="task-inbox">
+                <div class="subheading inbox-heading">
+                  <div>
+                    <h4>مهامي</h4>
+                    <p>
+                      تحمل شارة «جديدة» المهام التي لم تستلمها بعد.
+                    </p>
+                  </div>
+                  <button id="refresh-tasks"
+                          class="button secondary compact"
+                          type="button">تحديث القائمة</button>
+                </div>
+                <div id="task-list" class="task-list"></div>
+                <p id="task-inbox-status" class="status" role="status"></p>
+              </section>
 
               <div id="saved-drafts" class="saved-drafts" hidden>
                 <div class="subheading">
@@ -626,48 +607,73 @@
                 <div id="draft-list" class="draft-list"></div>
               </div>
 
-              <div class="task-instructions">
-                <strong>طريقة البدء</strong>
-                <ol>
-                  <li>اختر الدور الذي حدده لك منسق الجولة.</li>
-                  <li>
-                    اختر «تحميل العينة التجريبية» للتجربة، أو افتح
-                    ملف JSON الذي أرسله المنسق.
-                  </li>
-                  <li>
-                    تأكد من ظهور عدد الجمل والوحدات، ثم اضغط «التالي».
-                  </li>
-                </ol>
-              </div>
-              <div class="source-actions">
-                <button id="load-pilot" class="button primary" type="button">
-                  تحميل العينة التجريبية
-                </button>
+              <details class="recovery-panel">
+                <summary>استعادة نسخة محلية عند الطوارئ</summary>
+                <p>
+                  استخدم هذا الخيار فقط إذا سبق أن نزّلت نسخة من عملك
+                  أو تعذر ظهور المسودة. يقبل الملف الذي نزّلته المنصة
+                  ويستعيد القرارات اللغوية دون اعتماد تعهّداته القديمة.
+                </p>
                 <label class="file-button">
-                  حزمة يرسلها منسق التقييم
-                  <input id="packet-file" type="file"
+                  اختيار نسخة الاسترداد
+                  <input id="recovery-file" type="file"
                          accept=".json,application/json">
                 </label>
-              </div>
-              <div id="adjudication-files" class="form-grid" hidden>
-                <label>
-                  ملف المعلّق A
-                  <input id="annotation-a-file" type="file"
-                         accept=".json,application/json">
-                </label>
-                <label>
-                  ملف المعلّق B
-                  <input id="annotation-b-file" type="file"
-                         accept=".json,application/json">
-                </label>
-              </div>
-              <div id="ratification-files" class="form-grid" hidden>
-                <label>
-                  حزمة التحكيم الأولية من J1
-                  <input id="primary-adjudication-file" type="file"
-                         accept=".json,application/json">
-                </label>
-              </div>
+                <p id="recovery-status" class="status" role="status"></p>
+              </details>
+
+              <details id="manual-task-tools"
+                       class="recovery-panel technical-fallback" hidden>
+                <summary>أدوات الاختبار والتوافق القديمة</summary>
+                <fieldset class="role-grid">
+                  <legend>الدور في هذه الجولة</legend>
+                  <label class="choice-card">
+                    <input type="radio" name="role" value="A" checked>
+                    <strong>المعلّق المستقل A</strong>
+                  </label>
+                  <label class="choice-card">
+                    <input type="radio" name="role" value="B">
+                    <strong>المعلّق المستقل B</strong>
+                  </label>
+                  <label class="choice-card">
+                    <input type="radio" name="role" value="adjudication">
+                    <strong>المحكّم الأول J1</strong>
+                  </label>
+                  <label class="choice-card">
+                    <input type="radio" name="role" value="ratification">
+                    <strong>المراجع المستقل J2</strong>
+                  </label>
+                </fieldset>
+                <div class="source-actions">
+                  <button id="load-pilot" class="button primary" type="button">
+                    تحميل العينة التجريبية
+                  </button>
+                  <label class="file-button">
+                    حزمة JSON
+                    <input id="packet-file" type="file"
+                           accept=".json,application/json">
+                  </label>
+                </div>
+                <div id="adjudication-files" class="form-grid" hidden>
+                  <label>
+                    ملف المعلّق A
+                    <input id="annotation-a-file" type="file"
+                           accept=".json,application/json">
+                  </label>
+                  <label>
+                    ملف المعلّق B
+                    <input id="annotation-b-file" type="file"
+                           accept=".json,application/json">
+                  </label>
+                </div>
+                <div id="ratification-files" class="form-grid" hidden>
+                  <label>
+                    حزمة التحكيم الأولية من J1
+                    <input id="primary-adjudication-file" type="file"
+                           accept=".json,application/json">
+                  </label>
+                </div>
+              </details>
               <div id="packet-summary" class="case-summary" hidden></div>
             </section>
 

@@ -15,7 +15,33 @@ export class ConsensusConflict extends Error {
 }
 
 export async function ensureConsensusTask(db, packet, packetRoot, now) {
+  const registration = await prepareConsensusTaskRegistration(
+    db,
+    packet,
+    packetRoot,
+    now
+  );
+  await db.batch(registration.statements);
+  return assertConsensusTaskRegistration(db, packet, packetRoot);
+}
+
+export async function prepareConsensusTaskRegistration(
+  db,
+  packet,
+  packetRoot,
+  now
+) {
   const identity = taskVersionIdentity(packet, packetRoot);
+  const idBinding = await getConsensusTask(db, identity.id);
+  if (idBinding && !consensusTaskMatches(
+    idBinding,
+    identity,
+    packet.metricPolicy
+  )) {
+    throw new ConsensusConflict(
+      "Task identity is already bound to different versioned evidence."
+    );
+  }
   const packetBinding = await db.prepare(
     `SELECT id, packet_merkle_root
        FROM task_versions
@@ -47,70 +73,86 @@ export async function ensureConsensusTask(db, packet, packetRoot, now) {
     createdAt: now
   });
 
-  await db.batch([
-    db.prepare(
-      `INSERT OR IGNORE INTO task_versions
-        (id, task_id, task_version, packet_id, holdout_id,
-         packet_merkle_root, guideline_version, data_version,
-         protocol_version, metric_policy_json, state, state_version,
-         current_round, last_event_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', 0, 1, ?, ?, ?)`
-    ).bind(
-      identity.id,
-      identity.taskId,
-      identity.taskVersion,
-      identity.packetId,
-      identity.holdoutId,
-      identity.packetMerkleRoot,
-      identity.guidelineVersion,
-      identity.dataVersion,
-      identity.protocolVersion,
-      JSON.stringify(packet.metricPolicy),
-      initialEventId,
-      now,
-      now
-    ),
-    db.prepare(
-      `INSERT OR IGNORE INTO consensus_rounds
-        (id, task_version_id, round_number, status,
-         opened_at, deadline_at)
-       VALUES (?, ?, 1, 'open', ?, ?)`
-    ).bind(roundId, identity.id, now, now + ROUND_DEADLINE_MS),
-    db.prepare(
-      `INSERT OR IGNORE INTO consensus_events
-        (id, task_version_id, round_id, event_type, from_state,
-         to_state, reason_code, evidence_json, event_hash,
-         idempotency_key, created_at)
-       VALUES (?, ?, ?, 'task-opened', 'draft', 'open',
-               'task-version-registered', ?, ?, ?, ?)`
-    ).bind(
-      initialEventId,
-      identity.id,
-      roundId,
-      JSON.stringify(evidence),
-      eventHash,
-      initialEventId,
-      now
-    )
-  ]);
+  return {
+    identity,
+    statements: [
+      db.prepare(
+        `INSERT OR IGNORE INTO task_versions
+          (id, task_id, task_version, packet_id, holdout_id,
+           packet_merkle_root, guideline_version, data_version,
+           protocol_version, metric_policy_json, state, state_version,
+           current_round, last_event_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', 0, 1, ?, ?, ?)`
+      ).bind(
+        identity.id,
+        identity.taskId,
+        identity.taskVersion,
+        identity.packetId,
+        identity.holdoutId,
+        identity.packetMerkleRoot,
+        identity.guidelineVersion,
+        identity.dataVersion,
+        identity.protocolVersion,
+        JSON.stringify(packet.metricPolicy),
+        initialEventId,
+        now,
+        now
+      ),
+      db.prepare(
+        `INSERT OR IGNORE INTO consensus_rounds
+          (id, task_version_id, round_number, status,
+           opened_at, deadline_at)
+         VALUES (?, ?, 1, 'open', ?, ?)`
+      ).bind(roundId, identity.id, now, now + ROUND_DEADLINE_MS),
+      db.prepare(
+        `INSERT OR IGNORE INTO consensus_events
+          (id, task_version_id, round_id, event_type, from_state,
+           to_state, reason_code, evidence_json, event_hash,
+           idempotency_key, created_at)
+         VALUES (?, ?, ?, 'task-opened', 'draft', 'open',
+                 'task-version-registered', ?, ?, ?, ?)`
+      ).bind(
+        initialEventId,
+        identity.id,
+        roundId,
+        JSON.stringify(evidence),
+        eventHash,
+        initialEventId,
+        now
+      )
+    ]
+  };
+}
 
+export async function assertConsensusTaskRegistration(
+  db,
+  packet,
+  packetRoot
+) {
+  const identity = taskVersionIdentity(packet, packetRoot);
   const task = await getConsensusTask(db, identity.id);
-  if (!task
-      || task.task_id !== identity.taskId
-      || Number(task.task_version) !== identity.taskVersion
-      || task.packet_id !== identity.packetId
-      || task.holdout_id !== identity.holdoutId
-      || task.packet_merkle_root !== identity.packetMerkleRoot
-      || task.guideline_version !== identity.guidelineVersion
-      || task.data_version !== identity.dataVersion
-      || task.protocol_version !== identity.protocolVersion
-      || JSON.stringify(JSON.parse(task.metric_policy_json))
-        !== JSON.stringify(packet.metricPolicy)) {
+  if (!consensusTaskMatches(task, identity, packet.metricPolicy)) {
     throw new ConsensusConflict(
       "Task identity is already bound to different versioned evidence."
     );
   }
   return task;
+}
+
+function consensusTaskMatches(task, identity, metricPolicy) {
+  return Boolean(
+    task
+    && task.task_id === identity.taskId
+    && Number(task.task_version) === identity.taskVersion
+    && task.packet_id === identity.packetId
+    && task.holdout_id === identity.holdoutId
+    && task.packet_merkle_root === identity.packetMerkleRoot
+    && task.guideline_version === identity.guidelineVersion
+    && task.data_version === identity.dataVersion
+    && task.protocol_version === identity.protocolVersion
+    && JSON.stringify(JSON.parse(task.metric_policy_json))
+      === JSON.stringify(metricPolicy)
+  );
 }
 
 export async function getConsensusTask(db, taskVersionId) {

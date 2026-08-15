@@ -23,12 +23,17 @@ X/Twitter invitation actions.
    before continuing.
 4. Register a discoverable Passkey; no organization account or password is
    required for an external adjudicator.
-5. Read the worked example, then use the assigned independent role:
-   annotator A, annotator B, primary adjudicator J1, or ratifier J2.
-6. Load the built-in pilot or an organizer packet.
+5. Read the worked example, then open the authenticated task inbox.
+6. Claim an open task or an email-bound assignment. The portal fixes the role
+   and loads the repository packet automatically; J1 receives stored A/B
+   evidence and J2 receives the stored J1 package without exchanging files.
 7. Complete the guided linguistic decisions. Encrypted drafts are saved
-   manually and after edits so the adjudicator can return later.
-8. Save a local anonymized copy or submit through the protected API.
+   manually, before navigation, on page exit, and after edits. Changed server
+   drafts preserve the previous encrypted revision, while a same-browser
+   recovery copy protects work during a temporary network failure.
+8. Submit through the protected API. JSON files remain a hidden
+   disaster-recovery option for A, J1, and J2 rather than the ordinary reviewer
+   workflow; imported attestations are never trusted.
 9. After submitting, inspect pseudonymous prior results, discuss bound
    evidence, follow the consensus state, and appeal a provisional result
    within its 14-day window.
@@ -42,12 +47,33 @@ without claiming independent adjudication by opening:
 https://adg.sbay.sa/?mode=operational-test
 ```
 
-This lane is accepted only for a `pilotOnly`, developer-visible packet and an
-annotation role. It publishes `Independent: No`, `Blind: No`, and
-`Authentic: Yes`, uses the normal signed GitHub import queue, and renders a
-clearly labelled operational-test result. It does not create a consensus task,
-occupy A/B/J1/J2, alter the user's account, or change the existing encrypted
-draft key. Each account may run it once per pilot packet.
+The blind pilot packet is published under
+`human-evidence/tasks/*.task.json` with `lane: operational-test`. The ordinary
+task query excludes it; the URL above requests that lane explicitly. A
+CODEOWNERS-protected GitHub workflow validates the packet schema, prohibited
+fields, path, and Merkle root before sending a timestamped HMAC-signed catalog
+to the portal. The completed local annotation export is never committed.
+
+The lane publishes `Independent: No`, `Blind: No`, and `Authentic: Yes`, uses
+the normal signed GitHub evidence queue, and renders a clearly labelled result.
+Its claims are stored separately from consensus participation, so it does not
+occupy A/B/J1/J2 or change consensus state. Each account may run it once per
+pilot packet.
+
+### Repository task delivery
+
+- `human-evidence/tasks/` is the public packet source; packet identities are
+  immutable once bound to a Merkle root and first Git commit. Metadata and
+  routing are pinned too; only one-way withdrawal is permitted.
+- `.github/workflows/sync-msa-adjudication-tasks.yml` validates and signs the
+  repository-to-portal catalog. No reviewer email is stored in a task manifest.
+- Administrators may assign A/B/J1/J2 by verified email. The database stores a
+  one-way email fingerprint plus EntityCrypt ciphertext; public evidence never
+  receives the address.
+- Claiming is atomic. A single account cannot occupy two roles in the same
+  holdout family.
+- Once both A and B submit, disagreement is routed in the same round to J1
+  rather than silently opening a second independent round.
 
 The separate `/admin/` progress dashboard uses Microsoft Entra only. It is
 not part of participant registration and fails closed unless the signed-in
@@ -309,8 +335,8 @@ npm run postgres:migrate:d1-export -- --source .\path\to\wrangler-d1-export.sql
 npm run postgres:migrate:d1-export -- --source .\path\to\wrangler-d1-export.sql --apply
 ```
 
-`npm run postgres:schema` applies the checked-in `postgres\0001_portal_v15.sql`
-schema idempotently. The migration CLI defaults to dry-run, imports each source
+`npm run postgres:schema` applies every numbered `postgres\*.sql` migration in
+order and is idempotent. The migration CLI defaults to dry-run, imports each source
 application table in its own transaction when `--apply` is present, preserves
 source column names/types/values for tables shared with the v15 schema, uses
 parameterized inserts with `ON CONFLICT DO NOTHING` replay protection where the
@@ -328,7 +354,7 @@ provider image plus any chosen Hyperdrive rollback binding.
 
 ## Release integrity
 
-`release\portal-15.0.0.json` binds the sanitized portal, importer, workflows,
+`release\portal-15.1.0.json` binds the sanitized portal, importer, workflows,
 tests, and documentation with canonical LF-normalized SHA-256 records. Regenerate
 it deterministically from a clean clone with:
 

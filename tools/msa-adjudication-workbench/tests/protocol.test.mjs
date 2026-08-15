@@ -8,6 +8,7 @@ import {
   computePacketMerkleRoot,
   computeRatificationMerkleRoot,
   decisionNeedsResolution,
+  unpackPortalFile,
   validateAdjudicationBinding,
   validatePublicArtifactText,
   validateSubmissionBinding
@@ -41,6 +42,32 @@ test("browser annotation root matches the .NET contract", async () => {
     await computeAnnotationMerkleRoot(packet, annotation),
     "407cc841fc005089aa7abb57f4d8fe0a3b51050fbeea0d8db88326acfcc6262a"
   );
+});
+
+test("download wrapper is recognized as a recoverable annotation artifact", async () => {
+  const packet = await readJson(new URL(
+    "examples/arabic-text/msa-adjudication-pilot-v1/packet.json",
+    repositoryRoot
+  ));
+  const annotation = await readJson(new URL(
+    "examples/arabic-text/msa-adjudication-pilot-v1/"
+      + "annotation-a.synthetic.json",
+    repositoryRoot
+  ));
+  const recovered = unpackPortalFile({
+    participantId: "11111111-1111-4111-8111-111111111111",
+    exportedAtUtc: "2026-08-15T00:00:00.000Z",
+    artifact: {
+      schema: "adg-msa-portal-artifact-v1",
+      kind: "independent-annotation",
+      packet,
+      annotation
+    }
+  });
+  assert.equal(recovered.kind, "annotation-artifact");
+  assert.equal(recovered.packet.packetId, packet.packetId);
+  assert.equal(recovered.annotation.annotatorSlot, "A");
+  await validateSubmissionBinding(recovered.packet, recovered.annotation);
 });
 
 test("adjudication and J2 ratification bind the exact final root", async () => {
@@ -103,6 +130,19 @@ test("adjudication and J2 ratification bind the exact final root", async () => {
     await computeRatificationMerkleRoot(primaryArtifact, ratification),
     /^[a-f0-9]{64}$/
   );
+  const recovered = unpackPortalFile({
+    participantId: "44444444-4444-4444-8444-444444444444",
+    artifact: {
+      schema: "adg-msa-portal-artifact-v1",
+      kind: "ratification-package",
+      primaryArtifact,
+      ratification
+    }
+  });
+  assert.equal(recovered.kind, "ratification-artifact");
+  assert.equal(recovered.packet.packetId, packet.packetId);
+  assert.equal(recovered.primaryArtifact, primaryArtifact);
+  assert.equal(recovered.ratification, ratification);
 });
 
 test("consensus override requires resolution", () => {
