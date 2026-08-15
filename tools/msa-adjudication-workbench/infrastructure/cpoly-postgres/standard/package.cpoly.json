@@ -1,0 +1,46 @@
+{
+  "schema": "cpoly.package.standard.v1",
+  "id": "adg-msa-adjudication-postgres",
+  "name": "ADG MSA Adjudication PostgreSQL",
+  "category": "database",
+  "stateful": true,
+  "image": "postgres:16-bookworm@sha256:60f4761b9035e0b8d5218f701a8c3382f641bf12b1604822574cf5be3baeb537",
+  "transports": [
+    "postgresql-tcp-tls"
+  ],
+  "ports": [
+    5432
+  ],
+  "telemetry": [
+    "health",
+    "connections",
+    "wal",
+    "storage",
+    "backup",
+    "migration"
+  ],
+  "productionPlacement": {
+    "mode": "always-on-remote-host",
+    "localWorkstationAllowed": false,
+    "cloudflareContainerAllowed": false
+  },
+  "persistence": {
+    "mode": "named-volume",
+    "backupRequired": true,
+    "restoreRequired": true
+  },
+  "databaseAccess": {
+    "client": "cloudflare-hyperdrive",
+    "path": "direct-postgresql-wire-protocol",
+    "tlsMode": "verify-full",
+    "genericProviderProxyAllowed": false
+  },
+  "validation": {
+    "mode": "compose-and-policy",
+    "commands": [
+      "docker compose -f docker-compose.yml config --quiet",
+      "..\\validation\\validate.ps1"
+    ]
+  }
+}
+

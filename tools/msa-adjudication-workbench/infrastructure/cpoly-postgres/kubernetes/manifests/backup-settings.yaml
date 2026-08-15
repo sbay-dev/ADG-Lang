@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: adg-postgres-backup-settings
+  namespace: adg-data-plane
+  labels:
+    app.kubernetes.io/name: adg-cpoly-postgres
+    app.kubernetes.io/component: backup
+data:
+  ADG_BACKUP_CHUNK_BYTES: "524288"
+

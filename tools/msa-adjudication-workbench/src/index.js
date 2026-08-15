@@ -4,6 +4,67 @@ import {
   verifyAuthenticationResponse,
   verifyRegistrationResponse
 } from "@simplewebauthn/server";
+import {
+  computeAdjudicationMerkleRoot,
+  computeAnnotationMerkleRoot,
+  computePacketMerkleRoot,
+  computeRatificationMerkleRoot,
+  validateAdjudicationBinding,
+  validatePublicArtifactText,
+  validateRatificationBinding,
+  validateSubmissionBinding
+} from "../public/protocol.js";
+import {
+  APPEAL_WINDOW_MS,
+  CONSENSUS_POLICY_VERSION,
+  DEFAULT_METRIC_POLICY,
+  ROUND_DEADLINE_MS,
+  agreementPolicyPassed,
+  assertConsensusTransition,
+  computeIndependentAgreement,
+  consensusEventHash,
+  consensusRoundId,
+  countNovelPrimaryDecisions,
+  taskVersionIdentity
+} from "./consensus.js";
+import {
+  ConsensusConflict,
+  createReissuedRound,
+  ensureConsensusTask,
+  getConsensusTask,
+  getCurrentConsensusRound,
+  transitionConsensusTask
+} from "./consensus-store.js";
+import {
+  countDecisionDifferences,
+  notificationEmailContent,
+  validateDiscussionInput
+} from "./discussion.js";
+import {
+  EMAIL_CODE_TTL_MS,
+  EMAIL_MAX_ATTEMPTS,
+  EMAIL_MAX_SENDS_PER_ADDRESS_HOUR,
+  EMAIL_MAX_SENDS_PER_REQUESTER_HOUR,
+  EMAIL_RESEND_COOLDOWN_MS,
+  EMAIL_TOKEN_TTL_MS,
+  generateVerificationCode,
+  normalizeVerificationCode,
+  normalizeVerificationEmail,
+  verificationEmailContent
+} from "./email-verification.js";
+import {
+  CpolyAdgPostgresContainer,
+  fetchCpolyPostgresStatus,
+  processCpolyPostgresContainerMaintenance
+} from "./cpoly-postgres-container.js";
+import {
+  getCpolyRecoveryRuntime,
+  processCpolyRecoveryMaintenance,
+  routeCpolyBackupRequest
+} from "./cpoly-recovery.js";
+import { createRuntimeEnv } from "./database.js";
+
+export { CpolyAdgPostgresContainer };
 
 const JSON_HEADERS = {
   "content-type": "application/json; charset=utf-8",
@@ -19,6 +80,14 @@ const MAX_ACCOUNT_BODY_BYTES = 750000;
 const ADMIN_COOKIE_NAME = "adg_admin";
 const ADMIN_SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 const ADMIN_STATE_TTL_MS = 10 * 60 * 1000;
+const GRAPH_APP_SCOPE = "https://graph.microsoft.com/.default";
+const GRAPH_MAIL_TIMEOUT_MS = 15000;
+const JSON_OBJECT_CONTENT_TYPE = "application/json; charset=utf-8";
+const DEFAULT_D1_TIME_TRAVEL_RETENTION_DAYS = 30;
+const EVIDENCE_ARCHIVE_MODES = new Set(["d1", "r2", "azure"]);
+const REPOSITORY_EVIDENCE_CLAIM_WINDOW_MS = 10 * 60 * 1000;
+const REPOSITORY_EVIDENCE_CLAIM_HOLD_MS = 60 * 60 * 1000;
+const REPOSITORY_EVIDENCE_CLAIM_MAX_ITEMS = 50;
 const GLOBAL_ADMIN_ROLE_TEMPLATE_ID =
   "62e90394-69f5-4237-9190-012177145e10";
 
@@ -72,50 +141,78 @@ const FORBIDDEN_ANALYSIS_KEYS = new Set([
   "strictTag"
 ]);
 
-let azureTokenCache = null;
+const azureTokenCache = new Map();
 const secretCache = new Map();
 let entraMetadataCache = null;
 let entraJwksCache = null;
-let graphAppTokenCache = null;
+const graphAppTokenCache = new Map();
 const adminRoleCache = new Map();
 
 export default {
   async fetch(request, env) {
+    const runtimeEnv = createRuntimeEnv(env);
     const url = new URL(request.url);
     try {
-      const legacyRedirect = redirectLegacyOrigin(request, env, url);
+      const legacyRedirect = redirectLegacyOrigin(request, runtimeEnv, url);
       if (legacyRedirect) return legacyRedirect;
+
+      const cpolyBackupResponse = await routeCpolyBackupRequest(
+        request,
+        runtimeEnv,
+        url
+      );
+      if (cpolyBackupResponse) {
+        return cpolyBackupResponse;
+      }
+
+      await enforceRecoveryReady(runtimeEnv, url);
 
       if (url.pathname === "/api/config" && request.method === "GET") {
         return json({
           submissionEnabled:
-            String(env.SUBMISSION_ENABLED).toLowerCase() === "true",
-          maxSubmissionBytes: Number(env.MAX_SUBMISSION_BYTES || 900000),
-          turnstileSiteKey: env.TURNSTILE_SITE_KEY || null,
+            String(runtimeEnv.SUBMISSION_ENABLED).toLowerCase() === "true",
+          maxSubmissionBytes: Number(
+            runtimeEnv.MAX_SUBMISSION_BYTES || 900000
+          ),
+          turnstileSiteKey: runtimeEnv.TURNSTILE_SITE_KEY || null,
           repository:
-            env.GITHUB_REPOSITORY || "sbay-dev/ADG-Lang",
-          accountEnabled: Boolean(env.DB)
+            runtimeEnv.GITHUB_REPOSITORY || "sbay-dev/ADG-Lang",
+          accountEnabled: Boolean(runtimeEnv.DB),
+          emailVerificationEnabled: emailVerificationAvailable(runtimeEnv)
         });
       }
 
-      const adminResponse = await routeAdminRequest(request, env, url);
+      const adminResponse = await routeAdminRequest(
+        request,
+        runtimeEnv,
+        url
+      );
       if (adminResponse) {
         return adminResponse;
       }
 
       const accountResponse = await routeAccountRequest(
         request,
-        env,
+        runtimeEnv,
         url
       );
       if (accountResponse) {
         return accountResponse;
       }
 
+      if (url.pathname === "/api/repository/receipts"
+          && request.method === "POST") {
+        return await receiveRepositoryReceipt(request, runtimeEnv);
+      }
+      if (url.pathname === "/api/repository/evidence/claim"
+          && request.method === "POST") {
+        return await claimRepositoryEvidence(request, runtimeEnv);
+      }
+
       if (url.pathname === "/api/submissions"
           && request.method === "POST") {
-        enforceOrigin(request, env);
-        return await receiveSubmission(request, env);
+        enforceOrigin(request, runtimeEnv);
+        return await receiveSubmission(request, runtimeEnv);
       }
 
       if (url.pathname.startsWith("/api/")) {
@@ -126,7 +223,7 @@ export default {
         return Response.redirect(`${url.origin}/admin/`, 302);
       }
 
-      const asset = await env.ASSETS.fetch(request);
+      const asset = await runtimeEnv.ASSETS.fetch(request);
       return withSecurityHeaders(asset);
     } catch (error) {
       if (!(error instanceof PublicError && error.status < 500)) {
@@ -144,9 +241,84 @@ export default {
         },
         error instanceof PublicError ? error.status : 500
       );
+    } finally {
+      await runtimeEnv.__runtimeCleanup__?.();
     }
+  },
+
+  async scheduled(_controller, env, ctx) {
+    ctx.waitUntil((async () => {
+      const runtimeEnv = createRuntimeEnv(env);
+      try {
+        await runScheduledMaintenance(runtimeEnv);
+      } finally {
+        await runtimeEnv.__runtimeCleanup__?.();
+      }
+    })());
   }
 };
+
+async function runScheduledMaintenance(env) {
+  const recoveryRuntime = await getCpolyRecoveryRuntime(env);
+  let containerStatus = null;
+  if (env?.DB?.__isContainerPostgresD1Database) {
+    try {
+      containerStatus = await processCpolyPostgresContainerMaintenance(env, {
+        triggerBackup: recoveryRuntime.state !== "recovering"
+      });
+    } catch (error) {
+      console.error("CPOLY PostgreSQL container maintenance failed", {
+        name: error?.name,
+        message: error?.message
+      });
+      await processCpolyRecoveryMaintenance(env);
+      return;
+    }
+  }
+  if (recoveryRuntime.state === "recovering"
+      || (containerStatus && !containerStatus.ready)) {
+    await processCpolyRecoveryMaintenance(env);
+    return;
+  }
+  await Promise.all([
+    processCpolyRecoveryMaintenance(env),
+    processNotificationOutbox(env),
+    processGovernanceNotificationOutbox(env),
+    processEvidenceOutbox(env),
+    processExpiredConsensusRounds(env),
+    processPublishableTasks(env)
+  ]);
+  await processIdentityErasureRequests(env);
+}
+
+async function enforceRecoveryReady(env, url) {
+  if (!url.pathname.startsWith("/api/")
+      && !url.pathname.startsWith("/signin-microsoft")
+      && !url.pathname.startsWith("/api/admin/")) {
+    return;
+  }
+  const recoveryRuntime = await getCpolyRecoveryRuntime(env);
+  if (recoveryRuntime.state !== "recovering") {
+    if (!env?.DB?.__isContainerPostgresD1Database) {
+      return;
+    }
+    try {
+      const status = await fetchCpolyPostgresStatus(env);
+      if (!status || status.ready) {
+        return;
+      }
+    } catch (error) {
+      console.error("CPOLY PostgreSQL container readiness probe failed", {
+        name: error?.name,
+        message: error?.message
+      });
+    }
+  }
+  throw new PublicError(
+    "تجري الآن عملية استعادة موثقة. تعود الخدمات الديناميكية بعد اكتمال التحقق.",
+    503
+  );
+}
 
 async function routeAdminRequest(request, env, url) {
   if (!url.pathname.startsWith("/api/admin/")
@@ -178,6 +350,33 @@ async function routeAdminRequest(request, env, url) {
   if (url.pathname === "/api/admin/progress"
       && request.method === "GET") {
     return getAdminProgress(request, env);
+  }
+  if (url.pathname === "/api/admin/tasks/reissue"
+      && request.method === "POST") {
+    enforceExactOrigin(request, env);
+    return reissueConsensusTask(
+      request,
+      env,
+      await readJsonBody(request)
+    );
+  }
+  if (url.pathname === "/api/admin/appeals/review"
+      && request.method === "POST") {
+    enforceExactOrigin(request, env);
+    return reviewConsensusAppeal(
+      request,
+      env,
+      await readJsonBody(request)
+    );
+  }
+  if (url.pathname === "/api/admin/discussion/moderate"
+      && request.method === "POST") {
+    enforceExactOrigin(request, env);
+    return moderateDiscussionComment(
+      request,
+      env,
+      await readJsonBody(request)
+    );
   }
 
   return json({ message: "المسار الإداري غير موجود." }, 404);
@@ -400,7 +599,14 @@ async function logoutAdmin(request, env) {
 
 async function getAdminProgress(request, env) {
   const administrator = await findAdminSession(request, env, true);
-  const [usersResult, draftsResult, submissionsResult] =
+  const [
+    usersResult,
+    draftsResult,
+    submissionsResult,
+    tasksResult,
+    appealsResult,
+    commentsResult
+  ] =
     await Promise.all([
       env.DB.prepare(
         `SELECT id, profile_ciphertext, created_at
@@ -418,6 +624,39 @@ async function getAdminProgress(request, env) {
         `SELECT receipt_id, user_id, packet_id, role, submitted_at
            FROM submissions
           ORDER BY submitted_at DESC`
+      ).all(),
+      env.DB.prepare(
+        `SELECT id, packet_id, task_version, state, current_round,
+                repository_status, active_final_receipt_id,
+                appeal_deadline_at, github_issue_number, updated_at
+           FROM task_versions
+          ORDER BY updated_at DESC
+          LIMIT 100`
+      ).all(),
+      env.DB.prepare(
+        `SELECT a.id, a.task_version_id, a.final_receipt_id,
+                a.evidence, a.status, a.created_at,
+                tv.packet_id, tv.state
+           FROM appeals a
+           JOIN task_versions tv ON tv.id = a.task_version_id
+          ORDER BY a.created_at DESC
+          LIMIT 100`
+      ).all(),
+      env.DB.prepare(
+        `SELECT dc.comment_id, dc.packet_id,
+                dc.participant_pseudonym, dc.category, dc.body,
+                dc.created_at, dm.state AS moderation_state
+           FROM discussion_comments dc
+           LEFT JOIN discussion_moderation dm
+             ON dm.id = (
+               SELECT id
+                 FROM discussion_moderation
+                WHERE comment_id = dc.comment_id
+                ORDER BY created_at DESC
+                LIMIT 1
+             )
+          ORDER BY dc.created_at DESC
+          LIMIT 100`
       ).all()
     ]);
   const masterKey = await getVaultSecret(
@@ -480,14 +719,15 @@ async function getAdminProgress(request, env) {
       .map(item => item.submittedAtUtc || item.updatedAtUtc)
       .sort()
       .at(-1) ?? null;
+    const erased = profile.schema === "adg-erased-participant-v1";
     participants.push({
       userId: user.id,
-      fullName: profile.fullName,
-      email: profile.email,
-      socialAccounts: profile.socialAccounts ?? {},
-      specialization: profile.specialization,
-      affiliation: profile.affiliation,
-      experienceYears: profile.experienceYears,
+      fullName: erased ? "هوية ممحوة" : profile.fullName,
+      email: erased ? null : profile.email,
+      socialAccounts: erased ? {} : profile.socialAccounts ?? {},
+      specialization: erased ? null : profile.specialization,
+      affiliation: erased ? null : profile.affiliation,
+      experienceYears: erased ? null : profile.experienceYears,
       registeredAtUtc: new Date(user.created_at).toISOString(),
       lastActivityUtc: lastActivity,
       progressPercent: progress,
@@ -512,6 +752,15 @@ async function getAdminProgress(request, env) {
       (sum, item) => sum + item.progressPercent,
       0
     ) / participants.length);
+  await recordAdminAudit(
+    env.DB,
+    administrator.subject_hash,
+    "read-participant-progress",
+    true,
+    `Read ${participants.length} profiles, `
+      + `${tasksResult.results?.length || 0} tasks, and `
+      + `${appealsResult.results?.length || 0} appeals.`
+  );
   return json({
     generatedAtUtc: new Date().toISOString(),
     administrator: {
@@ -525,8 +774,266 @@ async function getAdminProgress(request, env) {
       notStarted: participants.length - active - completed,
       averageProgress
     },
-    participants
+    participants,
+    governance: {
+      tasks: (tasksResult.results || []).map(row => ({
+        taskVersionId: row.id,
+        packetId: row.packet_id,
+        taskVersion: Number(row.task_version),
+        state: row.state,
+        round: Number(row.current_round),
+        repositoryStatus: row.repository_status,
+        activeFinalReceiptId: row.active_final_receipt_id,
+        appealDeadlineAtUtc: row.appeal_deadline_at
+          ? new Date(row.appeal_deadline_at).toISOString()
+          : null,
+        githubIssueNumber: row.github_issue_number,
+        updatedAtUtc: new Date(row.updated_at).toISOString()
+      })),
+      appeals: (appealsResult.results || []).map(row => ({
+        id: row.id,
+        taskVersionId: row.task_version_id,
+        packetId: row.packet_id,
+        finalReceiptId: row.final_receipt_id,
+        evidence: row.evidence,
+        status: row.status,
+        taskState: row.state,
+        createdAtUtc: new Date(row.created_at).toISOString()
+      })),
+      comments: (commentsResult.results || []).map(row => ({
+        commentId: row.comment_id,
+        packetId: row.packet_id,
+        participantPseudonym: row.participant_pseudonym,
+        category: row.category,
+        body: row.body,
+        moderationState: row.moderation_state || "visible",
+        createdAtUtc: new Date(row.created_at).toISOString()
+      }))
+    }
   });
+}
+
+async function reissueConsensusTask(request, env, body) {
+  const administrator = await findAdminSession(request, env, true);
+  const taskVersionId = normalizedText(
+    body?.taskVersionId,
+    3,
+    200,
+    "معرف نسخة المهمة"
+  );
+  const reasons = new Set([
+    "missing-quorum-deadline",
+    "accepted-recusal",
+    "j2-disagreement",
+    "accepted-appeal",
+    "material-evidence-defect",
+    "low-independent-agreement",
+    "novel-primary-decision"
+  ]);
+  if (!reasons.has(body?.reason)) {
+    throw new PublicError("سبب إعادة الطرح غير معتمد.", 400);
+  }
+  const task = await getConsensusTask(env.DB, taskVersionId);
+  if (!task) throw new PublicError("نسخة المهمة غير موجودة.", 404);
+  let updated;
+  try {
+    updated = await createReissuedRound(
+      env.DB,
+      task,
+      body.reason,
+      { subjectHash: administrator.subject_hash }
+    );
+  } catch (error) {
+    if (error instanceof ConsensusConflict) {
+      throw new PublicError(error.message, 409);
+    }
+    throw error;
+  }
+  await ensureTaskStateEvidence(env, updated);
+  await queueGovernanceNotifications(
+    env,
+    updated.id,
+    "task-reissued",
+    {
+      taskVersionId: updated.id,
+      packetId: updated.packet_id,
+      reason: body.reason
+    },
+    `task-reissued:${updated.last_event_id}`
+  );
+  await recordAdminAudit(
+    env.DB,
+    administrator.subject_hash,
+    "reissue-consensus-task",
+    true,
+    `${taskVersionId}:${body.reason}`
+  );
+  return json({
+    reissued: true,
+    taskVersionId,
+    state: updated.state,
+    round: Number(updated.current_round)
+  });
+}
+
+async function reviewConsensusAppeal(request, env, body) {
+  const administrator = await findAdminSession(request, env, true);
+  const appealId = requiredId(body?.appealId, "معرف الاستئناف");
+  const decision = body?.decision;
+  if (!["accepted", "rejected"].includes(decision)) {
+    throw new PublicError("قرار الاستئناف غير صالح.", 400);
+  }
+  const reason = normalizedText(
+    body?.reason,
+    20,
+    4000,
+    "تعليل قرار الاستئناف"
+  );
+  const appeal = await env.DB.prepare(
+    `SELECT id, task_version_id, round_id, final_receipt_id,
+            appellant_user_id, status
+       FROM appeals
+      WHERE id = ?`
+  ).bind(appealId).first();
+  if (!appeal || appeal.status !== "pending") {
+    throw new PublicError("الاستئناف غير موجود أو سبق البت فيه.", 409);
+  }
+  let task = await getConsensusTask(env.DB, appeal.task_version_id);
+  if (!task || task.state !== "approved") {
+    throw new PublicError(
+      "لا يمكن البت في الاستئناف بعد مغادرة حالة الاعتماد المؤقت.",
+      409
+    );
+  }
+  const reviewed = await env.DB.prepare(
+    `UPDATE appeals
+        SET status = ?, reviewer_subject_hash = ?,
+            review_reason = ?, reviewed_at = ?
+      WHERE id = ? AND status = 'pending'`
+  ).bind(
+    decision,
+    administrator.subject_hash,
+    reason,
+    Date.now(),
+    appealId
+  ).run();
+  if (Number(reviewed.meta?.changes || 0) !== 1) {
+    throw new PublicError("تغيرت حالة الاستئناف بالتزامن.", 409);
+  }
+  if (decision === "accepted") {
+    await env.DB.prepare(
+      `UPDATE final_results
+          SET status = 'revoked', revoked_at = ?,
+              revocation_reason = ?
+        WHERE primary_receipt_id = ? AND status = 'active'`
+    ).bind(Date.now(), reason, appeal.final_receipt_id).run();
+    task = await transitionConsensusTask(env.DB, task, {
+      toState: "escalated",
+      roundId: appeal.round_id,
+      eventType: "approved-result-appealed",
+      reasonCode: "accepted-appeal",
+      evidence: { appealId, finalReceiptId: appeal.final_receipt_id },
+      actorSubjectHash: administrator.subject_hash,
+      clearActiveFinal: true,
+      idempotencyKey: `appeal-escalation:${appealId}`
+    });
+    await ensureTaskStateEvidence(env, task);
+    task = await createReissuedRound(
+      env.DB,
+      task,
+      "accepted-appeal",
+      { subjectHash: administrator.subject_hash }
+    );
+    await ensureTaskStateEvidence(env, task);
+    await queueGovernanceNotifications(
+      env,
+      task.id,
+      "result-revoked",
+      {
+        taskVersionId: task.id,
+        packetId: task.packet_id,
+        reason: "accepted-appeal"
+      },
+      `result-revoked:${appealId}`
+    );
+    await queueGovernanceNotifications(
+      env,
+      task.id,
+      "task-reissued",
+      {
+        taskVersionId: task.id,
+        packetId: task.packet_id,
+        reason: "accepted-appeal"
+      },
+      `task-reissued:${appealId}`
+    );
+  }
+  await queueGovernanceNotifications(
+    env,
+    task.id,
+    "appeal-decided",
+    {
+      taskVersionId: task.id,
+      packetId: task.packet_id,
+      reason: decision
+    },
+    `appeal-decided:${appealId}`
+  );
+  await recordAdminAudit(
+    env.DB,
+    administrator.subject_hash,
+    "review-consensus-appeal",
+    true,
+    `${appealId}:${decision}`
+  );
+  return json({
+    reviewed: true,
+    appealId,
+    decision,
+    state: task.state,
+    round: Number(task.current_round)
+  });
+}
+
+async function moderateDiscussionComment(request, env, body) {
+  const administrator = await findAdminSession(request, env, true);
+  const commentId = requiredId(body?.commentId, "معرف التعليق");
+  const state = body?.state;
+  if (!["hidden", "redacted", "blocked"].includes(state)) {
+    throw new PublicError("حالة الإشراف غير صالحة.", 400);
+  }
+  const reason = normalizedText(
+    body?.reason,
+    10,
+    1000,
+    "سبب الإشراف"
+  );
+  const comment = await env.DB.prepare(
+    `SELECT body FROM discussion_comments WHERE comment_id = ?`
+  ).bind(commentId).first();
+  if (!comment) throw new PublicError("التعليق غير موجود.", 404);
+  await env.DB.prepare(
+    `INSERT INTO discussion_moderation
+      (id, comment_id, state, reason, original_body_hash,
+       actor_subject_hash, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
+  ).bind(
+    crypto.randomUUID(),
+    commentId,
+    state,
+    reason,
+    await sha256Hex(comment.body),
+    administrator.subject_hash,
+    Date.now()
+  ).run();
+  await recordAdminAudit(
+    env.DB,
+    administrator.subject_hash,
+    "moderate-discussion-comment",
+    true,
+    `${commentId}:${state}`
+  );
+  return json({ moderated: true, commentId, state });
 }
 
 async function takeAdminState(state, env) {
@@ -782,52 +1289,30 @@ async function evaluateGlobalAdministratorWithGraph(objectId, env) {
 }
 
 async function getGraphAppToken(env) {
-  if (graphAppTokenCache?.expiresAt > Date.now()) {
-    return graphAppTokenCache.value;
-  }
   const clientSecret = await getVaultSecret(
     env.ENTRA_CLIENT_SECRET_NAME,
     env
   );
-  const response = await fetch(
-    `https://login.microsoftonline.com/${env.ENTRA_TENANT_ID}`
-      + "/oauth2/v2.0/token",
-    {
-      method: "POST",
-      headers: {
-        "content-type": "application/x-www-form-urlencoded"
-      },
-      body: new URLSearchParams({
-        client_id: env.ENTRA_CLIENT_ID,
-        client_secret: clientSecret,
-        scope: "https://graph.microsoft.com/.default",
-        grant_type: "client_credentials"
-      })
+  return getMicrosoftGraphClientToken({
+    tenantId: env.ENTRA_TENANT_ID,
+    clientId: env.ENTRA_CLIENT_ID,
+    clientSecret,
+    scope: GRAPH_APP_SCOPE,
+    cacheKey: `entra-admin:${String(env.ENTRA_TENANT_ID || "")}:`
+      + String(env.ENTRA_CLIENT_ID || ""),
+    label: "Microsoft Graph app token",
+    validateAccessToken(accessToken) {
+      const claims = decodeJwtJson(accessToken.split(".")[1] || "");
+      if (!signedRoleIds(claims.roles).includes(
+        "RoleManagement.Read.Directory"
+      )) {
+        throw new Error(
+          "Microsoft Graph RoleManagement.Read.Directory is missing."
+        );
+      }
+      return accessToken;
     }
-  );
-  if (!response.ok) {
-    throw new Error(
-      `Microsoft Graph app token returned ${response.status}.`
-    );
-  }
-  const result = await response.json();
-  if (typeof result.access_token !== "string") {
-    throw new Error("Microsoft Graph app token was not issued.");
-  }
-  const claims = decodeJwtJson(result.access_token.split(".")[1] || "");
-  if (!signedRoleIds(claims.roles).includes(
-    "RoleManagement.Read.Directory"
-  )) {
-    throw new Error(
-      "Microsoft Graph RoleManagement.Read.Directory is missing."
-    );
-  }
-  graphAppTokenCache = {
-    value: result.access_token,
-    expiresAt: Date.now()
-      + Math.max(60, Number(result.expires_in) - 300) * 1000
-  };
-  return graphAppTokenCache.value;
+  });
 }
 
 async function graphJson(path, accessToken) {
@@ -1040,7 +1525,11 @@ async function routeAccountRequest(request, env, url) {
   const path = url.pathname;
   if (!path.startsWith("/api/account")
       && path !== "/api/draft"
-      && path !== "/api/drafts") {
+      && path !== "/api/drafts"
+      && path !== "/api/results"
+      && path !== "/api/discussion/comments"
+      && path !== "/api/tasks/status"
+      && path !== "/api/consensus/appeals") {
     return null;
   }
   if (!env.DB) {
@@ -1051,6 +1540,23 @@ async function routeAccountRequest(request, env, url) {
       && request.method === "POST") {
     enforceOrigin(request, env);
     return beginRegistration(await readJsonBody(request), env);
+  }
+  if (path === "/api/account/email/send-code"
+      && request.method === "POST") {
+    enforceOrigin(request, env);
+    return sendEmailVerificationCode(
+      request,
+      env,
+      await readJsonBody(request)
+    );
+  }
+  if (path === "/api/account/email/verify-code"
+      && request.method === "POST") {
+    enforceOrigin(request, env);
+    return verifyEmailVerificationCode(
+      env,
+      await readJsonBody(request)
+    );
   }
   if (path === "/api/account/register/verify"
       && request.method === "POST") {
@@ -1070,10 +1576,28 @@ async function routeAccountRequest(request, env, url) {
   if (path === "/api/account" && request.method === "GET") {
     return getAccount(request, env);
   }
+  if (path === "/api/account/preferences"
+      && request.method === "PUT") {
+    enforceOrigin(request, env);
+    return updateAccountPreferences(
+      request,
+      env,
+      await readJsonBody(request)
+    );
+  }
   if (path === "/api/account/logout"
       && request.method === "POST") {
     enforceOrigin(request, env);
     return logout(request, env);
+  }
+  if (path === "/api/account/privacy/erasure"
+      && request.method === "POST") {
+    enforceExactOrigin(request, env);
+    return requestIdentityErasure(
+      request,
+      env,
+      await readJsonBody(request)
+    );
   }
   if (path === "/api/draft") {
     if (request.method === "GET") {
@@ -1095,13 +1619,346 @@ async function routeAccountRequest(request, env, url) {
   if (path === "/api/drafts" && request.method === "GET") {
     return listDrafts(request, env);
   }
+  if (path === "/api/results" && request.method === "GET") {
+    return getCompletedResults(request, env, url);
+  }
+  if (path === "/api/discussion/comments"
+      && request.method === "POST") {
+    enforceOrigin(request, env);
+    return createDiscussionComment(
+      request,
+      env,
+      await readJsonBody(request)
+    );
+  }
+  if (path === "/api/tasks/status" && request.method === "GET") {
+    return getTaskStatus(request, env, url);
+  }
+  if (path === "/api/consensus/appeals"
+      && request.method === "POST") {
+    enforceOrigin(request, env);
+    return createConsensusAppeal(
+      request,
+      env,
+      await readJsonBody(request)
+    );
+  }
 
   return json({ message: "المسار المطلوب غير موجود." }, 404);
+}
+
+function emailVerificationAvailable(env) {
+  return String(env.EMAIL_VERIFICATION_ENABLED).toLowerCase() === "true"
+    && Boolean(
+      env.DB
+      && mailTransportAvailable(env)
+      && secretCanBeResolved(env.EMAIL_VERIFICATION_HMAC_SECRET_NAME, env)
+    );
+}
+
+function requireEmailVerificationConfiguration(env) {
+  if (!emailVerificationAvailable(env)) {
+    throw new PublicError(
+      "خدمة توثيق البريد غير مهيأة حاليًا.",
+      503
+    );
+  }
+}
+
+function verifiedEmail(value) {
+  try {
+    return normalizeVerificationEmail(value);
+  } catch (error) {
+    throw new PublicError(error.message, 400);
+  }
+}
+
+function verifiedEmailCode(value) {
+  try {
+    return normalizeVerificationCode(value);
+  } catch (error) {
+    throw new PublicError(error.message, 400);
+  }
+}
+
+async function emailVerificationKey(env) {
+  requireEmailVerificationConfiguration(env);
+  return getVaultSecret(env.EMAIL_VERIFICATION_HMAC_SECRET_NAME, env);
+}
+
+async function sendEmailVerificationCode(request, env, body) {
+  const email = verifiedEmail(body?.email);
+  const secret = await emailVerificationKey(env);
+  const requester = request.headers.get("CF-Connecting-IP")
+    || request.headers.get("user-agent")
+    || "unknown";
+  const [emailHash, requestFingerprint] = await Promise.all([
+    hmacSha256(secret, `email-v1:${email}`),
+    hmacSha256(secret, `request-v1:${requester.slice(0, 200)}`)
+  ]);
+  const now = Date.now();
+  await pruneAuthRecords(env.DB, now);
+  const hourAgo = now - 60 * 60 * 1000;
+  const [addressRate, requesterRate] = await Promise.all([
+    env.DB.prepare(
+      `SELECT COUNT(*) AS recent_count, MAX(created_at) AS last_created
+         FROM email_verifications
+        WHERE email_hash = ? AND created_at >= ?`
+    ).bind(emailHash, hourAgo).first(),
+    env.DB.prepare(
+      `SELECT COUNT(*) AS recent_count
+         FROM email_verifications
+        WHERE request_fingerprint = ? AND created_at >= ?`
+    ).bind(requestFingerprint, hourAgo).first()
+  ]);
+  if (Number(addressRate?.recent_count || 0)
+        >= EMAIL_MAX_SENDS_PER_ADDRESS_HOUR
+      || Number(requesterRate?.recent_count || 0)
+        >= EMAIL_MAX_SENDS_PER_REQUESTER_HOUR) {
+    throw new PublicError(
+      "بلغت محاولات الإرسال الحد المؤقت. أعد المحاولة بعد ساعة.",
+      429
+    );
+  }
+  const lastCreated = Number(addressRate?.last_created || 0);
+  if (lastCreated && now - lastCreated < EMAIL_RESEND_COOLDOWN_MS) {
+    const remainingSeconds = Math.ceil(
+      (EMAIL_RESEND_COOLDOWN_MS - (now - lastCreated)) / 1000
+    );
+    throw new PublicError(
+      `انتظر ${remainingSeconds} ثانية قبل طلب رمز جديد.`,
+      429
+    );
+  }
+
+  const verificationId = crypto.randomUUID();
+  const code = generateVerificationCode();
+  const codeHash = await hmacSha256(
+    secret,
+    `code-v1:${verificationId}:${code}`
+  );
+  try {
+    const inserted = await env.DB.prepare(
+      `INSERT INTO email_verifications
+        (id, email_hash, request_fingerprint, code_hash, attempts,
+         expires_at, resend_after, created_at)
+       SELECT ?, ?, ?, ?, 0, ?, ?, ?
+        WHERE NOT EXISTS (
+          SELECT 1
+            FROM email_verifications
+           WHERE email_hash = ?
+             AND created_at > ? - ?
+        )
+          AND (
+            SELECT COUNT(*)
+              FROM email_verifications
+             WHERE email_hash = ?
+               AND created_at >= ? - 3600000
+          ) < ?
+          AND (
+            SELECT COUNT(*)
+              FROM email_verifications
+             WHERE request_fingerprint = ?
+               AND created_at >= ? - 3600000
+          ) < ?`
+    ).bind(
+      verificationId,
+      emailHash,
+      requestFingerprint,
+      codeHash,
+      now + EMAIL_CODE_TTL_MS,
+      now + EMAIL_RESEND_COOLDOWN_MS,
+      now,
+      emailHash,
+      now,
+      EMAIL_RESEND_COOLDOWN_MS,
+      emailHash,
+      now,
+      EMAIL_MAX_SENDS_PER_ADDRESS_HOUR,
+      requestFingerprint,
+      now,
+      EMAIL_MAX_SENDS_PER_REQUESTER_HOUR
+    ).run();
+    if (Number(inserted.meta?.changes || 0) !== 1) {
+      throw new Error("email verification send limit");
+    }
+  } catch {
+    throw new PublicError(
+      "طلب رمز آخر جارٍ أو بلغ حد الإرسال المؤقت. حاول لاحقًا.",
+      429
+    );
+  }
+
+  try {
+    await sendNotificationEmail(
+      env,
+      email,
+      verificationEmailContent(code),
+      "email-verification",
+      verificationId
+    );
+  } catch (error) {
+    await env.DB.prepare(
+      "DELETE FROM email_verifications WHERE id = ?"
+    ).bind(verificationId).run();
+    console.error("ADG email verification delivery failed", {
+      name: error?.name,
+      message: error?.message
+    });
+    throw new PublicError(
+      "تعذر إرسال رمز التحقق الآن. حاول مرة أخرى بعد قليل.",
+      503
+    );
+  }
+
+  await env.DB.prepare(
+    `UPDATE email_verifications
+        SET consumed_at = ?
+      WHERE email_hash = ?
+        AND id <> ?
+        AND consumed_at IS NULL`
+  ).bind(now, emailHash, verificationId).run();
+
+  return json({
+    verificationId,
+    expiresInSeconds: EMAIL_CODE_TTL_MS / 1000,
+    resendAfterSeconds: EMAIL_RESEND_COOLDOWN_MS / 1000,
+    message: "أرسلنا رمزًا من ستة أرقام إلى بريدك."
+  });
+}
+
+async function verifyEmailVerificationCode(env, body) {
+  requireEmailVerificationConfiguration(env);
+  const verificationId = requiredId(
+    body?.verificationId,
+    "معرف توثيق البريد"
+  );
+  const code = verifiedEmailCode(body?.code);
+  const row = await env.DB.prepare(
+    `SELECT id, attempts, expires_at, verified_at, reserved_at, consumed_at
+       FROM email_verifications
+      WHERE id = ?`
+  ).bind(verificationId).first();
+  const now = Date.now();
+  if (!row
+      || Number(row.expires_at) <= now
+      || Number(row.attempts) >= EMAIL_MAX_ATTEMPTS
+      || row.verified_at
+      || row.reserved_at
+      || row.consumed_at) {
+    throw new PublicError(
+      "انتهى رمز التحقق أو استُخدم. اطلب رمزًا جديدًا.",
+      400
+    );
+  }
+
+  const secret = await emailVerificationKey(env);
+  const codeHash = await hmacSha256(
+    secret,
+    `code-v1:${verificationId}:${code}`
+  );
+  const verificationToken = randomBase64Url(32);
+  const tokenHash = await sha256Hex(verificationToken);
+  const verified = await env.DB.prepare(
+    `UPDATE email_verifications
+        SET verified_at = ?, verification_token_hash = ?,
+            token_expires_at = ?
+      WHERE id = ?
+        AND code_hash = ?
+        AND attempts < ?
+        AND expires_at > ?
+        AND verified_at IS NULL
+        AND reserved_at IS NULL
+        AND consumed_at IS NULL`
+  ).bind(
+    now,
+    tokenHash,
+    now + EMAIL_TOKEN_TTL_MS,
+    verificationId,
+    codeHash,
+    EMAIL_MAX_ATTEMPTS,
+    now
+  ).run();
+  if (Number(verified.meta?.changes || 0) !== 1) {
+    await env.DB.prepare(
+      `UPDATE email_verifications
+          SET attempts = attempts + 1,
+              consumed_at = CASE
+                WHEN attempts + 1 >= ? THEN ?
+                ELSE consumed_at
+              END
+        WHERE id = ?
+          AND attempts < ?
+          AND verified_at IS NULL
+          AND reserved_at IS NULL
+          AND consumed_at IS NULL`
+    ).bind(
+      EMAIL_MAX_ATTEMPTS,
+      now,
+      verificationId,
+      EMAIL_MAX_ATTEMPTS
+    ).run();
+    throw new PublicError(
+      "رمز التحقق غير صحيح. تحقق من الرسالة وحاول مرة أخرى.",
+      400
+    );
+  }
+
+  return json({
+    verified: true,
+    verificationToken,
+    tokenExpiresInSeconds: EMAIL_TOKEN_TTL_MS / 1000,
+    message: "تم توثيق البريد بنجاح."
+  });
+}
+
+async function requireVerifiedEmail(emailValue, tokenValue, env) {
+  const email = verifiedEmail(emailValue);
+  if (typeof tokenValue !== "string"
+      || tokenValue.length < 32
+      || tokenValue.length > 200) {
+    throw new PublicError(
+      "وثّق البريد الإلكتروني بالرمز قبل المتابعة.",
+      403
+    );
+  }
+  const secret = await emailVerificationKey(env);
+  const [emailHash, tokenHash] = await Promise.all([
+    hmacSha256(secret, `email-v1:${email}`),
+    sha256Hex(tokenValue)
+  ]);
+  const now = Date.now();
+  const row = await env.DB.prepare(
+    `SELECT id
+       FROM email_verifications
+      WHERE email_hash = ?
+        AND verification_token_hash = ?
+        AND verified_at IS NOT NULL
+        AND token_expires_at > ?
+        AND reserved_at IS NULL
+        AND consumed_at IS NULL`
+  ).bind(emailHash, tokenHash, now).first();
+  if (!row) {
+    throw new PublicError(
+      "انتهى توثيق البريد أو لا يطابق العنوان المدخل.",
+      403
+    );
+  }
+  return {
+    id: row.id,
+    emailHash,
+    tokenHash
+  };
 }
 
 async function beginRegistration(body, env) {
   const profile = validateAccountProfile(body?.profile);
   const consent = validateAccountConsent(body?.consent);
+  const emailVerification = await requireVerifiedEmail(
+    profile.email,
+    body?.emailVerificationToken,
+    env
+  );
   const userId = crypto.randomUUID();
   const { origin, rpId } = relyingParty(env);
   const secret = await getVaultSecret(
@@ -1130,19 +1987,51 @@ async function beginRegistration(body, env) {
   const now = Date.now();
 
   await pruneAuthRecords(env.DB, now);
-  await env.DB.prepare(
-    `INSERT INTO webauthn_challenges
-      (id, challenge, kind, user_id, profile_ciphertext,
-       consent_json, expires_at)
-     VALUES (?, ?, 'registration', ?, ?, ?, ?)`
-  ).bind(
-    challengeId,
-    options.challenge,
-    userId,
-    profileCiphertext,
-    JSON.stringify(consent),
-    now + CHALLENGE_TTL_MS
-  ).run();
+  const reservation = await env.DB.batch([
+    env.DB.prepare(
+      `UPDATE email_verifications
+          SET reserved_at = ?, reservation_id = ?
+        WHERE id = ?
+          AND email_hash = ?
+          AND verification_token_hash = ?
+          AND verified_at IS NOT NULL
+          AND token_expires_at > ?
+          AND reserved_at IS NULL
+          AND consumed_at IS NULL`
+    ).bind(
+      now,
+      challengeId,
+      emailVerification.id,
+      emailVerification.emailHash,
+      emailVerification.tokenHash,
+      now
+    ),
+    env.DB.prepare(
+      `INSERT INTO webauthn_challenges
+        (id, challenge, kind, user_id, profile_ciphertext,
+         consent_json, email_verification_id, verified_email_hash,
+         expires_at)
+       VALUES (?, ?, 'registration', ?, ?, ?, ?, ?, ?)`
+    ).bind(
+      challengeId,
+      options.challenge,
+      userId,
+      profileCiphertext,
+      JSON.stringify(consent),
+      emailVerification.id,
+      emailVerification.emailHash,
+      now + CHALLENGE_TTL_MS
+    )
+  ]);
+  if (Number(reservation[0]?.meta?.changes || 0) !== 1) {
+    await env.DB.prepare(
+      "DELETE FROM webauthn_challenges WHERE id = ?"
+    ).bind(challengeId).run();
+    throw new PublicError(
+      "انتهى توثيق البريد أو استُخدم. أرسل رمزًا جديدًا.",
+      409
+    );
+  }
 
   return json({ challengeId, options, origin });
 }
@@ -1157,6 +2046,27 @@ async function finishRegistration(body, env) {
     challengeId,
     "registration"
   );
+  const emailReservation = challenge.email_verification_id
+    ? await env.DB.prepare(
+      `SELECT id
+         FROM email_verifications
+        WHERE id = ?
+          AND email_hash = ?
+          AND reservation_id = ?
+          AND verified_at IS NOT NULL
+          AND consumed_at IS NULL`
+    ).bind(
+      challenge.email_verification_id,
+      challenge.verified_email_hash,
+      challenge.id
+    ).first()
+    : null;
+  if (!emailReservation) {
+    throw new PublicError(
+      "انتهى توثيق البريد. أرسل رمزًا جديدًا ثم أعد التسجيل.",
+      400
+    );
+  }
   const { origin, rpId } = relyingParty(env);
   let verification;
   try {
@@ -1185,12 +2095,14 @@ async function finishRegistration(body, env) {
     await env.DB.batch([
       env.DB.prepare(
         `INSERT INTO users
-          (id, profile_ciphertext, consent_json, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?)`
+          (id, profile_ciphertext, consent_json, verified_email_hash,
+           created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?)`
       ).bind(
         challenge.user_id,
         challenge.profile_ciphertext,
         challenge.consent_json,
+        challenge.verified_email_hash,
         now,
         now
       ),
@@ -1218,11 +2130,20 @@ async function finishRegistration(body, env) {
         challenge.user_id,
         session.expiresAt,
         now
+      ),
+      env.DB.prepare(
+        `DELETE FROM email_verifications
+          WHERE id = ?
+            AND reservation_id = ?
+            AND consumed_at IS NULL`
+      ).bind(
+        challenge.email_verification_id,
+        challenge.id
       )
     ]);
   } catch {
     throw new PublicError(
-      "هذا المفتاح مسجل مسبقًا أو تعذر إنشاء الحساب.",
+      "البريد أو مفتاح المرور مرتبط بحساب قائم، أو تعذر إنشاء الحساب.",
       409
     );
   }
@@ -1360,12 +2281,1340 @@ async function getAccount(request, env) {
     account.profile_ciphertext,
     secret
   );
+  const erasure = await env.DB.prepare(
+    `SELECT id, eligible_after
+       FROM identity_erasure_requests
+      WHERE user_id = ? AND status = 'pending'`
+  ).bind(account.user_id).first();
+  const d1Backup = evidenceArchiveMode(env) === "d1"
+    ? d1TimeTravelRetentionSummary(env)
+    : null;
   return json({
     authenticated: true,
     userId: account.user_id,
     profile: JSON.parse(profileText),
-    consent: JSON.parse(account.consent_json)
+    consent: JSON.parse(account.consent_json),
+    emailVerified: Boolean(account.verified_email_hash),
+    identityErasure: erasure
+      ? {
+        requested: true,
+        requestId: erasure.id,
+        eligibleAfterUtc: new Date(erasure.eligible_after).toISOString(),
+        deletionScope: d1Backup
+          ? "active-store-after-retention"
+          : "archive-after-retention",
+        providerBackupRetentionDays: d1Backup?.retentionDays ?? null,
+        providerBackupBoundaryNote: d1Backup
+          ? "قد تبقى لقطات Cloudflare D1 Time Travel القابلة للاسترجاع "
+            + "حتى انتهاء نافذة الخطة بعد حذف المخزن النشط."
+          : null
+      }
+      : { requested: false }
   });
+}
+
+async function updateAccountPreferences(request, env, body) {
+  const account = await requireSession(request, env);
+  if (account.erasure_status === "pending") {
+    throw new PublicError(
+      "لا يمكن تغيير بيانات الهوية بعد تسجيل طلب محوها.",
+      409
+    );
+  }
+  const profile = validateAccountProfile(body?.profile);
+  const consent = validateAccountConsent(body?.consent);
+  const secret = await getVaultSecret(
+    env.ENTITYCRYPT_MASTER_KEY_SECRET_NAME,
+    env
+  );
+  const currentProfile = JSON.parse(await decryptEntityCrypt(
+    account.profile_ciphertext,
+    secret
+  ));
+  const profileCiphertext = await encryptEntityCrypt(
+    JSON.stringify(profile),
+    secret
+  );
+  const requiresEmailVerification =
+    !account.verified_email_hash
+    || currentProfile.email !== profile.email;
+  const now = Date.now();
+  if (requiresEmailVerification) {
+    const verification = await requireVerifiedEmail(
+      profile.email,
+      body?.emailVerificationToken,
+      env
+    );
+    let changes;
+    try {
+      changes = await env.DB.batch([
+        env.DB.prepare(
+          `UPDATE users
+              SET profile_ciphertext = ?, consent_json = ?,
+                  verified_email_hash = ?, updated_at = ?
+            WHERE id = ?
+              AND EXISTS (
+                SELECT 1
+                  FROM email_verifications
+                 WHERE id = ?
+                   AND email_hash = ?
+                   AND verification_token_hash = ?
+                   AND verified_at IS NOT NULL
+                   AND token_expires_at > ?
+                   AND reserved_at IS NULL
+                   AND consumed_at IS NULL
+              )`
+        ).bind(
+          profileCiphertext,
+          JSON.stringify(consent),
+          verification.emailHash,
+          now,
+          account.user_id,
+          verification.id,
+          verification.emailHash,
+          verification.tokenHash,
+          now
+        ),
+        env.DB.prepare(
+          `DELETE FROM email_verifications
+            WHERE id = ?
+              AND verification_token_hash = ?
+              AND consumed_at IS NULL`
+        ).bind(
+          verification.id,
+          verification.tokenHash
+        )
+      ]);
+    } catch {
+      throw new PublicError(
+        "هذا البريد مرتبط بحساب آخر أو تعذر حفظ التغيير.",
+        409
+      );
+    }
+    if (Number(changes[0]?.meta?.changes || 0) !== 1
+        || Number(changes[1]?.meta?.changes || 0) !== 1) {
+      throw new PublicError(
+        "انتهى توثيق البريد أو استُخدم. أرسل رمزًا جديدًا.",
+        409
+      );
+    }
+  } else {
+    await env.DB.prepare(
+      `UPDATE users
+          SET profile_ciphertext = ?, consent_json = ?, updated_at = ?
+        WHERE id = ?`
+    ).bind(
+      profileCiphertext,
+      JSON.stringify(consent),
+      now,
+      account.user_id
+    ).run();
+  }
+  return json({
+    saved: true,
+    consent,
+    emailVerified: true,
+    message: "حُفظت بيانات الحساب وتفضيلات الإشعارات."
+  });
+}
+
+async function getCompletedResults(request, env, url) {
+  const account = await requireSession(request, env);
+  const receiptId = String(url.searchParams.get("receiptId") || "");
+  if (!isUuid(receiptId)) {
+    throw new PublicError("معرف الإرسال المطلوب غير صالح.", 400);
+  }
+  const source = await env.DB.prepare(
+    `SELECT receipt_id, user_id, packet_id, role, artifact_sha256,
+            participant_pseudonym, artifact_type, artifact_json,
+            repository_status, submitted_at, task_version_id, round_id,
+            (SELECT status FROM final_results
+              WHERE primary_receipt_id = submissions.receipt_id)
+              AS final_status
+       FROM submissions
+      WHERE receipt_id = ? AND user_id = ?`
+  ).bind(receiptId, account.user_id).first();
+  if (!source || !source.artifact_json) {
+    throw new PublicError(
+      "لا يمكن فتح النتائج قبل إتمام المهمة المرتبطة بهذا الحساب.",
+      404
+    );
+  }
+
+  const now = Date.now();
+  await env.DB.prepare(
+    `INSERT OR IGNORE INTO result_access
+      (user_id, packet_id, source_receipt_id, first_viewed_at,
+       task_version_id, round_id)
+     VALUES (?, ?, ?, ?, ?, ?)`
+  ).bind(
+    account.user_id,
+    source.packet_id,
+    receiptId,
+    now,
+    source.task_version_id,
+    source.round_id
+  ).run();
+
+  const [resultsQuery, commentsQuery] = await Promise.all([
+    env.DB.prepare(
+      `SELECT s.receipt_id, s.packet_id, s.role, s.artifact_sha256,
+              s.participant_pseudonym, s.artifact_type, s.artifact_json,
+              s.repository_status, s.submitted_at,
+              f.status AS final_status
+         FROM submissions s
+         LEFT JOIN final_results f
+           ON f.primary_receipt_id = s.receipt_id
+        WHERE s.task_version_id = ?
+          AND s.round_id = ?
+          AND s.receipt_id <> ?
+          AND s.artifact_json IS NOT NULL
+        ORDER BY s.submitted_at ASC
+        LIMIT 40`
+    ).bind(source.task_version_id, source.round_id, receiptId).all(),
+    env.DB.prepare(
+      `SELECT dc.comment_id, dc.participant_pseudonym,
+              dc.source_receipt_id, dc.target_receipt_id,
+              dc.parent_comment_id, dc.category, dc.body,
+              dc.sentence_id, dc.token_id, dc.mentions_json,
+              dc.references_json, dc.github_status, dc.created_at,
+              dm.state AS moderation_state
+         FROM discussion_comments dc
+         LEFT JOIN discussion_moderation dm
+           ON dm.id = (
+             SELECT id
+               FROM discussion_moderation
+              WHERE comment_id = dc.comment_id
+              ORDER BY created_at DESC
+              LIMIT 1
+           )
+        WHERE dc.task_version_id = ?
+          AND dc.round_id = ?
+        ORDER BY dc.created_at ASC
+        LIMIT 250`
+    ).bind(source.task_version_id, source.round_id).all()
+  ]);
+
+  return json({
+    source: publicResultRow(source, false),
+    revealedAtUtc: new Date(now).toISOString(),
+    results: (resultsQuery.results || [])
+      .map(row => publicResultRow(row, true)),
+    comments: (commentsQuery.results || [])
+      .filter(row => !["hidden", "blocked"].includes(
+        row.moderation_state
+      ))
+      .map(publicCommentRow),
+    repository:
+      env.GITHUB_REPOSITORY || "sbay-dev/ADG-Lang",
+    publicationBoundary:
+      "تظهر الأدلة المجهّلة فقط، وتبقى الهوية وبيانات التواصل خاصة."
+  });
+}
+
+async function getTaskStatus(request, env, url) {
+  const account = await requireSession(request, env);
+  const receiptId = requiredId(
+    url.searchParams.get("receiptId"),
+    "معرف المساهمة"
+  );
+  const task = await env.DB.prepare(
+    `SELECT tv.id, tv.task_id, tv.task_version, tv.packet_id,
+            tv.holdout_id, tv.packet_merkle_root,
+            tv.guideline_version, tv.data_version, tv.protocol_version,
+            tv.metric_policy_json, tv.state, tv.state_version,
+            tv.current_round, tv.active_final_receipt_id,
+            tv.appeal_deadline_at, tv.repository_status,
+            tv.github_issue_number, tv.updated_at, tv.approved_at,
+            tv.published_at, tv.revoked_at
+       FROM submissions s
+       JOIN task_versions tv ON tv.id = s.task_version_id
+      WHERE s.receipt_id = ? AND s.user_id = ?`
+  ).bind(receiptId, account.user_id).first();
+  if (!task) {
+    return json({ found: false, receiptId });
+  }
+  const round = await getCurrentConsensusRound(env.DB, task);
+  const [participationResult, ownParticipation, metrics, appeals] =
+    await Promise.all([
+      env.DB.prepare(
+        `SELECT role, status, COUNT(*) AS count
+           FROM task_participations
+          WHERE round_id = ?
+          GROUP BY role, status`
+      ).bind(round.id).all(),
+      env.DB.prepare(
+        `SELECT role, status, submission_receipt_id
+           FROM task_participations
+          WHERE task_version_id = ? AND user_id = ?`
+      ).bind(task.id, account.user_id).first(),
+      env.DB.prepare(
+        `SELECT metrics_json, policy_passed, computed_at
+           FROM consensus_metrics
+          WHERE task_version_id = ? AND round_id = ?`
+      ).bind(task.id, round.id).first(),
+      env.DB.prepare(
+        `SELECT id, status, created_at, reviewed_at
+           FROM appeals
+          WHERE task_version_id = ?
+          ORDER BY created_at DESC
+          LIMIT 20`
+      ).bind(task.id).all()
+    ]);
+  const canViewMetrics = Boolean(ownParticipation)
+    || !["open", "independent-review"].includes(task.state);
+  return json({
+    found: true,
+    sourceReceiptId: receiptId,
+    taskVersionId: task.id,
+    taskId: task.task_id,
+    taskVersion: Number(task.task_version),
+    packetId: task.packet_id,
+    holdoutId: task.holdout_id,
+    packetMerkleRoot: task.packet_merkle_root,
+    guidelineVersion: task.guideline_version,
+    dataVersion: task.data_version,
+    protocolVersion: task.protocol_version,
+    state: task.state,
+    stateVersion: Number(task.state_version),
+    round: {
+      id: round.id,
+      number: Number(round.round_number),
+      status: round.status,
+      deadlineAtUtc: new Date(round.deadline_at).toISOString()
+    },
+    slots: (participationResult.results || []).map(row => ({
+      role: row.role,
+      status: row.status,
+      count: Number(row.count)
+    })),
+    ownParticipation: ownParticipation
+      ? {
+        role: ownParticipation.role,
+        status: ownParticipation.status,
+        receiptId: ownParticipation.submission_receipt_id
+      }
+      : null,
+    metricPolicy: JSON.parse(task.metric_policy_json),
+    agreement: canViewMetrics && metrics
+      ? {
+        ...JSON.parse(metrics.metrics_json),
+        policyPassed: Boolean(metrics.policy_passed),
+        computedAtUtc: new Date(metrics.computed_at).toISOString()
+      }
+      : null,
+    activeFinalReceiptId: task.active_final_receipt_id,
+    appealDeadlineAtUtc: task.appeal_deadline_at
+      ? new Date(task.appeal_deadline_at).toISOString()
+      : null,
+    repositoryStatus: task.repository_status,
+    githubIssueNumber: task.github_issue_number,
+    appeals: (appeals.results || []).map(row => ({
+      id: row.id,
+      status: row.status,
+      createdAtUtc: new Date(row.created_at).toISOString(),
+      reviewedAtUtc: row.reviewed_at
+        ? new Date(row.reviewed_at).toISOString()
+        : null
+    })),
+    updatedAtUtc: new Date(task.updated_at).toISOString()
+  });
+}
+
+async function createConsensusAppeal(request, env, body) {
+  const account = await requireSession(request, env);
+  if (!account.verified_email_hash) {
+    throw new PublicError("وثّق بريد الحساب قبل تقديم الاستئناف.", 403);
+  }
+  const finalReceiptId = requiredId(
+    body?.finalReceiptId,
+    "معرف النتيجة النهائية"
+  );
+  const evidence = normalizedText(
+    body?.evidence,
+    40,
+    4000,
+    "دليل الاستئناف"
+  );
+  const final = await env.DB.prepare(
+    `SELECT f.primary_receipt_id, f.task_version_id, f.round_id,
+            f.status, tv.state, tv.appeal_deadline_at, tv.packet_id
+       FROM final_results f
+       JOIN task_versions tv ON tv.id = f.task_version_id
+      WHERE f.primary_receipt_id = ?`
+  ).bind(finalReceiptId).first();
+  if (!final
+      || final.status !== "active"
+      || final.state !== "approved") {
+    throw new PublicError("النتيجة غير مؤهلة للاستئناف.", 409);
+  }
+  if (!final.appeal_deadline_at
+      || Number(final.appeal_deadline_at) < Date.now()) {
+    throw new PublicError("انتهت مهلة الاستئناف لهذه النتيجة.", 409);
+  }
+  const eligible = await env.DB.prepare(
+    `SELECT role
+       FROM task_participations
+      WHERE task_version_id = ? AND user_id = ?
+        AND role IN ('A', 'B', 'J1', 'J2')
+        AND status = 'submitted'`
+  ).bind(final.task_version_id, account.user_id).first();
+  if (!eligible) {
+    throw new PublicError(
+      "الاستئناف متاح للمشاركين المثبتين في هذه المهمة فقط.",
+      403
+    );
+  }
+  const appealId = crypto.randomUUID();
+  const createdAt = Date.now();
+  let inserted;
+  try {
+    inserted = await env.DB.prepare(
+      `INSERT INTO appeals
+        (id, task_version_id, round_id, appellant_user_id,
+         final_receipt_id, evidence, status, created_at)
+       SELECT ?, f.task_version_id, f.round_id, ?, f.primary_receipt_id,
+              ?, 'pending', ?
+         FROM final_results f
+         JOIN task_versions tv ON tv.id = f.task_version_id
+        WHERE f.primary_receipt_id = ?
+          AND f.status = 'active'
+          AND tv.state = 'approved'
+          AND tv.appeal_deadline_at IS NOT NULL
+          AND tv.appeal_deadline_at >= ?
+          AND EXISTS (
+            SELECT 1
+              FROM task_participations tp
+             WHERE tp.task_version_id = f.task_version_id
+               AND tp.user_id = ?
+               AND tp.role IN ('A', 'B', 'J1', 'J2')
+               AND tp.status = 'submitted'
+          )`
+    ).bind(
+      appealId,
+      account.user_id,
+      evidence,
+      createdAt,
+      finalReceiptId,
+      createdAt,
+      account.user_id
+    ).run();
+  } catch {
+    throw new PublicError(
+      "سبق أن قدمت استئنافًا لهذه النتيجة.",
+      409
+    );
+  }
+  if (Number(inserted?.meta?.changes || 0) !== 1) {
+    throw new PublicError(
+      "تغيرت حالة النتيجة أو انتهت مهلة الاستئناف.",
+      409
+    );
+  }
+  await queueGovernanceNotifications(
+    env,
+    final.task_version_id,
+    "appeal-opened",
+    {
+      taskVersionId: final.task_version_id,
+      packetId: final.packet_id,
+      appealId
+    },
+    `appeal-opened:${appealId}`
+  );
+  return json({
+    accepted: true,
+    appealId,
+    status: "pending",
+    message:
+      "سُجل الاستئناف وسيحتاج مراجعًا مستقلًا قبل إعادة طرح المهمة."
+  }, 202);
+}
+
+async function requestIdentityErasure(request, env, body) {
+  const account = await requireSession(request, env);
+  if (body?.confirm !== true) {
+    throw new PublicError(
+      "يلزم تأكيد طلب محو ارتباط الهوية صراحة.",
+      400
+    );
+  }
+  const existing = await env.DB.prepare(
+    `SELECT id, eligible_after
+       FROM identity_erasure_requests
+      WHERE user_id = ? AND status = 'pending'`
+  ).bind(account.user_id).first();
+  const d1Backup = evidenceArchiveMode(env) === "d1"
+    ? d1TimeTravelRetentionSummary(env)
+    : null;
+  if (existing) {
+    return json({
+      accepted: true,
+      requestId: existing.id,
+      eligibleAfterUtc:
+        new Date(existing.eligible_after).toISOString(),
+      deletionScope: d1Backup
+        ? "active-store-after-retention"
+        : "archive-after-retention",
+      providerBackupRetentionDays: d1Backup?.retentionDays ?? null
+    }, 202);
+  }
+  const retentionDays = Math.min(
+    730,
+    Math.max(30, Number(env.IDENTITY_RETENTION_DAYS || 365))
+  );
+  const now = Date.now();
+  const eligibleAfter = now
+    + retentionDays * 24 * 60 * 60 * 1000;
+  const requestId = crypto.randomUUID();
+  const receipts = await env.DB.prepare(
+    `SELECT receipt_id
+       FROM submissions
+      WHERE user_id = ?`
+  ).bind(account.user_id).all();
+  const writes = [
+    env.DB.prepare(
+      `INSERT INTO identity_erasure_requests
+        (id, user_id, status, requested_at, eligible_after)
+       VALUES (?, ?, 'pending', ?, ?)`
+    ).bind(requestId, account.user_id, now, eligibleAfter)
+  ];
+  for (const row of receipts.results || []) {
+    writes.push(env.DB.prepare(
+      `INSERT INTO identity_erasure_items
+        (request_id, blob_name, status)
+       VALUES (?, ?, 'pending')`
+    ).bind(requestId, `${row.receipt_id}.json`));
+  }
+  await env.DB.batch(writes);
+  return json({
+    accepted: true,
+    requestId,
+    retentionDays,
+    eligibleAfterUtc: new Date(eligibleAfter).toISOString(),
+    deletionScope: d1Backup
+      ? "active-store-after-retention"
+      : "archive-after-retention",
+    providerBackupRetentionDays: d1Backup?.retentionDays ?? null,
+    message:
+      d1Backup
+        ? "سيمحى ارتباط الهوية من المخزن النشط بعد إغلاق المهام "
+          + "وانقضاء مدة الاحتفاظ، وقد تبقى لقطات D1 القابلة للاسترجاع "
+          + "حتى انتهاء نافذة الخطة."
+        : "سيمحى ارتباط الهوية بعد إغلاق المهام وانقضاء مدة الاحتفاظ."
+  }, 202);
+}
+
+async function receiveRepositoryReceipt(request, env) {
+  if (!env.REPOSITORY_RECEIPT_HMAC_SECRET_NAME) {
+    throw new PublicError("قناة إيصال المستودع غير مهيأة.", 503);
+  }
+  const text = await request.text();
+  if (!text || text.length > 32768) {
+    throw new PublicError("حجم إيصال المستودع غير صالح.", 413);
+  }
+  let signed;
+  try {
+    signed = JSON.parse(text);
+  } catch {
+    throw new PublicError("إيصال المستودع ليس JSON صالحًا.", 400);
+  }
+  const { hmacSha256: signature, ...envelope } = signed || {};
+  if (envelope.schema === "adg-msa-repository-receipt-v1") {
+    validateRepositoryReceiptEnvelope(envelope, signature, env);
+  } else if (envelope.schema === "adg-msa-evidence-receipt-v1") {
+    validateEvidenceRepositoryReceiptEnvelope(
+      envelope,
+      signature,
+      env
+    );
+  } else {
+    throw new PublicError("نوع إيصال المستودع غير مدعوم.", 400);
+  }
+  const key = await getVaultSecret(
+    env.REPOSITORY_RECEIPT_HMAC_SECRET_NAME,
+    env
+  );
+  if (!await verifyHmacSha256(
+    key,
+    JSON.stringify(envelope),
+    signature
+  )) {
+    throw new PublicError("توقيع إيصال المستودع غير صحيح.", 401);
+  }
+  if (envelope.schema === "adg-msa-evidence-receipt-v1") {
+    return acceptEvidenceRepositoryReceipt(
+      env,
+      envelope,
+      signature
+    );
+  }
+  const binding = await env.DB.prepare(
+    `SELECT e.id, e.round_id, e.to_state,
+            f.primary_receipt_id, f.final_merkle_root, f.status
+       FROM consensus_events e
+       JOIN final_results f
+         ON f.task_version_id = e.task_version_id
+        AND f.round_id = e.round_id
+      WHERE e.id = ?
+        AND e.task_version_id = ?
+        AND e.round_id = ?
+        AND e.to_state = 'approved'
+        AND f.final_merkle_root = ?
+        AND f.status = 'active'`
+  ).bind(
+    envelope.nonce,
+    envelope.taskVersionId,
+    envelope.roundId,
+    envelope.finalMerkleRoot
+  ).first();
+  if (!binding) {
+    throw new PublicError(
+      "إيصال المستودع لا يطابق نتيجة معتمدة في سجل الإجماع.",
+      409
+    );
+  }
+  const receivedAt = Date.parse(envelope.receivedAtUtc);
+  const acceptedAt = Date.parse(envelope.acceptedAtUtc);
+  await env.DB.batch([
+    env.DB.prepare(
+      `INSERT OR IGNORE INTO repository_receipts
+        (id, task_version_id, round_id, final_merkle_root, nonce,
+         pr_number, pr_merge_sha, importer_commit_sha, envelope_json,
+         signature_sha256, received_at, accepted_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(
+      envelope.receiptId,
+      envelope.taskVersionId,
+      envelope.roundId,
+      envelope.finalMerkleRoot,
+      envelope.nonce,
+      envelope.prNumber,
+      envelope.prMergeSha,
+      envelope.importerCommitSha,
+      JSON.stringify(envelope),
+      signature,
+      receivedAt,
+      acceptedAt
+    ),
+    env.DB.prepare(
+      `UPDATE task_versions
+          SET repository_status = 'accepted',
+              github_issue_number = COALESCE(?, github_issue_number),
+              updated_at = ?
+        WHERE id = ? AND state = 'approved'
+          AND active_final_receipt_id = ?`
+    ).bind(
+      envelope.issueNumber ?? null,
+      Date.now(),
+      envelope.taskVersionId,
+      binding.primary_receipt_id
+    ),
+    env.DB.prepare(
+      `UPDATE evidence_outbox
+          SET status = 'sent',
+              sent_at = COALESCE(sent_at, ?),
+              last_error = NULL
+        WHERE kind = 'task-state' AND related_id = ?`
+    ).bind(
+      acceptedAt,
+      envelope.nonce
+    )
+  ]);
+  const stored = await env.DB.prepare(
+    `SELECT id
+       FROM repository_receipts
+      WHERE task_version_id = ? AND final_merkle_root = ?
+        AND nonce = ?`
+  ).bind(
+    envelope.taskVersionId,
+    envelope.finalMerkleRoot,
+    envelope.nonce
+  ).first();
+  if (!stored) {
+    throw new PublicError("تعارض إيصال المستودع مع إيصال سابق.", 409);
+  }
+  const task = await attemptPublishTask(env, envelope.taskVersionId);
+  return json({
+    accepted: true,
+    receiptId: stored.id,
+    taskVersionId: envelope.taskVersionId,
+    state: task?.state ?? "approved",
+    publicationDeferred: task?.state !== "published"
+  }, 202);
+}
+
+async function claimRepositoryEvidence(request, env) {
+  if (!env.DB || !env.REPOSITORY_RECEIPT_HMAC_SECRET_NAME) {
+    throw new PublicError("قناة سحب أدلة المستودع غير مهيأة.", 503);
+  }
+  const signed = await readJsonBody(request);
+  const { hmacSha256: signature, ...envelope } = signed || {};
+  validateRepositoryEvidenceClaimEnvelope(
+    envelope,
+    signature,
+    env
+  );
+  const key = await getVaultSecret(
+    env.REPOSITORY_RECEIPT_HMAC_SECRET_NAME,
+    env
+  );
+  if (!await verifyHmacSha256(
+    key,
+    JSON.stringify(envelope),
+    signature
+  )) {
+    throw new PublicError("توقيع طلب سحب الأدلة غير صحيح.", 401);
+  }
+  const now = Date.now();
+  const limit = Math.min(
+    REPOSITORY_EVIDENCE_CLAIM_MAX_ITEMS,
+    Math.max(1, Number(envelope.maxItems || REPOSITORY_EVIDENCE_CLAIM_MAX_ITEMS))
+  );
+  const claimMarker = repositoryEvidenceClaimMarker(envelope.nonce);
+  let rows = (await selectClaimedRepositoryEvidenceRows(
+    env.DB,
+    claimMarker,
+    limit
+  )).results || [];
+  if (rows.length === 0) {
+    const candidates = await selectClaimableRepositoryEvidenceRows(
+      env.DB,
+      now,
+      limit
+    );
+    const statements = [];
+    for (const row of candidates.results || []) {
+      statements.push(env.DB.prepare(
+        `UPDATE evidence_outbox
+            SET status = 'sending',
+                next_attempt_at = ?,
+                last_error = ?
+          WHERE id = ?
+            AND (
+              status IN ('pending', 'sent')
+              OR (status = 'sending' AND next_attempt_at <= ?)
+            )`
+      ).bind(
+        now + REPOSITORY_EVIDENCE_CLAIM_HOLD_MS,
+        claimMarker,
+        row.id,
+        now
+      ));
+    }
+    if (statements.length) {
+      await env.DB.batch(statements);
+    }
+    rows = (await selectClaimedRepositoryEvidenceRows(
+      env.DB,
+      claimMarker,
+      limit
+    )).results || [];
+  }
+  return json({
+    accepted: true,
+    claim: {
+      schema: "adg-msa-repository-evidence-claim-result-v1",
+      repository: envelope.repository,
+      nonce: envelope.nonce,
+      requestedAtUtc: envelope.requestedAtUtc,
+      claimedAtUtc: new Date(now).toISOString(),
+      count: rows.length
+    },
+    items: rows.map(row => ({
+      kind: row.kind,
+      relatedId: row.related_id,
+      publicBlobName: row.public_blob_name,
+      publicPayloadJson: row.public_payload_json
+    }))
+  });
+}
+
+function validateRepositoryEvidenceClaimEnvelope(envelope, signature, env) {
+  const requestedAt = Date.parse(envelope?.requestedAtUtc);
+  const now = Date.now();
+  if (!envelope
+      || envelope.schema !== "adg-msa-repository-evidence-claim-v1"
+      || !isUuid(envelope.nonce)
+      || envelope.repository
+        !== (env.GITHUB_REPOSITORY || "sbay-dev/ADG-Lang")
+      || !Number.isSafeInteger(envelope.maxItems)
+      || envelope.maxItems < 1
+      || envelope.maxItems > REPOSITORY_EVIDENCE_CLAIM_MAX_ITEMS
+      || !/^[a-f0-9]{64}$/.test(signature || "")
+      || !Number.isFinite(requestedAt)
+      || Math.abs(now - requestedAt) > REPOSITORY_EVIDENCE_CLAIM_WINDOW_MS) {
+    throw new PublicError("صيغة طلب سحب الدليل غير صالحة.", 400);
+  }
+}
+
+function repositoryEvidenceClaimMarker(nonce) {
+  return `repository-claim:${nonce}`;
+}
+
+async function selectClaimableRepositoryEvidenceRows(db, now, limit) {
+  return db.prepare(
+    `SELECT eo.id
+       FROM evidence_outbox eo
+       LEFT JOIN submissions s
+         ON eo.kind = 'submission' AND s.receipt_id = eo.related_id
+       LEFT JOIN discussion_comments dc
+         ON eo.kind = 'comment' AND dc.comment_id = eo.related_id
+       LEFT JOIN task_versions tv
+         ON eo.kind = 'task-state' AND tv.id = eo.task_version_id
+       LEFT JOIN evidence_repository_receipts err
+         ON eo.kind = err.kind
+        AND err.related_id = eo.related_id
+        AND eo.kind IN ('submission', 'comment')
+       LEFT JOIN repository_receipts rr
+         ON eo.kind = 'task-state' AND rr.nonce = eo.related_id
+      WHERE eo.kind IN ('submission', 'comment', 'task-state')
+        AND err.id IS NULL
+        AND rr.id IS NULL
+        AND (
+          eo.status IN ('pending', 'sent')
+          OR (eo.status = 'sending' AND eo.next_attempt_at <= ?)
+        )
+        AND (eo.kind <> 'submission' OR s.receipt_id IS NOT NULL)
+        AND (eo.kind <> 'submission' OR s.repository_status <> 'imported')
+        AND (eo.kind <> 'comment' OR dc.comment_id IS NOT NULL)
+        AND (eo.kind <> 'comment' OR dc.github_status <> 'imported')
+        AND (eo.kind <> 'task-state' OR tv.id IS NOT NULL)
+        AND (eo.kind <> 'task-state' OR tv.repository_status <> 'accepted')
+      ORDER BY eo.created_at
+      LIMIT ?`
+  ).bind(now, limit).all();
+}
+
+async function selectClaimedRepositoryEvidenceRows(db, claimMarker, limit) {
+  return db.prepare(
+    `SELECT eo.kind, eo.related_id, eo.public_blob_name,
+            eo.public_payload_json
+       FROM evidence_outbox eo
+       LEFT JOIN submissions s
+         ON eo.kind = 'submission' AND s.receipt_id = eo.related_id
+       LEFT JOIN discussion_comments dc
+         ON eo.kind = 'comment' AND dc.comment_id = eo.related_id
+       LEFT JOIN task_versions tv
+         ON eo.kind = 'task-state' AND tv.id = eo.task_version_id
+       LEFT JOIN evidence_repository_receipts err
+         ON eo.kind = err.kind
+        AND err.related_id = eo.related_id
+        AND eo.kind IN ('submission', 'comment')
+       LEFT JOIN repository_receipts rr
+         ON eo.kind = 'task-state' AND rr.nonce = eo.related_id
+      WHERE eo.kind IN ('submission', 'comment', 'task-state')
+        AND eo.status = 'sending'
+        AND eo.last_error = ?
+        AND err.id IS NULL
+        AND rr.id IS NULL
+        AND (eo.kind <> 'submission' OR s.receipt_id IS NOT NULL)
+        AND (eo.kind <> 'submission' OR s.repository_status <> 'imported')
+        AND (eo.kind <> 'comment' OR dc.comment_id IS NOT NULL)
+        AND (eo.kind <> 'comment' OR dc.github_status <> 'imported')
+        AND (eo.kind <> 'task-state' OR tv.id IS NOT NULL)
+        AND (eo.kind <> 'task-state' OR tv.repository_status <> 'accepted')
+      ORDER BY eo.created_at
+      LIMIT ?`
+  ).bind(claimMarker, limit).all();
+}
+
+function validateEvidenceRepositoryReceiptEnvelope(
+  envelope,
+  signature,
+  env
+) {
+  const acceptedAt = Date.parse(envelope.acceptedAtUtc);
+  const now = Date.now();
+  if (!isUuid(envelope.receiptId)
+      || !["submission", "comment"].includes(envelope.evidenceKind)
+      || !isUuid(envelope.relatedId)
+      || envelope.repository
+        !== (env.GITHUB_REPOSITORY || "sbay-dev/ADG-Lang")
+      || !Number.isSafeInteger(envelope.prNumber)
+      || envelope.prNumber < 1
+      || !/^[a-f0-9]{40}$/.test(envelope.prMergeSha || "")
+      || !/^[a-f0-9]{40}$/.test(envelope.importerCommitSha || "")
+      || !/^[a-f0-9]{64}$/.test(signature || "")
+      || !Number.isFinite(acceptedAt)
+      || Math.abs(now - acceptedAt) > 24 * 60 * 60 * 1000) {
+    throw new PublicError("صيغة إيصال الدليل غير صالحة.", 400);
+  }
+}
+
+async function acceptEvidenceRepositoryReceipt(env, envelope, signature) {
+  const table = envelope.evidenceKind === "submission"
+    ? "submissions"
+    : "discussion_comments";
+  const idColumn = envelope.evidenceKind === "submission"
+    ? "receipt_id"
+    : "comment_id";
+  const exists = await env.DB.prepare(
+    `SELECT ${idColumn} AS id FROM ${table} WHERE ${idColumn} = ?`
+  ).bind(envelope.relatedId).first();
+  if (!exists) {
+    throw new PublicError("الدليل المشار إليه غير موجود في المنصة.", 409);
+  }
+  const acceptedAt = Date.parse(envelope.acceptedAtUtc);
+  await env.DB.batch([
+    env.DB.prepare(
+      `INSERT OR IGNORE INTO evidence_repository_receipts
+        (id, kind, related_id, repository, pr_number, pr_merge_sha,
+         importer_commit_sha, envelope_json, signature_sha256,
+         accepted_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(
+      envelope.receiptId,
+      envelope.evidenceKind,
+      envelope.relatedId,
+      envelope.repository,
+      envelope.prNumber,
+      envelope.prMergeSha,
+      envelope.importerCommitSha,
+      JSON.stringify(envelope),
+      signature,
+      acceptedAt
+    ),
+    env.DB.prepare(
+      envelope.evidenceKind === "submission"
+        ? `UPDATE submissions
+              SET repository_status = 'imported'
+            WHERE receipt_id = ?`
+        : `UPDATE discussion_comments
+              SET github_status = 'imported'
+            WHERE comment_id = ?`
+    ).bind(envelope.relatedId),
+    env.DB.prepare(
+      `UPDATE evidence_outbox
+          SET status = 'sent',
+              sent_at = COALESCE(sent_at, ?),
+              last_error = NULL
+        WHERE kind = ? AND related_id = ?`
+    ).bind(acceptedAt, envelope.evidenceKind, envelope.relatedId)
+  ]);
+  return json({
+    accepted: true,
+    receiptId: envelope.receiptId,
+    evidenceKind: envelope.evidenceKind,
+    relatedId: envelope.relatedId
+  }, 202);
+}
+
+function validateRepositoryReceiptEnvelope(envelope, signature, env) {
+  if (!envelope || envelope.schema !== "adg-msa-repository-receipt-v1"
+      || !isUuid(envelope.receiptId)
+      || typeof envelope.taskVersionId !== "string"
+      || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/
+        .test(envelope.taskVersionId)
+      || typeof envelope.roundId !== "string"
+      || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/.test(envelope.roundId)
+      || typeof envelope.nonce !== "string"
+      || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/.test(envelope.nonce)
+      || !/^[a-f0-9]{64}$/.test(envelope.finalMerkleRoot || "")
+      || !/^[a-f0-9]{40}$/.test(envelope.prMergeSha || "")
+      || !/^[a-f0-9]{40}$/.test(envelope.importerCommitSha || "")
+      || !Number.isSafeInteger(envelope.prNumber)
+      || envelope.prNumber < 1
+      || (envelope.issueNumber !== null
+        && envelope.issueNumber !== undefined
+        && (!Number.isSafeInteger(envelope.issueNumber)
+          || envelope.issueNumber < 1))
+      || envelope.repository
+        !== (env.GITHUB_REPOSITORY || "sbay-dev/ADG-Lang")
+      || !/^[a-f0-9]{64}$/.test(signature || "")) {
+    throw new PublicError("صيغة إيصال المستودع غير صالحة.", 400);
+  }
+  const receivedAt = Date.parse(envelope.receivedAtUtc);
+  const acceptedAt = Date.parse(envelope.acceptedAtUtc);
+  const now = Date.now();
+  if (!Number.isFinite(receivedAt)
+      || !Number.isFinite(acceptedAt)
+      || Math.abs(now - receivedAt) > 24 * 60 * 60 * 1000
+      || acceptedAt < receivedAt
+      || acceptedAt > now + 5 * 60 * 1000) {
+    throw new PublicError("توقيت إيصال المستودع غير صالح.", 400);
+  }
+}
+
+async function attemptPublishTask(env, taskVersionId) {
+  let task = await getConsensusTask(env.DB, taskVersionId);
+  if (!task || task.state !== "approved"
+      || task.repository_status !== "accepted"
+      || !task.appeal_deadline_at
+      || Number(task.appeal_deadline_at) > Date.now()) {
+    return task;
+  }
+  const pendingAppeal = await env.DB.prepare(
+    `SELECT id FROM appeals
+      WHERE task_version_id = ? AND status = 'pending'
+      LIMIT 1`
+  ).bind(taskVersionId).first();
+  if (pendingAppeal) return task;
+  const final = await env.DB.prepare(
+    `SELECT primary_receipt_id, round_id, final_merkle_root
+       FROM final_results
+      WHERE task_version_id = ? AND status = 'active'
+        AND primary_receipt_id = ?`
+  ).bind(taskVersionId, task.active_final_receipt_id).first();
+  if (!final) return task;
+  const receipt = await env.DB.prepare(
+    `SELECT id, pr_number, pr_merge_sha, importer_commit_sha
+       FROM repository_receipts
+      WHERE task_version_id = ? AND round_id = ?
+        AND final_merkle_root = ?
+      LIMIT 1`
+  ).bind(
+    taskVersionId,
+    final.round_id,
+    final.final_merkle_root
+  ).first();
+  if (!receipt) return task;
+  try {
+    task = await transitionConsensusTask(env.DB, task, {
+      toState: "published",
+      roundId: final.round_id,
+      eventType: "repository-publication-confirmed",
+      reasonCode: "signed-repository-receipt",
+      evidence: {
+        repositoryReceiptId: receipt.id,
+        finalReceiptId: final.primary_receipt_id,
+        finalMerkleRoot: final.final_merkle_root,
+        pullRequestNumber: Number(receipt.pr_number),
+        mergeCommitSha: receipt.pr_merge_sha,
+        importerCommitSha: receipt.importer_commit_sha
+      },
+      activeFinalReceiptId: final.primary_receipt_id,
+      requirePublicationReady: true,
+      publicationGuardAt: Date.now(),
+      idempotencyKey: `publish:${taskVersionId}:${receipt.id}`
+    });
+  } catch (error) {
+    if (!(error instanceof ConsensusConflict)) throw error;
+    return getConsensusTask(env.DB, taskVersionId);
+  }
+  await env.DB.prepare(
+    `UPDATE final_results
+        SET published_at = ?
+      WHERE primary_receipt_id = ? AND status = 'active'`
+  ).bind(Date.now(), final.primary_receipt_id).run();
+  await ensureTaskStateEvidence(env, task);
+  await queueGovernanceNotifications(
+    env,
+    task.id,
+    "result-published",
+    {
+      taskVersionId: task.id,
+      packetId: task.packet_id,
+      repositoryReceiptId: receipt.id
+    },
+    `result-published:${receipt.id}`
+  );
+  return task;
+}
+
+async function createDiscussionComment(request, env, body) {
+  const account = await requireSession(request, env);
+  const sourceReceiptId = String(body?.sourceReceiptId || "");
+  if (!isUuid(sourceReceiptId)) {
+    throw new PublicError("معرف مساهمتك المكتملة غير صالح.", 400);
+  }
+  let input;
+  try {
+    input = validateDiscussionInput(body);
+  } catch (error) {
+    throw new PublicError(error.message, 400);
+  }
+  const source = await env.DB.prepare(
+    `SELECT receipt_id, user_id, packet_id, participant_pseudonym,
+            artifact_sha256, artifact_type, task_version_id, round_id
+       FROM submissions
+      WHERE receipt_id = ? AND user_id = ? AND artifact_json IS NOT NULL`
+  ).bind(sourceReceiptId, account.user_id).first();
+  if (!source) {
+    throw new PublicError(
+      "لا يمكن المشاركة في النقاش قبل إتمام المهمة.",
+      403
+    );
+  }
+  const access = await env.DB.prepare(
+    `SELECT first_viewed_at
+       FROM result_access
+      WHERE user_id = ? AND source_receipt_id = ?
+        AND task_version_id = ? AND round_id = ?`
+  ).bind(
+    account.user_id,
+    sourceReceiptId,
+    source.task_version_id,
+    source.round_id
+  ).first();
+  if (!access) {
+    throw new PublicError(
+      "افتح النتائج السابقة أولًا قبل إضافة تعليق.",
+      409
+    );
+  }
+  const recent = await env.DB.prepare(
+    `SELECT COUNT(*) AS count
+       FROM discussion_comments
+      WHERE author_user_id = ? AND created_at >= ?`
+  ).bind(account.user_id, Date.now() - 24 * 60 * 60 * 1000).first();
+  if (Number(recent?.count || 0) >= 20) {
+    throw new PublicError(
+      "بلغت الحد اليومي للتعليقات. عد لاحقًا لاستكمال النقاش.",
+      429
+    );
+  }
+
+  const referencedIds = [
+    ...(input.targetReceiptId ? [input.targetReceiptId] : []),
+    ...input.mentionedReceiptIds,
+    ...input.referencedReceiptIds
+  ];
+  const relatedRows = await findTaskSubmissions(
+    env.DB,
+    source.task_version_id,
+    source.round_id,
+    referencedIds
+  );
+  const related = new Map(
+    relatedRows.map(row => [row.receipt_id, row])
+  );
+  for (const receiptId of new Set(referencedIds)) {
+    if (!related.has(receiptId)) {
+      throw new PublicError(
+        "إحدى النتائج المشار إليها لا تنتمي إلى هذه المهمة.",
+        400
+      );
+    }
+  }
+  if (input.targetReceiptId === sourceReceiptId) {
+    throw new PublicError(
+      "استخدم توضيحًا عامًا بدل استهداف نتيجتك نفسها.",
+      400
+    );
+  }
+  if (input.parentCommentId) {
+    const parent = await env.DB.prepare(
+      `SELECT comment_id
+         FROM discussion_comments
+        WHERE comment_id = ? AND task_version_id = ? AND round_id = ?`
+    ).bind(
+      input.parentCommentId,
+      source.task_version_id,
+      source.round_id
+    ).first();
+    if (!parent) {
+      throw new PublicError("التعليق المراد الرد عليه غير متاح.", 400);
+    }
+  }
+
+  const mentions = input.mentionedReceiptIds
+    .filter(receiptId => receiptId !== sourceReceiptId)
+    .map(receiptId => ({
+      receiptId,
+      pseudonym: related.get(receiptId).participant_pseudonym
+    }));
+  const resultReferences = input.referencedReceiptIds.map(receiptId => {
+    const row = related.get(receiptId);
+    return {
+      receiptId,
+      artifactSha256: row.artifact_sha256,
+      kind: row.artifact_type,
+      pseudonym: row.participant_pseudonym,
+      isFinal: row.artifact_type === "adjudication-package"
+        && row.final_status === "active"
+    };
+  });
+  if (input.category === "final-result"
+      && !resultReferences.some(reference => reference.isFinal)) {
+    throw new PublicError(
+      "تعليق النتيجة النهائية يجب أن يشير إلى قرار تحكيم نهائي.",
+      400
+    );
+  }
+
+  const commentId = crypto.randomUUID();
+  const receivedAtUtc = new Date().toISOString();
+  const target = input.targetReceiptId
+    ? related.get(input.targetReceiptId)
+    : null;
+  const publicEnvelope = {
+    schema: "adg-msa-github-comment-v1",
+    commentId,
+    participantPseudonym: source.participant_pseudonym,
+    receivedAtUtc,
+    packetId: source.packet_id,
+    taskVersionId: source.task_version_id,
+    roundId: source.round_id,
+    sourceReceiptId,
+    targetReceiptId: input.targetReceiptId,
+    targetArtifactSha256: target?.artifact_sha256 ?? null,
+    parentCommentId: input.parentCommentId,
+    category: input.category,
+    body: input.body,
+    location: {
+      sentenceId: input.sentenceId,
+      tokenId: input.tokenId
+    },
+    mentions,
+    resultReferences,
+    attestation: {
+      authoredAfterIndependentSubmission: true,
+      publicTechnicalDiscussion: true
+    },
+    claimBoundaries: [
+      "The author identity is private and represented only by a pseudonym.",
+      "A disagreement is not an established error without an approved final result.",
+      "The comment remains untrusted until repository validation passes."
+    ]
+  };
+  const hmacKey = await getVaultSecret(
+    env.SUBMISSION_HMAC_SECRET_NAME,
+    env
+  );
+  const signedEnvelope = {
+    ...publicEnvelope,
+    hmacSha256: await hmacSha256(
+      hmacKey,
+      JSON.stringify(publicEnvelope)
+    )
+  };
+  const evidencePayload =
+    JSON.stringify(signedEnvelope, null, 2) + "\n";
+  const createdAt = Date.parse(receivedAtUtc);
+  await env.DB.batch([
+    env.DB.prepare(
+      `INSERT INTO discussion_comments
+        (comment_id, packet_id, author_user_id, participant_pseudonym,
+         source_receipt_id, target_receipt_id, parent_comment_id,
+         category, body, sentence_id, token_id, mentions_json,
+         references_json, github_status, created_at,
+         task_version_id, round_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+               'pending-validation', ?, ?, ?)`
+    ).bind(
+      commentId,
+      source.packet_id,
+      account.user_id,
+      source.participant_pseudonym,
+      sourceReceiptId,
+      input.targetReceiptId,
+      input.parentCommentId,
+      input.category,
+      input.body,
+      input.sentenceId,
+      input.tokenId,
+      JSON.stringify(mentions),
+      JSON.stringify(resultReferences),
+      createdAt,
+      source.task_version_id,
+      source.round_id
+    ),
+    env.DB.prepare(
+      `INSERT INTO evidence_outbox
+        (id, kind, task_version_id, related_id, public_blob_name,
+         public_payload_json, dedupe_key, status, attempts,
+         next_attempt_at, created_at)
+       VALUES (?, 'comment', ?, ?, ?, ?, ?,
+               'pending', 0, ?, ?)`
+    ).bind(
+      crypto.randomUUID(),
+      source.task_version_id,
+      commentId,
+      `comment-${commentId}.json`,
+      evidencePayload,
+      `comment:${commentId}`,
+      createdAt,
+      createdAt
+    )
+  ]);
+
+  await queueDiscussionNotifications(
+    env,
+    account.user_id,
+    source,
+    commentId,
+    input.body,
+    target,
+    mentions,
+    related
+  );
+
+  return json({
+    accepted: true,
+    comment: {
+      ...publicEnvelope,
+      githubStatus: "pending-validation"
+    }
+  }, 202);
+}
+
+async function findTaskSubmissions(
+  db,
+  taskVersionId,
+  roundId,
+  receiptIds
+) {
+  const unique = [...new Set(receiptIds.filter(Boolean))];
+  if (unique.length === 0) return [];
+  const placeholders = unique.map(() => "?").join(", ");
+  const result = await db.prepare(
+    `SELECT s.receipt_id, s.user_id, s.packet_id, s.role,
+            s.participant_pseudonym, s.artifact_sha256, s.artifact_type,
+            s.repository_status, u.consent_json,
+            f.status AS final_status
+       FROM submissions s
+       JOIN users u ON u.id = s.user_id
+       LEFT JOIN final_results f
+         ON f.primary_receipt_id = s.receipt_id
+      WHERE s.task_version_id = ?
+        AND s.round_id = ?
+        AND s.receipt_id IN (${placeholders})`
+  ).bind(taskVersionId, roundId, ...unique).all();
+  return result.results || [];
+}
+
+function publicResultRow(row, includeArtifact) {
+  const value = {
+    receiptId: row.receipt_id,
+    packetId: row.packet_id,
+    role: row.role,
+    participantPseudonym: row.participant_pseudonym,
+    artifactType: row.artifact_type,
+    artifactSha256: row.artifact_sha256,
+    isFinal: row.artifact_type === "adjudication-package"
+      && row.final_status === "active",
+    githubStatus: row.repository_status,
+    submittedAtUtc: new Date(row.submitted_at).toISOString()
+  };
+  if (includeArtifact) value.artifact = JSON.parse(row.artifact_json);
+  return value;
+}
+
+function publicCommentRow(row) {
+  const redacted = row.moderation_state === "redacted";
+  return {
+    commentId: row.comment_id,
+    participantPseudonym: row.participant_pseudonym,
+    sourceReceiptId: row.source_receipt_id,
+    targetReceiptId: row.target_receipt_id,
+    parentCommentId: row.parent_comment_id,
+    category: row.category,
+    body: redacted
+      ? "حُجب نص هذا التعليق بقرار إشراف موثق."
+      : row.body,
+    location: {
+      sentenceId: row.sentence_id,
+      tokenId: row.token_id == null ? null : Number(row.token_id)
+    },
+    mentions: redacted ? [] : JSON.parse(row.mentions_json),
+    resultReferences: redacted
+      ? []
+      : JSON.parse(row.references_json),
+    githubStatus: row.github_status,
+    moderationState: row.moderation_state || "visible",
+    createdAtUtc: new Date(row.created_at).toISOString()
+  };
 }
 
 async function logout(request, env) {
@@ -1471,6 +3720,20 @@ async function deleteDraft(request, env, url) {
 }
 
 export function calculateDraftProgress(draft) {
+  if (draft.role === "ratification") {
+    const value = (draft.fields || [])
+      .find(field => field.kind === "ratification") || {};
+    const completed = [
+      isUuid(value.primaryReceiptId),
+      ["agree", "disagree", "recuse"].includes(value.decision),
+      String(value.rationale || "").trim().length >= 20
+    ].filter(Boolean).length;
+    return {
+      completed,
+      total: 3,
+      percentage: Math.round(completed / 3 * 100)
+    };
+  }
   let total = 0;
   let completed = 0;
   for (const sentence of draft.fields || []) {
@@ -1558,12 +3821,7 @@ export function validateAccountProfile(profile) {
     120,
     "الاسم الكامل"
   );
-  const email = normalizedText(
-    profile.email,
-    5,
-    160,
-    "البريد الإلكتروني"
-  ).toLowerCase();
+  const email = verifiedEmail(profile.email);
   const experienceYears = Number(profile.experienceYears);
   const specialization = normalizedText(
     profile.specialization,
@@ -1579,9 +3837,6 @@ export function validateAccountProfile(profile) {
     "linguistics",
     "other"
   ]);
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    throw new PublicError("البريد الإلكتروني غير صالح.", 400);
-  }
   if (!Number.isInteger(experienceYears)
       || experienceYears < 0 || experienceYears > 80) {
     throw new PublicError("سنوات الخبرة غير صالحة.", 400);
@@ -1652,7 +3907,7 @@ function validateSocialAccounts(value) {
   return normalized;
 }
 
-function validateAccountConsent(consent) {
+export function validateAccountConsent(consent) {
   if (!consent || consent.identityStorage !== true) {
     throw new PublicError(
       "الموافقة على حفظ بيانات الحساب مطلوبة.",
@@ -1661,7 +3916,9 @@ function validateAccountConsent(consent) {
   }
   return {
     identityStorage: true,
-    futureContact: consent.futureContact === true
+    futureContact: consent.futureContact === true,
+    discussionNotifications:
+      consent.discussionNotifications === true
   };
 }
 
@@ -1672,7 +3929,7 @@ function validateDraftKey(packetId, role) {
     160,
     "معرف المهمة"
   );
-  if (!["A", "B", "adjudication"].includes(role)) {
+  if (!["A", "B", "adjudication", "ratification"].includes(role)) {
     throw new PublicError("دور التحكيم غير صالح.", 400);
   }
   return { packetId: normalizedPacketId, role };
@@ -1715,7 +3972,8 @@ function relyingParty(env) {
 async function takeChallenge(db, id, kind) {
   const row = await db.prepare(
     `SELECT id, challenge, kind, user_id, profile_ciphertext,
-            consent_json, expires_at
+            consent_json, email_verification_id, verified_email_hash,
+            expires_at
        FROM webauthn_challenges
       WHERE id = ? AND kind = ?`
   ).bind(id, kind).first();
@@ -1735,9 +3993,27 @@ async function takeChallenge(db, id, kind) {
 async function pruneAuthRecords(db, now) {
   await db.batch([
     db.prepare(
+      `UPDATE email_verifications
+          SET consumed_at = ?
+        WHERE consumed_at IS NULL
+          AND (
+            expires_at <= ?
+            OR (token_expires_at IS NOT NULL AND token_expires_at <= ?)
+            OR reservation_id IN (
+              SELECT id
+                FROM webauthn_challenges
+               WHERE expires_at <= ?
+            )
+          )`
+    ).bind(now, now, now, now),
+    db.prepare(
       "DELETE FROM webauthn_challenges WHERE expires_at <= ?"
     ).bind(now),
-    db.prepare("DELETE FROM sessions WHERE expires_at <= ?").bind(now)
+    db.prepare("DELETE FROM sessions WHERE expires_at <= ?").bind(now),
+    db.prepare(
+      `DELETE FROM email_verifications
+        WHERE created_at <= ?`
+    ).bind(now - 7 * 24 * 60 * 60 * 1000)
   ]);
 }
 
@@ -1760,7 +4036,13 @@ async function requireSession(request, env) {
   const tokenHash = await sha256Hex(token);
   const row = await env.DB.prepare(
     `SELECT s.user_id, s.expires_at, u.profile_ciphertext,
-            u.consent_json
+            u.consent_json, u.verified_email_hash,
+            (
+              SELECT status
+                FROM identity_erasure_requests
+               WHERE user_id = u.id AND status = 'pending'
+               LIMIT 1
+            ) AS erasure_status
        FROM sessions s
        JOIN users u ON u.id = s.user_id
       WHERE s.token_hash = ?`
@@ -1830,6 +4112,18 @@ async function receiveSubmission(request, env) {
     );
   }
   const account = await requireSession(request, env);
+  if (!account.verified_email_hash) {
+    throw new PublicError(
+      "وثّق بريد الحساب قبل إرسال التحكيم.",
+      403
+    );
+  }
+  if (account.erasure_status === "pending") {
+    throw new PublicError(
+      "لا يمكن إنشاء مساهمة جديدة بعد تسجيل طلب محو الهوية.",
+      409
+    );
+  }
 
   const maxBytes = Number(env.MAX_SUBMISSION_BYTES || 900000);
   const contentLength = Number(request.headers.get("content-length") || 0);
@@ -1849,6 +4143,19 @@ async function receiveSubmission(request, env) {
     throw new PublicError("بيانات التقييم غير صالحة.", 400);
   }
   validateSubmission(submission);
+  await validateArtifactForServer(submission.artifact);
+  const task = await submissionTask(submission.artifact);
+  const resultAccess = await env.DB.prepare(
+    `SELECT first_viewed_at
+       FROM result_access
+      WHERE user_id = ? AND task_version_id = ?`
+  ).bind(account.user_id, task.identity.id).first();
+  if (resultAccess && ["A", "B"].includes(task.role)) {
+    throw new PublicError(
+      "اطلعت على نتائج هذه المهمة؛ لا يمكن بدء تحكيم مستقل جديد لها.",
+      409
+    );
+  }
 
   const turnstile = await verifyTurnstile(
     submission.turnstileToken,
@@ -1865,10 +4172,6 @@ async function receiveSubmission(request, env) {
   if (actualArtifactSha256 !== submission.artifactSha256) {
     throw new PublicError("تغيّرت نتيجة التقييم أثناء الإرسال.", 400);
   }
-  const task = submissionTask(submission.artifact);
-
-  const receiptId = crypto.randomUUID();
-  const receivedAtUtc = new Date().toISOString();
   const entityCryptMasterKey = await getVaultSecret(
     env.ENTITYCRYPT_MASTER_KEY_SECRET_NAME,
     env
@@ -1878,6 +4181,61 @@ async function receiveSubmission(request, env) {
     entityCryptMasterKey
   ));
   const storedConsent = JSON.parse(account.consent_json);
+  const priorParticipation = await env.DB.prepare(
+    `SELECT id
+       FROM task_participations
+      WHERE user_id = ?
+        AND (task_version_id = ? OR holdout_id = ?)
+      LIMIT 1`
+  ).bind(
+    account.user_id,
+    task.identity.id,
+    task.identity.holdoutId
+  ).first();
+  if (priorParticipation) {
+    throw new PublicError(
+      "سبق أن شارك هذا الحساب في المهمة أو عائلة الحجز نفسها.",
+      409
+    );
+  }
+
+  let consensusTask;
+  try {
+    const existingTask = await getConsensusTask(
+      env.DB,
+      task.identity.id
+    );
+    if (!existingTask
+        && !["A", "B"].includes(task.consensusRole)) {
+      throw new PublicError(
+        "يجب تثبيت التحكيمين المستقلين قبل هذا الدور.",
+        409
+      );
+    }
+    consensusTask = await ensureConsensusTask(
+      env.DB,
+      task.packet,
+      task.packetRoot,
+      Date.now()
+    );
+  } catch (error) {
+    if (error instanceof ConsensusConflict) {
+      throw new PublicError(error.message, 409);
+    }
+    throw error;
+  }
+  const round = await getCurrentConsensusRound(env.DB, consensusTask);
+  const roleContext = await validateConsensusEligibility(
+    env,
+    account,
+    task,
+    consensusTask,
+    round,
+    submission.artifact
+  );
+  const receiptId = crypto.randomUUID();
+  const participantPseudonym = `adg-${receiptId.slice(0, 12)}`;
+  const receivedAtUtc = new Date().toISOString();
   const privateIdentity = {
     schema: "adg-msa-private-participant-identity-v1",
     receiptId,
@@ -1892,7 +4250,7 @@ async function receiveSubmission(request, env) {
   const publicEnvelope = {
     schema: "adg-msa-github-inbox-v1",
     receiptId,
-    participantPseudonym: `adg-${receiptId.slice(0, 12)}`,
+    participantPseudonym,
     receivedAtUtc,
     artifactType: submission.artifactType,
     artifactSha256: actualArtifactSha256,
@@ -1915,14 +4273,6 @@ async function receiveSubmission(request, env) {
       hmacKey,
       JSON.stringify(publicEnvelope))
   };
-  const identitySas = await getVaultSecret(
-    env.IDENTITY_SAS_SECRET_NAME,
-    env
-  );
-  const submissionSas = await getVaultSecret(
-    env.SUBMISSION_SAS_SECRET_NAME,
-    env
-  );
 
   const encryptedIdentity = await encryptEntityCrypt(
     JSON.stringify(privateIdentity),
@@ -1936,45 +4286,257 @@ async function receiveSubmission(request, env) {
     ciphertext: encryptedIdentity
   };
 
-  await putBlob(
-    identitySas,
-    `${receiptId}.json`,
-    JSON.stringify(identityEnvelope, null, 2) + "\n"
-  );
-  await putBlob(
-    submissionSas,
-    `${receiptId}.json`,
-    JSON.stringify(signedEnvelope, null, 2) + "\n"
-  );
-  await env.DB.prepare(
-    `INSERT INTO submissions
-      (receipt_id, user_id, packet_id, role,
-       artifact_sha256, submitted_at)
-     VALUES (?, ?, ?, ?, ?, ?)`
-  ).bind(
-    receiptId,
-    account.user_id,
-    task.packetId,
-    task.role,
-    actualArtifactSha256,
-    Date.parse(receivedAtUtc)
-  ).run();
+  const receivedAt = Date.parse(receivedAtUtc);
+  const deliveryId = crypto.randomUUID();
+  const participationId = crypto.randomUUID();
+  const participationStatus =
+    task.consensusRole === "J2"
+      && submission.artifact.ratification.decision === "recuse"
+      ? "recused"
+      : "submitted";
+  const evidenceStatus = ["A", "B"].includes(task.consensusRole)
+    ? "held"
+    : "pending";
+  const writes = [
+    env.DB.prepare(
+      `INSERT INTO submissions
+        (receipt_id, user_id, packet_id, role,
+         artifact_sha256, submitted_at, participant_pseudonym,
+         artifact_type, artifact_json, repository_status,
+         task_version_id, round_id, holdout_id, guideline_version,
+         data_version, protocol_version, consensus_role,
+         consensus_round)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending-validation',
+               ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(
+      receiptId,
+      account.user_id,
+      task.packetId,
+      task.role,
+      actualArtifactSha256,
+      receivedAt,
+      participantPseudonym,
+      submission.artifactType,
+      JSON.stringify(submission.artifact),
+      consensusTask.id,
+      round.id,
+      task.identity.holdoutId,
+      task.identity.guidelineVersion,
+      task.identity.dataVersion,
+      task.identity.protocolVersion,
+      task.consensusRole,
+      Number(round.round_number)
+    ),
+    env.DB.prepare(
+      `INSERT INTO task_participations
+        (id, task_version_id, round_id, holdout_id, user_id,
+         role, status, submission_receipt_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(
+      participationId,
+      consensusTask.id,
+      round.id,
+      task.identity.holdoutId,
+      account.user_id,
+      task.consensusRole,
+      participationStatus,
+      receiptId,
+      receivedAt,
+      receivedAt
+    ),
+    env.DB.prepare(
+      `INSERT INTO evidence_outbox
+        (id, kind, task_version_id, related_id, public_blob_name,
+         identity_blob_name, public_payload_json, identity_payload_json,
+         dedupe_key, status, attempts, next_attempt_at, created_at)
+       VALUES (?, 'submission', ?, ?, ?, ?, ?, ?, ?,
+               ?, 0, ?, ?)`
+    ).bind(
+      deliveryId,
+      consensusTask.id,
+      receiptId,
+      `${receiptId}.json`,
+      `${receiptId}.json`,
+      JSON.stringify(signedEnvelope, null, 2) + "\n",
+      JSON.stringify(identityEnvelope, null, 2) + "\n",
+      `submission:${receiptId}`,
+      evidenceStatus,
+      receivedAt,
+      receivedAt
+    )
+  ];
+  let primaryFinalRoot = null;
+  if (task.consensusRole === "J1") {
+    primaryFinalRoot = await computeAdjudicationMerkleRoot(
+      submission.artifact.packet,
+      submission.artifact.annotationA,
+      submission.artifact.annotationB,
+      submission.artifact.adjudication
+    );
+    writes.push(env.DB.prepare(
+      `INSERT INTO final_results
+        (primary_receipt_id, task_version_id, round_id,
+         final_merkle_root, status, proposed_at)
+       VALUES (?, ?, ?, ?, 'proposed', ?)`
+    ).bind(
+      receiptId,
+      consensusTask.id,
+      round.id,
+      primaryFinalRoot,
+      receivedAt
+    ));
+  }
+  if (task.consensusRole === "J2"
+      && submission.artifact.ratification.decision === "agree") {
+    writes.push(env.DB.prepare(
+      `UPDATE final_results
+          SET secondary_receipt_id = ?, status = 'active',
+              approved_at = ?
+        WHERE primary_receipt_id = ?
+          AND task_version_id = ?
+          AND round_id = ?
+          AND final_merkle_root = ?
+          AND status = 'proposed'
+          AND secondary_receipt_id IS NULL`
+    ).bind(
+      receiptId,
+      receivedAt,
+      roleContext.primaryFinal.primary_receipt_id,
+      consensusTask.id,
+      round.id,
+      submission.artifact.ratification
+        .primaryAdjudicationMerkleRoot
+    ));
+  }
+  if (task.consensusRole === "J2"
+      && submission.artifact.ratification.decision === "recuse") {
+    writes.push(env.DB.prepare(
+      `INSERT INTO recusals
+        (id, task_version_id, round_id, user_id, role,
+         scope, reason, created_at)
+       VALUES (?, ?, ?, ?, 'J2', 'holdout-family', ?, ?)`
+    ).bind(
+      crypto.randomUUID(),
+      consensusTask.id,
+      round.id,
+      account.user_id,
+      submission.artifact.ratification.rationale,
+      receivedAt
+    ));
+  }
+  let writeResults;
+  try {
+    writeResults = await env.DB.batch(writes);
+  } catch (error) {
+    console.error("ADG consensus submission write failed", {
+      name: error?.name,
+      message: error?.message
+    });
+    throw new PublicError(
+      "تعارض الدور أو تغيرت حالة الجولة. حدّث المهمة وأعد المحاولة.",
+      409
+    );
+  }
+  if (Number(writeResults[0]?.meta?.changes || 0) !== 1
+      || Number(writeResults[1]?.meta?.changes || 0) !== 1
+      || Number(writeResults[2]?.meta?.changes || 0) !== 1
+      || (writes.length > 3
+        && Number(writeResults[3]?.meta?.changes || 0) !== 1)) {
+    throw new PublicError(
+      "لم تُثبت المساهمة ذريًا في سجل الجولة.",
+      409
+    );
+  }
+  if (["A", "B"].includes(task.consensusRole)
+      && consensusTask.state === "open") {
+    try {
+      consensusTask = await transitionConsensusTask(
+        env.DB,
+        consensusTask,
+        {
+          toState: "independent-review",
+          roundId: round.id,
+          eventType: "independent-review-opened",
+          reasonCode: "first-independent-submission",
+          evidence: { roundNumber: Number(round.round_number) },
+          actorUserId: account.user_id,
+          idempotencyKey:
+            `independent-open:${consensusTask.id}:${round.id}`
+        }
+      );
+      await ensureTaskStateEvidence(env, consensusTask);
+    } catch (error) {
+      if (!(error instanceof ConsensusConflict)) throw error;
+      consensusTask = await getConsensusTask(env.DB, consensusTask.id);
+    }
+  }
+  await reconcileConsensusTask(env, consensusTask.id);
+  const refreshedTask = await getConsensusTask(env.DB, consensusTask.id);
+  if (refreshedTask?.state === "approved"
+      && task.consensusRole === "J2"
+      && submission.artifact.ratification.decision === "agree") {
+    await queueFinalResultNotifications(
+      env,
+      account.user_id,
+      roleContext.primaryFinal.primary_receipt_id,
+      roleContext.primaryFinal.participant_pseudonym,
+      JSON.parse(roleContext.primaryFinal.artifact_json)
+    );
+  }
+  const previous = await env.DB.prepare(
+    `SELECT COUNT(*) AS count
+       FROM submissions
+      WHERE task_version_id = ? AND round_id = ?
+        AND receipt_id <> ?
+        AND artifact_json IS NOT NULL`
+  ).bind(consensusTask.id, round.id, receiptId).first();
+  const delivery = await env.DB.prepare(
+    `SELECT status
+       FROM evidence_outbox
+      WHERE dedupe_key = ?`
+  ).bind(`submission:${receiptId}`).first();
+  const repositoryImportStatus = delivery?.status === "held"
+    ? "held-for-independent-quorum"
+    : "pending-validation";
 
   return json({
     accepted: true,
     receiptId,
-    repositoryImportStatus: "pending-validation"
+    repositoryImportStatus,
+    previousResultsAvailable: Number(previous?.count || 0),
+    consensus: {
+      taskVersionId: consensusTask.id,
+      round: Number(round.round_number),
+      role: task.consensusRole,
+      state: refreshedTask?.state ?? consensusTask.state
+    }
   }, 202);
 }
 
-function submissionTask(artifact) {
-  const packetId = artifact?.packet?.packetId;
+async function submissionTask(artifact) {
+  const packet = artifact?.kind === "ratification-package"
+    ? artifact?.primaryArtifact?.packet
+    : artifact?.packet;
+  const packetRoot = await computePacketMerkleRoot(packet);
   const role = artifact?.kind === "independent-annotation"
     ? artifact?.annotation?.annotatorSlot
     : artifact?.kind === "adjudication-package"
       ? "adjudication"
-      : null;
-  return validateDraftKey(packetId, role);
+      : artifact?.kind === "ratification-package"
+        ? "ratification"
+        : null;
+  const draftKey = validateDraftKey(packet?.packetId, role);
+  return {
+    ...draftKey,
+    packet,
+    packetRoot,
+    identity: taskVersionIdentity(packet, packetRoot),
+    consensusRole: role === "adjudication"
+      ? "J1"
+      : role === "ratification"
+        ? "J2"
+        : role
+  };
 }
 
 function validateSubmission(value) {
@@ -1985,6 +4547,27 @@ function validateSubmission(value) {
       || !/^[a-f0-9]{64}$/.test(value.artifactSha256 || "")
       || typeof value.clientVersion !== "string") {
     throw new PublicError("غلاف التقييم غير صالح.", 400);
+  }
+  const participantPrefix = value.participantId.slice(0, 12);
+  if (value.artifact.kind === "independent-annotation") {
+    const expected =
+      `human-${participantPrefix}-${value.artifact.annotation.annotatorSlot}`;
+    if (value.artifact.annotation.annotatorPseudonym !== expected) {
+      throw new PublicError("معرف المعلّق داخل النتيجة غير مرتبط بالجلسة.", 400);
+    }
+  } else if (value.artifact.kind === "adjudication-package") {
+    const expected = `human-${participantPrefix}-J1`;
+    if (value.artifact.adjudication.adjudicatorPseudonym !== expected) {
+      throw new PublicError("معرف المحكّم داخل النتيجة غير مرتبط بالجلسة.", 400);
+    }
+  } else {
+    const expected = `human-${participantPrefix}-J2`;
+    if (value.artifact.ratification.reviewerPseudonym !== expected) {
+      throw new PublicError(
+        "معرف المراجع الثاني داخل النتيجة غير مرتبط بالجلسة.",
+        400
+      );
+    }
   }
 
   validateAccountProfile(value.profile);
@@ -2002,7 +4585,11 @@ function validateSubmission(value) {
   }
   if (!value.artifact
       || value.artifact.schema !== "adg-msa-portal-artifact-v1"
-      || !["independent-annotation", "adjudication-package"]
+      || ![
+        "independent-annotation",
+        "adjudication-package",
+        "ratification-package"
+      ]
         .includes(value.artifact.kind)
       || containsKey(value.artifact, PII_KEYS)
       || containsKey(value.artifact, FORBIDDEN_ANALYSIS_KEYS)) {
@@ -2011,6 +4598,1727 @@ function validateSubmission(value) {
       400
     );
   }
+}
+
+async function validateArtifactForServer(artifact) {
+  try {
+    validatePublicArtifactText(artifact);
+    if (artifact.kind === "independent-annotation") {
+      await validateSubmissionBinding(artifact.packet, artifact.annotation);
+      return;
+    }
+    if (artifact.kind === "adjudication-package") {
+      await validateAdjudicationBinding(
+        artifact.packet,
+        artifact.annotationA,
+        artifact.annotationB,
+        artifact.adjudication
+      );
+      return;
+    }
+    await validateRatificationBinding(
+      artifact.primaryArtifact,
+      artifact.ratification
+    );
+  } catch (error) {
+    throw new PublicError(
+      `فشل التحقق البنيوي من نتيجة التحكيم: ${error.message}`,
+      400
+    );
+  }
+}
+
+async function validateConsensusEligibility(
+  env,
+  account,
+  task,
+  consensusTask,
+  round,
+  artifact
+) {
+  if (!round || round.status !== "open") {
+    throw new PublicError("جولة الإجماع الحالية ليست مفتوحة.", 409);
+  }
+  const allowedStates = {
+    A: new Set(["open", "independent-review"]),
+    B: new Set(["open", "independent-review"]),
+    J1: new Set(["discussion"]),
+    J2: new Set(["final-review"])
+  }[task.consensusRole];
+  if (!allowedStates?.has(consensusTask.state)) {
+    throw new PublicError(
+      `الدور ${task.consensusRole} غير متاح في حالة `
+      + `${consensusTask.state}.`,
+      409
+    );
+  }
+  const existing = await env.DB.prepare(
+    `SELECT id, task_version_id, holdout_id, role, status
+       FROM task_participations
+      WHERE user_id = ?
+        AND (task_version_id = ? OR holdout_id = ?)
+      LIMIT 1`
+  ).bind(
+    account.user_id,
+    consensusTask.id,
+    task.identity.holdoutId
+  ).first();
+  if (existing) {
+    throw new PublicError(
+      "سبق أن شارك هذا الحساب في المهمة أو عائلة الحجز نفسها.",
+      409
+    );
+  }
+  const occupied = await env.DB.prepare(
+    `SELECT id
+       FROM task_participations
+      WHERE round_id = ? AND role = ?
+      LIMIT 1`
+  ).bind(round.id, task.consensusRole).first();
+  if (occupied) {
+    throw new PublicError("اكتمل هذا الدور في الجولة الحالية.", 409);
+  }
+
+  if (["A", "B"].includes(task.consensusRole)) return {};
+  if (task.consensusRole === "J1") {
+    const independent = await env.DB.prepare(
+      `SELECT receipt_id, user_id, consensus_role, artifact_json
+         FROM submissions
+        WHERE task_version_id = ? AND round_id = ?
+          AND consensus_role IN ('A', 'B')
+          AND active = 1
+        ORDER BY consensus_role`
+    ).bind(consensusTask.id, round.id).all();
+    if ((independent.results || []).length !== 2) {
+      throw new PublicError(
+        "لا يمكن بدء J1 قبل تثبيت A وB في الجولة نفسها.",
+        409
+      );
+    }
+    const requiredRoots = new Set([
+      artifact.adjudication.annotationAMerkleRoot,
+      artifact.adjudication.annotationBMerkleRoot
+    ]);
+    const storedRoots = new Set();
+    for (const row of independent.results) {
+      const storedArtifact = JSON.parse(row.artifact_json);
+      storedRoots.add(await computeAnnotationMerkleRoot(
+        storedArtifact.packet,
+        storedArtifact.annotation
+      ));
+    }
+    if (storedRoots.size !== 2
+        || [...requiredRoots].some(root => !storedRoots.has(root))) {
+      throw new PublicError(
+        "حزمة J1 لا ترتبط بإرسالي A وB المثبتين لهذه الجولة.",
+        409
+      );
+    }
+    return { independent: independent.results };
+  }
+
+  const primaryFinal = await env.DB.prepare(
+    `SELECT f.primary_receipt_id, f.final_merkle_root, f.status,
+            s.user_id, s.participant_pseudonym, s.artifact_json
+       FROM final_results f
+       JOIN submissions s ON s.receipt_id = f.primary_receipt_id
+      WHERE f.primary_receipt_id = ?
+        AND f.task_version_id = ?
+        AND f.round_id = ?
+        AND f.status = 'proposed'`
+  ).bind(
+    artifact.ratification.primaryReceiptId,
+    consensusTask.id,
+    round.id
+  ).first();
+  if (!primaryFinal
+      || primaryFinal.final_merkle_root
+        !== artifact.ratification.primaryAdjudicationMerkleRoot) {
+    throw new PublicError(
+      "مراجعة J2 لا ترتبط بنتيجة J1 المقترحة في الجولة الحالية.",
+      409
+    );
+  }
+  return { primaryFinal };
+}
+
+async function reconcileConsensusTask(env, taskVersionId) {
+  let task = await getConsensusTask(env.DB, taskVersionId);
+  if (!task) return null;
+  const round = await getCurrentConsensusRound(env.DB, task);
+  if (!round) return task;
+
+  try {
+    if (task.state === "independent-review") {
+      const result = await env.DB.prepare(
+        `SELECT receipt_id, consensus_role, artifact_json
+           FROM submissions
+          WHERE task_version_id = ? AND round_id = ?
+            AND consensus_role IN ('A', 'B') AND active = 1
+          ORDER BY consensus_role`
+      ).bind(task.id, round.id).all();
+      const rows = result.results || [];
+      if (rows.length === 2) {
+        const byRole = new Map(rows.map(row => [row.consensus_role, row]));
+        await releaseIndependentEvidence(
+          env.DB,
+          task.id,
+          round.id,
+          [
+            byRole.get("A").receipt_id,
+            byRole.get("B").receipt_id
+          ]
+        );
+        const artifactA = JSON.parse(byRole.get("A").artifact_json);
+        const artifactB = JSON.parse(byRole.get("B").artifact_json);
+        const metrics = computeIndependentAgreement(
+          artifactA.annotation,
+          artifactB.annotation
+        );
+        const policy = JSON.parse(task.metric_policy_json);
+        const passed = agreementPolicyPassed(metrics, policy);
+        await env.DB.prepare(
+          `INSERT OR IGNORE INTO consensus_metrics
+            (task_version_id, round_id, annotation_a_receipt_id,
+             annotation_b_receipt_id, metrics_json, policy_passed,
+             computed_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`
+        ).bind(
+          task.id,
+          round.id,
+          byRole.get("A").receipt_id,
+          byRole.get("B").receipt_id,
+          JSON.stringify(metrics),
+          passed ? 1 : 0,
+          Date.now()
+        ).run();
+        task = await transitionConsensusTask(env.DB, task, {
+          toState: passed ? "discussion" : "escalated",
+          roundId: round.id,
+          eventType: passed
+            ? "independent-quorum-reached"
+            : "independent-agreement-below-policy",
+          reasonCode: passed
+            ? "independent-quorum-complete"
+            : "low-independent-agreement",
+          evidence: {
+            annotationAReceiptId: byRole.get("A").receipt_id,
+            annotationBReceiptId: byRole.get("B").receipt_id,
+            metrics,
+            policy
+          },
+          idempotencyKey:
+            `independent-quorum:${round.id}:`
+            + `${byRole.get("A").receipt_id}:`
+            + `${byRole.get("B").receipt_id}`
+        });
+        await ensureTaskStateEvidence(env, task);
+        if (!passed) {
+          task = await createReissuedRound(
+            env.DB,
+            task,
+            "low-independent-agreement",
+            null
+          );
+          await ensureTaskStateEvidence(env, task);
+          await queueGovernanceNotifications(
+            env,
+            task.id,
+            "task-reissued",
+            {
+              taskVersionId: task.id,
+              packetId: task.packet_id,
+              reason: "low-independent-agreement"
+            },
+            `task-reissued:${task.last_event_id}`
+          );
+        }
+      }
+    } else if (task.state === "discussion") {
+      const primary = await env.DB.prepare(
+        `SELECT receipt_id, artifact_json
+           FROM submissions
+          WHERE task_version_id = ? AND round_id = ?
+            AND consensus_role = 'J1' AND active = 1`
+      ).bind(task.id, round.id).first();
+      if (primary) {
+        const artifact = JSON.parse(primary.artifact_json);
+        const novelCount = countNovelPrimaryDecisions(
+          artifact.annotationA,
+          artifact.annotationB,
+          artifact.adjudication
+        );
+        task = await transitionConsensusTask(env.DB, task, {
+          toState: novelCount > 0 ? "escalated" : "final-review",
+          roundId: round.id,
+          eventType: novelCount > 0
+            ? "novel-primary-decision"
+            : "primary-adjudication-proposed",
+          reasonCode: novelCount > 0
+            ? "novel-primary-decision"
+            : "j1-final-root-proposed",
+          evidence: {
+            primaryReceiptId: primary.receipt_id,
+            finalMerkleRoot: await computeAdjudicationMerkleRoot(
+              artifact.packet,
+              artifact.annotationA,
+              artifact.annotationB,
+              artifact.adjudication
+            ),
+            novelDecisionCount: novelCount
+          },
+          idempotencyKey: `j1-proposal:${primary.receipt_id}`
+        });
+        await ensureTaskStateEvidence(env, task);
+        if (novelCount > 0) {
+          task = await createReissuedRound(
+            env.DB,
+            task,
+            "novel-primary-decision",
+            null
+          );
+          await ensureTaskStateEvidence(env, task);
+          await queueGovernanceNotifications(
+            env,
+            task.id,
+            "task-reissued",
+            {
+              taskVersionId: task.id,
+              packetId: task.packet_id,
+              reason: "novel-primary-decision"
+            },
+            `task-reissued:${task.last_event_id}`
+          );
+        }
+      }
+    } else if (task.state === "final-review") {
+      const secondary = await env.DB.prepare(
+        `SELECT receipt_id, artifact_json
+           FROM submissions
+          WHERE task_version_id = ? AND round_id = ?
+            AND consensus_role = 'J2' AND active = 1`
+      ).bind(task.id, round.id).first();
+      if (secondary) {
+        const artifact = JSON.parse(secondary.artifact_json);
+        const agrees = artifact.ratification.decision === "agree";
+        task = await transitionConsensusTask(env.DB, task, {
+          toState: agrees ? "approved" : "escalated",
+          roundId: round.id,
+          eventType: agrees
+            ? "secondary-ratification-approved"
+            : "secondary-ratification-escalated",
+          reasonCode: agrees
+            ? "j2-exact-root-cosign"
+            : artifact.ratification.decision === "recuse"
+              ? "accepted-recusal"
+              : "j2-disagreement",
+          evidence: {
+            secondaryReceiptId: secondary.receipt_id,
+            primaryReceiptId: artifact.ratification.primaryReceiptId,
+            finalMerkleRoot:
+              artifact.ratification.primaryAdjudicationMerkleRoot,
+            decision: artifact.ratification.decision
+          },
+          activeFinalReceiptId: agrees
+            ? artifact.ratification.primaryReceiptId
+            : null,
+          appealDeadlineAt: agrees
+            ? Date.now() + APPEAL_WINDOW_MS
+            : null,
+          idempotencyKey: `j2-ratification:${secondary.receipt_id}`
+        });
+        if (agrees) {
+          await env.DB.prepare(
+            `UPDATE consensus_rounds
+                SET status = 'closed', closed_at = ?
+              WHERE id = ? AND status = 'open'`
+          ).bind(Date.now(), round.id).run();
+        }
+        await ensureTaskStateEvidence(env, task);
+        if (agrees) {
+          await queueGovernanceNotifications(
+            env,
+            task.id,
+            "result-approved",
+            {
+              taskVersionId: task.id,
+              packetId: task.packet_id,
+              appealDeadlineAtUtc:
+                new Date(task.appeal_deadline_at).toISOString()
+            },
+            `result-approved:${secondary.receipt_id}`
+          );
+        } else {
+          task = await createReissuedRound(
+            env.DB,
+            task,
+            artifact.ratification.decision === "recuse"
+              ? "accepted-recusal"
+              : "j2-disagreement",
+            null
+          );
+          await ensureTaskStateEvidence(env, task);
+          await queueGovernanceNotifications(
+            env,
+            task.id,
+            "task-reissued",
+            {
+              taskVersionId: task.id,
+              packetId: task.packet_id,
+              reason:
+                artifact.ratification.decision === "recuse"
+                  ? "accepted-recusal"
+                  : "j2-disagreement"
+            },
+            `task-reissued:${task.last_event_id}`
+          );
+        }
+      }
+    }
+  } catch (error) {
+    if (!(error instanceof ConsensusConflict)) throw error;
+  }
+  return getConsensusTask(env.DB, taskVersionId);
+}
+
+async function releaseIndependentEvidence(
+  db,
+  taskVersionId,
+  roundId,
+  receiptIds
+) {
+  await db.prepare(
+    `UPDATE evidence_outbox
+        SET status = 'pending', next_attempt_at = ?
+      WHERE kind = 'submission'
+        AND task_version_id = ?
+        AND status = 'held'
+        AND related_id IN (?, ?)
+        AND related_id IN (
+          SELECT receipt_id
+            FROM submissions
+           WHERE task_version_id = ? AND round_id = ?
+             AND consensus_role IN ('A', 'B') AND active = 1
+        )`
+  ).bind(
+    Date.now(),
+    taskVersionId,
+    receiptIds[0],
+    receiptIds[1],
+    taskVersionId,
+    roundId
+  ).run();
+  const released = await db.prepare(
+    `SELECT COUNT(*) AS count
+       FROM evidence_outbox
+      WHERE kind = 'submission'
+        AND task_version_id = ?
+        AND related_id IN (?, ?)
+        AND status IN ('pending', 'sending', 'sent')`
+  ).bind(
+    taskVersionId,
+    receiptIds[0],
+    receiptIds[1]
+  ).first();
+  if (Number(released?.count || 0) !== 2) {
+    throw new ConsensusConflict(
+      "Independent evidence could not be released as one quorum."
+    );
+  }
+}
+
+async function ensureTaskStateEvidence(env, task) {
+  if (!task?.last_event_id) return;
+  const exists = await env.DB.prepare(
+    `SELECT id FROM evidence_outbox
+      WHERE dedupe_key = ?`
+  ).bind(`task-state:${task.last_event_id}`).first();
+  if (exists) return;
+  const event = await env.DB.prepare(
+    `SELECT id, round_id, event_type, from_state, to_state,
+            reason_code, evidence_json, prior_state_hash,
+            event_hash, created_at
+       FROM consensus_events
+      WHERE id = ?`
+  ).bind(task.last_event_id).first();
+  if (!event) return;
+  const publicEnvelope = {
+    schema: "adg-msa-task-state-v1",
+    nonce: event.id,
+    eventId: event.id,
+    taskVersionId: task.id,
+    taskId: task.task_id,
+    taskVersion: Number(task.task_version),
+    packetId: task.packet_id,
+    holdoutId: task.holdout_id,
+    packetMerkleRoot: task.packet_merkle_root,
+    guidelineVersion: task.guideline_version,
+    dataVersion: task.data_version,
+    protocolVersion: task.protocol_version,
+    state: event.to_state,
+    stateVersion: Number(task.state_version),
+    round: Number(task.current_round),
+    roundId: event.round_id,
+    eventType: event.event_type,
+    fromState: event.from_state,
+    toState: event.to_state,
+    reasonCode: event.reason_code,
+    evidence: JSON.parse(event.evidence_json),
+    priorStateHash: event.prior_state_hash,
+    eventHash: event.event_hash,
+    activeFinalReceiptId: task.active_final_receipt_id,
+    repositoryStatus: task.repository_status,
+    createdAtUtc: new Date(event.created_at).toISOString(),
+    transitionedAtUtc: new Date(event.created_at).toISOString(),
+    claimBoundaries: [
+      "This is a signed workflow-state event, not linguistic gold by itself.",
+      "Participant identity and contact data are excluded.",
+      "Published status requires a separately authenticated repository receipt."
+    ]
+  };
+  const hmacKey = await getVaultSecret(
+    env.SUBMISSION_HMAC_SECRET_NAME,
+    env
+  );
+  const signedEnvelope = {
+    ...publicEnvelope,
+    hmacSha256: await hmacSha256(
+      hmacKey,
+      JSON.stringify(publicEnvelope)
+    )
+  };
+  await env.DB.prepare(
+    `INSERT OR IGNORE INTO evidence_outbox
+      (id, kind, task_version_id, related_id, public_blob_name,
+       public_payload_json, dedupe_key, status, attempts,
+       next_attempt_at, created_at)
+     VALUES (?, 'task-state', ?, ?, ?, ?, ?,
+             'pending', 0, ?, ?)`
+  ).bind(
+    crypto.randomUUID(),
+    task.id,
+    event.id,
+    `${event.id}.state.json`,
+    JSON.stringify(signedEnvelope, null, 2) + "\n",
+    `task-state:${event.id}`,
+    Date.now(),
+    Date.now()
+  ).run();
+}
+
+async function queueDiscussionNotifications(
+  env,
+  authorUserId,
+  source,
+  commentId,
+  body,
+  target,
+  mentions,
+  related
+) {
+  const recipients = new Map();
+  if (target && target.user_id !== authorUserId) {
+    recipients.set(target.user_id, {
+      row: target,
+      eventType: "comment"
+    });
+  }
+  for (const mention of mentions) {
+    const row = related.get(mention.receiptId);
+    if (row && row.user_id !== authorUserId) {
+      recipients.set(row.user_id, {
+        row,
+        eventType: "mention"
+      });
+    }
+  }
+  for (const [userId, recipient] of recipients) {
+    if (!discussionNotificationsEnabled(recipient.row.consent_json)) {
+      continue;
+    }
+    await enqueueNotification(env.DB, {
+      recipientUserId: userId,
+      eventType: recipient.eventType,
+      packetId: source.packet_id,
+      commentId,
+      sourceReceiptId: recipient.row.receipt_id,
+      context: {
+        packetId: source.packet_id,
+        sourceReceiptId: recipient.row.receipt_id,
+        actorPseudonym: source.participant_pseudonym,
+        excerpt: body
+      },
+      dedupeKey:
+        `${recipient.eventType}:${commentId}:${userId}`
+    });
+  }
+}
+
+async function queueFinalResultNotifications(
+  env,
+  adjudicatorUserId,
+  finalReceiptId,
+  finalPseudonym,
+  finalArtifact
+) {
+  const result = await env.DB.prepare(
+    `SELECT s.receipt_id, s.user_id, s.artifact_json, u.consent_json
+       FROM submissions s
+       JOIN users u ON u.id = s.user_id
+      WHERE s.packet_id = ?
+        AND s.artifact_type = 'independent-annotation'
+        AND s.user_id <> ?
+        AND s.artifact_json IS NOT NULL`
+  ).bind(
+    finalArtifact.packet.packetId,
+    adjudicatorUserId
+  ).all();
+  const acceptedRoots = new Set([
+    finalArtifact.adjudication.annotationAMerkleRoot,
+    finalArtifact.adjudication.annotationBMerkleRoot
+  ]);
+  for (const row of result.results || []) {
+    if (!discussionNotificationsEnabled(row.consent_json)) continue;
+    const priorArtifact = JSON.parse(row.artifact_json);
+    const root = await computeAnnotationMerkleRoot(
+      priorArtifact.packet,
+      priorArtifact.annotation
+    );
+    if (!acceptedRoots.has(root)) continue;
+    const differenceCount = countDecisionDifferences(
+      priorArtifact.annotation,
+      finalArtifact.adjudication
+    );
+    if (differenceCount === 0) continue;
+    await enqueueNotification(env.DB, {
+      recipientUserId: row.user_id,
+      eventType: "final-result-difference",
+      packetId: finalArtifact.packet.packetId,
+      commentId: null,
+      sourceReceiptId: row.receipt_id,
+      context: {
+        packetId: finalArtifact.packet.packetId,
+        sourceReceiptId: row.receipt_id,
+        finalReceiptId,
+        actorPseudonym: finalPseudonym,
+        differenceCount
+      },
+      dedupeKey:
+        `final-result-difference:${finalReceiptId}:${row.user_id}`
+    });
+  }
+}
+
+async function enqueueNotification(db, value) {
+  const now = Date.now();
+  await db.prepare(
+    `INSERT OR IGNORE INTO notification_outbox
+      (id, recipient_user_id, event_type, packet_id, comment_id,
+       source_receipt_id, context_json, dedupe_key, status, attempts,
+       next_attempt_at, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', 0, ?, ?)`
+  ).bind(
+    crypto.randomUUID(),
+    value.recipientUserId,
+    value.eventType,
+    value.packetId,
+    value.commentId,
+    value.sourceReceiptId,
+    JSON.stringify(value.context),
+    value.dedupeKey,
+    now,
+    now
+  ).run();
+}
+
+async function queueGovernanceNotifications(
+  env,
+  taskVersionId,
+  eventType,
+  context,
+  dedupeKey
+) {
+  const recipients = await env.DB.prepare(
+    `SELECT DISTINCT tp.user_id, u.consent_json
+       FROM task_participations tp
+       JOIN users u ON u.id = tp.user_id
+      WHERE tp.task_version_id = ?`
+  ).bind(taskVersionId).all();
+  const now = Date.now();
+  const writes = [];
+  for (const row of recipients.results || []) {
+    if (!discussionNotificationsEnabled(row.consent_json)) continue;
+    writes.push(env.DB.prepare(
+      `INSERT OR IGNORE INTO governance_notification_outbox
+        (id, recipient_user_id, event_type, task_version_id,
+         context_json, dedupe_key, status, attempts,
+         next_attempt_at, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, 'pending', 0, ?, ?)`
+    ).bind(
+      crypto.randomUUID(),
+      row.user_id,
+      eventType,
+      taskVersionId,
+      JSON.stringify(context),
+      `${dedupeKey}:${row.user_id}`,
+      now,
+      now
+    ));
+  }
+  if (writes.length) await env.DB.batch(writes);
+}
+
+function discussionNotificationsEnabled(consentJson) {
+  const consent = JSON.parse(consentJson);
+  return consent.discussionNotifications === true;
+}
+
+async function processGovernanceNotificationOutbox(env) {
+  if (!notificationEmailAvailable(env)) {
+    return;
+  }
+  const now = Date.now();
+  await env.DB.prepare(
+    `UPDATE governance_notification_outbox
+        SET status = 'pending'
+      WHERE status = 'sending' AND next_attempt_at <= ?`
+  ).bind(now).run();
+  const pending = await env.DB.prepare(
+    `SELECT id, recipient_user_id, event_type, task_version_id,
+            context_json, attempts
+       FROM governance_notification_outbox
+      WHERE status = 'pending' AND next_attempt_at <= ?
+      ORDER BY created_at
+      LIMIT 20`
+  ).bind(now).all();
+  if (!(pending.results || []).length) return;
+  const masterKey = await getVaultSecret(
+    env.ENTITYCRYPT_MASTER_KEY_SECRET_NAME,
+    env
+  );
+  for (const item of pending.results) {
+    const claim = await env.DB.prepare(
+      `UPDATE governance_notification_outbox
+          SET status = 'sending', next_attempt_at = ?
+        WHERE id = ? AND status = 'pending'`
+    ).bind(now + 10 * 60 * 1000, item.id).run();
+    if (Number(claim.meta?.changes || 0) !== 1) continue;
+    try {
+      const recipient = await env.DB.prepare(
+        `SELECT profile_ciphertext, consent_json
+           FROM users
+          WHERE id = ?`
+      ).bind(item.recipient_user_id).first();
+      if (!recipient
+          || !discussionNotificationsEnabled(recipient.consent_json)) {
+        await env.DB.prepare(
+          `UPDATE governance_notification_outbox
+              SET status = 'skipped', last_error = NULL
+            WHERE id = ?`
+        ).bind(item.id).run();
+        continue;
+      }
+      const profile = JSON.parse(await decryptEntityCrypt(
+        recipient.profile_ciphertext,
+        masterKey
+      ));
+      const content = governanceNotificationEmailContent(
+        item.event_type,
+        JSON.parse(item.context_json),
+        env.ALLOWED_ORIGIN || DEFAULT_ORIGIN
+      );
+      await sendNotificationEmail(
+        env,
+        profile.email,
+        content,
+        "adjudication-governance",
+        item.id
+      );
+      await env.DB.prepare(
+        `UPDATE governance_notification_outbox
+            SET status = 'sent', attempts = attempts + 1,
+                sent_at = ?, last_error = NULL
+          WHERE id = ?`
+      ).bind(Date.now(), item.id).run();
+    } catch (error) {
+      const attempts = Number(item.attempts || 0) + 1;
+      const terminal = attempts >= 5;
+      await env.DB.prepare(
+        `UPDATE governance_notification_outbox
+            SET status = ?, attempts = ?, next_attempt_at = ?,
+                last_error = ?
+          WHERE id = ?`
+      ).bind(
+        terminal ? "failed" : "pending",
+        attempts,
+        Date.now() + Math.min(60, 2 ** attempts) * 60 * 1000,
+        String(error?.message || "Governance notification failed.")
+          .slice(0, 400),
+        item.id
+      ).run();
+    }
+  }
+}
+
+function governanceNotificationEmailContent(eventType, context, origin) {
+  const descriptions = {
+    "task-reissued": {
+      subject: "أعيد طرح مهمة تحكيم ADG-Lang",
+      body: "لم تكتمل شروط الإجماع، ففُتحت جولة مستقلة جديدة."
+    },
+    "result-approved": {
+      subject: "اعتماد مؤقت لنتيجة تحكيم ADG-Lang",
+      body:
+        "وقّع المراجع الثاني الجذر النهائي، وبدأت نافذة الاستئناف."
+    },
+    "result-published": {
+      subject: "نشر نتيجة تحكيم ADG-Lang",
+      body: "قُبل الدليل في المستودع وانتهت نافذة الاستئناف."
+    },
+    "result-revoked": {
+      subject: "سحب نتيجة تحكيم ADG-Lang",
+      body: "سُحبت النتيجة بعد مراجعة موثقة، وستبقى الأدلة السابقة محفوظة."
+    },
+    "appeal-opened": {
+      subject: "فتح استئناف في مهمة ADG-Lang",
+      body: "قُدم استئناف موثق على النتيجة المؤقتة وينتظر مراجعًا مستقلًا."
+    },
+    "appeal-decided": {
+      subject: "صدور قرار استئناف ADG-Lang",
+      body: "صدر قرار موثق في الاستئناف المرتبط بالمهمة."
+    }
+  };
+  const descriptor = descriptions[eventType];
+  if (!descriptor) throw new Error("Unsupported governance event.");
+  const packetId = String(context.packetId || "");
+  const link = `${String(origin).replace(/\/+$/, "")}/`
+    + `?packetId=${encodeURIComponent(packetId)}`;
+  const details = [
+    descriptor.body,
+    "",
+    `المهمة: ${packetId || context.taskVersionId}`,
+    context.reason ? `السبب: ${context.reason}` : null,
+    `الرابط: ${link}`
+  ].filter(Boolean).join("\n");
+  return {
+    subject: descriptor.subject,
+    plainText: details,
+    html: `<p>${escapeEmailHtml(descriptor.body)}</p>`
+      + `<p><strong>المهمة:</strong> ${escapeEmailHtml(
+        packetId || context.taskVersionId
+      )}</p>`
+      + (context.reason
+        ? `<p><strong>السبب:</strong> ${escapeEmailHtml(context.reason)}</p>`
+        : "")
+      + `<p><a href="${escapeEmailHtml(link)}">فتح المنصة</a></p>`
+  };
+}
+
+function escapeEmailHtml(value) {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+async function processEvidenceOutbox(env) {
+  if (!env.DB || !evidenceStorageAvailable(env)) {
+    return;
+  }
+  const archiveMode = evidenceArchiveMode(env);
+  const now = Date.now();
+  const result = await env.DB.prepare(
+    `SELECT id, kind, related_id, public_blob_name,
+            identity_blob_name, public_payload_json,
+            identity_payload_json, attempts
+       FROM evidence_outbox
+      WHERE status = 'pending' AND next_attempt_at <= ?
+      ORDER BY created_at
+      LIMIT 20`
+  ).bind(now).all();
+  if (!(result.results || []).length) return;
+
+  if (archiveMode === "d1") {
+    for (const item of result.results) {
+      const claimed = await env.DB.prepare(
+        `UPDATE evidence_outbox
+            SET status = 'sending', next_attempt_at = ?
+          WHERE id = ? AND status = 'pending'`
+      ).bind(now + 10 * 60 * 1000, item.id).run();
+      if (Number(claimed.meta?.changes || 0) !== 1) continue;
+      await env.DB.prepare(
+        `UPDATE evidence_outbox
+            SET status = 'sent',
+                sent_at = COALESCE(sent_at, ?),
+                last_error = NULL
+          WHERE id = ? AND status = 'sending'`
+      ).bind(Date.now(), item.id).run();
+    }
+    return;
+  }
+
+  const [submissionSas, identitySas] = await Promise.all([
+    storageUsesAzureSas(env, "submissions")
+      ? getVaultSecret(env.SUBMISSION_SAS_SECRET_NAME, env)
+      : Promise.resolve(null),
+    storageUsesAzureSas(env, "identities")
+      ? getVaultSecret(env.IDENTITY_SAS_SECRET_NAME, env)
+      : Promise.resolve(null)
+  ]);
+  for (const item of result.results) {
+    const claimed = await env.DB.prepare(
+      `UPDATE evidence_outbox
+          SET status = 'sending', next_attempt_at = ?
+        WHERE id = ? AND status = 'pending'`
+    ).bind(now + 10 * 60 * 1000, item.id).run();
+    if (Number(claimed.meta?.changes || 0) !== 1) continue;
+    try {
+      if (item.identity_blob_name && item.identity_payload_json) {
+        await putEvidenceBlob(
+          env,
+          "identities",
+          item.identity_blob_name,
+          item.identity_payload_json,
+          identitySas
+        );
+      }
+      await putEvidenceBlob(
+        env,
+        "submissions",
+        item.public_blob_name,
+        item.public_payload_json,
+        submissionSas
+      );
+      await env.DB.prepare(
+        `UPDATE evidence_outbox
+            SET status = 'sent', attempts = attempts + 1,
+                sent_at = ?, last_error = NULL
+          WHERE id = ?`
+      ).bind(Date.now(), item.id).run();
+    } catch (error) {
+      const attempts = Number(item.attempts) + 1;
+      const terminal = attempts >= 8;
+      const retryAt = Date.now()
+        + Math.min(6 * 60 * 60 * 1000, 30000 * 2 ** attempts);
+      await env.DB.prepare(
+        `UPDATE evidence_outbox
+            SET status = ?, attempts = ?, next_attempt_at = ?,
+                last_error = ?
+          WHERE id = ?`
+      ).bind(
+        terminal ? "failed" : "pending",
+        attempts,
+        retryAt,
+        String(error?.message || "Evidence delivery failed.").slice(0, 400),
+        item.id
+      ).run();
+    }
+  }
+}
+
+async function processExpiredConsensusRounds(env) {
+  if (!env.DB) return;
+  const active = await env.DB.prepare(
+    `SELECT id
+       FROM task_versions
+      WHERE state IN (
+        'independent-review',
+        'discussion',
+        'final-review'
+      )
+      ORDER BY updated_at
+      LIMIT 25`
+  ).all();
+  for (const row of active.results || []) {
+    try {
+      await reconcileConsensusTask(env, row.id);
+    } catch (error) {
+      console.error("ADG consensus reconciliation failed", {
+        taskVersionId: row.id,
+        message: error?.message
+      });
+    }
+  }
+
+  const missingStateEvidence = await env.DB.prepare(
+    `SELECT tv.id
+       FROM task_versions tv
+       JOIN consensus_events ce ON ce.id = tv.last_event_id
+       LEFT JOIN evidence_outbox eo
+         ON eo.dedupe_key = 'task-state:' || ce.id
+      WHERE eo.id IS NULL
+      ORDER BY ce.created_at
+      LIMIT 25`
+  ).all();
+  for (const row of missingStateEvidence.results || []) {
+    try {
+      await ensureTaskStateEvidence(
+        env,
+        await getConsensusTask(env.DB, row.id)
+      );
+    } catch (error) {
+      console.error("ADG task-state evidence enqueue failed", {
+        taskVersionId: row.id,
+        message: error?.message
+      });
+    }
+  }
+
+  const now = Date.now();
+  const expired = await env.DB.prepare(
+    `SELECT tv.id
+       FROM task_versions tv
+       JOIN consensus_rounds cr
+         ON cr.task_version_id = tv.id
+        AND cr.round_number = tv.current_round
+      WHERE tv.state = 'independent-review'
+        AND cr.status = 'open'
+        AND cr.deadline_at <= ?
+      LIMIT 10`
+  ).bind(now).all();
+  for (const row of expired.results || []) {
+    try {
+      let task = await getConsensusTask(env.DB, row.id);
+      const round = await getCurrentConsensusRound(env.DB, task);
+      task = await transitionConsensusTask(env.DB, task, {
+        toState: "escalated",
+        roundId: round.id,
+        eventType: "independent-quorum-expired",
+        reasonCode: "missing-quorum-deadline",
+        evidence: {
+          deadlineAtUtc: new Date(round.deadline_at).toISOString()
+        },
+        idempotencyKey: `deadline-expired:${round.id}`
+      });
+      await ensureTaskStateEvidence(env, task);
+      task = await createReissuedRound(
+        env.DB,
+        task,
+        "missing-quorum-deadline",
+        null
+      );
+      await ensureTaskStateEvidence(env, task);
+      await queueGovernanceNotifications(
+        env,
+        task.id,
+        "task-reissued",
+        {
+          taskVersionId: task.id,
+          packetId: task.packet_id,
+          reason: "missing-quorum-deadline"
+        },
+        `task-reissued:${task.last_event_id}`
+      );
+    } catch (error) {
+      console.error("ADG consensus deadline handling failed", {
+        taskVersionId: row.id,
+        message: error?.message
+      });
+    }
+  }
+}
+
+async function processPublishableTasks(env) {
+  if (!env.DB) return;
+  const result = await env.DB.prepare(
+    `SELECT id
+       FROM task_versions
+      WHERE state = 'approved'
+        AND repository_status = 'accepted'
+        AND appeal_deadline_at IS NOT NULL
+        AND appeal_deadline_at <= ?
+      ORDER BY appeal_deadline_at
+      LIMIT 25`
+  ).bind(Date.now()).all();
+  for (const row of result.results || []) {
+    try {
+      await attemptPublishTask(env, row.id);
+    } catch (error) {
+      if (!(error instanceof ConsensusConflict)) {
+        console.error("ADG task publication failed", {
+          taskVersionId: row.id,
+          message: error?.message
+        });
+      }
+    }
+  }
+}
+
+async function processIdentityErasureRequests(env) {
+  if (!env.DB
+      || !secretCanBeResolved(env.ENTITYCRYPT_MASTER_KEY_SECRET_NAME, env)
+      || !storageTargetAvailable(env, "identities")) {
+    return;
+  }
+  const archiveMode = evidenceArchiveMode(env);
+  const externalIdentityArchive = archiveMode !== "d1";
+  const now = Date.now();
+  const requests = await env.DB.prepare(
+    `SELECT id, user_id, eligible_after
+       FROM identity_erasure_requests
+      WHERE status = 'pending' AND eligible_after <= ?
+      ORDER BY requested_at
+      LIMIT 10`
+  ).bind(now).all();
+  if (!(requests.results || []).length) return;
+  const retentionMs = Math.min(
+    730,
+    Math.max(30, Number(env.IDENTITY_RETENTION_DAYS || 365))
+  ) * 24 * 60 * 60 * 1000;
+  const [identitySas, masterKey] = await Promise.all([
+    storageUsesAzureSas(env, "identities")
+      ? getVaultSecret(env.IDENTITY_SAS_SECRET_NAME, env)
+      : Promise.resolve(null),
+    getVaultSecret(env.ENTITYCRYPT_MASTER_KEY_SECRET_NAME, env)
+  ]);
+  for (const request of requests.results) {
+    try {
+      const taskBoundary = await env.DB.prepare(
+        `SELECT MAX(tv.updated_at) AS latest_update,
+                SUM(CASE
+                  WHEN tv.state NOT IN ('published', 'revoked', 'failed')
+                  THEN 1 ELSE 0
+                END) AS active_count
+           FROM task_participations tp
+           JOIN task_versions tv ON tv.id = tp.task_version_id
+          WHERE tp.user_id = ?`
+      ).bind(request.user_id).first();
+      const latestUpdate = Number(taskBoundary?.latest_update || 0);
+      if (Number(taskBoundary?.active_count || 0) > 0
+          || latestUpdate + retentionMs > now) {
+        const retryAt = Math.max(
+          now + 24 * 60 * 60 * 1000,
+          latestUpdate + retentionMs
+        );
+        await env.DB.prepare(
+          `UPDATE identity_erasure_requests
+              SET eligible_after = ?
+            WHERE id = ? AND status = 'pending'`
+        ).bind(retryAt, request.id).run();
+        continue;
+      }
+      if (externalIdentityArchive) {
+        await env.DB.prepare(
+          `INSERT OR IGNORE INTO identity_erasure_items
+            (request_id, blob_name, status)
+           SELECT ?, receipt_id || '.json', 'pending'
+             FROM submissions
+            WHERE user_id = ?`
+        ).bind(request.id, request.user_id).run();
+        const items = await env.DB.prepare(
+          `SELECT blob_name
+             FROM identity_erasure_items
+            WHERE request_id = ? AND status = 'pending'`
+        ).bind(request.id).all();
+        for (const item of items.results || []) {
+          await deleteEvidenceBlob(
+            env,
+            "identities",
+            item.blob_name,
+            identitySas
+          );
+          await env.DB.prepare(
+            `UPDATE identity_erasure_items
+                SET status = 'deleted', deleted_at = ?
+              WHERE request_id = ? AND blob_name = ?
+                AND status = 'pending'`
+          ).bind(Date.now(), request.id, item.blob_name).run();
+        }
+        const remaining = await env.DB.prepare(
+          `SELECT COUNT(*) AS count
+             FROM identity_erasure_items
+            WHERE request_id = ? AND status <> 'deleted'`
+        ).bind(request.id).first();
+        if (Number(remaining?.count || 0) !== 0) continue;
+      }
+      const user = await env.DB.prepare(
+        `SELECT verified_email_hash
+           FROM users
+          WHERE id = ?`
+      ).bind(request.user_id).first();
+      if (!user) {
+        await env.DB.prepare(
+          `UPDATE identity_erasure_requests
+              SET status = 'completed', completed_at = ?
+            WHERE id = ? AND status = 'pending'`
+        ).bind(Date.now(), request.id).run();
+        continue;
+      }
+      const completedAt = Date.now();
+      const d1Backup = archiveMode === "d1"
+        ? d1TimeTravelCompletionInfo(env, completedAt)
+        : null;
+      const tombstone = await encryptEntityCrypt(
+        JSON.stringify({
+          schema: "adg-erased-participant-v1",
+          erasedAtUtc: new Date(completedAt).toISOString(),
+          activeStoreDeletedAtUtc: new Date(completedAt).toISOString(),
+          providerBackupRetention: d1Backup
+            ? {
+              provider: "cloudflare-d1-time-travel",
+              mayRemainRecoverableUntilUtc:
+                d1Backup.providerBackupExpiresAfterUtc,
+              retentionDays: d1Backup.retentionDays
+            }
+            : null
+        }),
+        masterKey
+      );
+      const writes = [
+        env.DB.prepare(
+          `UPDATE users
+              SET profile_ciphertext = ?,
+                  consent_json = ?,
+                  verified_email_hash = NULL,
+                  updated_at = ?
+            WHERE id = ?`
+        ).bind(
+          tombstone,
+          JSON.stringify({
+            identityStorage: false,
+            futureContact: false,
+            discussionNotifications: false
+          }),
+          completedAt,
+          request.user_id
+        ),
+        env.DB.prepare(
+          "DELETE FROM passkeys WHERE user_id = ?"
+        ).bind(request.user_id),
+        env.DB.prepare(
+          "DELETE FROM sessions WHERE user_id = ?"
+        ).bind(request.user_id),
+        env.DB.prepare(
+          "DELETE FROM drafts WHERE user_id = ?"
+        ).bind(request.user_id),
+        env.DB.prepare(
+          "DELETE FROM result_access WHERE user_id = ?"
+        ).bind(request.user_id),
+        env.DB.prepare(
+          "DELETE FROM notification_outbox WHERE recipient_user_id = ?"
+        ).bind(request.user_id),
+        env.DB.prepare(
+          `DELETE FROM governance_notification_outbox
+            WHERE recipient_user_id = ?`
+        ).bind(request.user_id),
+        env.DB.prepare(
+          "DELETE FROM webauthn_challenges WHERE user_id = ?"
+        ).bind(request.user_id),
+        env.DB.prepare(
+          `UPDATE evidence_outbox
+              SET identity_blob_name = NULL,
+                  identity_payload_json = NULL
+            WHERE related_id IN (
+              SELECT receipt_id FROM submissions WHERE user_id = ?
+            )`
+        ).bind(request.user_id),
+        env.DB.prepare(
+          `UPDATE appeals
+              SET appellant_user_id = NULL
+            WHERE appellant_user_id = ?`
+        ).bind(request.user_id),
+        env.DB.prepare(
+          `UPDATE identity_erasure_requests
+              SET status = 'completed', completed_at = ?
+            WHERE id = ? AND status = 'pending'`
+        ).bind(completedAt, request.id)
+      ];
+      if (user.verified_email_hash) {
+        writes.push(env.DB.prepare(
+          "DELETE FROM email_verifications WHERE email_hash = ?"
+        ).bind(user.verified_email_hash));
+      }
+      await env.DB.batch(writes);
+    } catch (error) {
+      console.error("ADG identity erasure deferred", {
+        requestId: request.id,
+        message: error?.message
+      });
+    }
+  }
+}
+
+async function processNotificationOutbox(env) {
+  if (!notificationEmailAvailable(env)) {
+    return;
+  }
+  const now = Date.now();
+  await env.DB.prepare(
+    `UPDATE notification_outbox
+        SET status = 'pending'
+      WHERE status = 'sending' AND next_attempt_at <= ?`
+  ).bind(now).run();
+  const pending = await env.DB.prepare(
+    `SELECT id, recipient_user_id, event_type, context_json, attempts
+       FROM notification_outbox
+      WHERE status = 'pending' AND next_attempt_at <= ?
+      ORDER BY created_at ASC
+      LIMIT 20`
+  ).bind(now).all();
+  if (!pending.results?.length) return;
+
+  const masterKey = await getVaultSecret(
+    env.ENTITYCRYPT_MASTER_KEY_SECRET_NAME,
+    env
+  );
+  for (const item of pending.results) {
+    const claim = await env.DB.prepare(
+      `UPDATE notification_outbox
+          SET status = 'sending', next_attempt_at = ?
+        WHERE id = ? AND status = 'pending'`
+    ).bind(now + 10 * 60 * 1000, item.id).run();
+    if (Number(claim.meta?.changes || 0) !== 1) continue;
+    try {
+      const recipient = await env.DB.prepare(
+        `SELECT profile_ciphertext, consent_json
+           FROM users
+          WHERE id = ?`
+      ).bind(item.recipient_user_id).first();
+      if (!recipient
+          || !discussionNotificationsEnabled(recipient.consent_json)) {
+        await env.DB.prepare(
+          `UPDATE notification_outbox
+              SET status = 'skipped', last_error = NULL
+            WHERE id = ?`
+        ).bind(item.id).run();
+        continue;
+      }
+      const profile = JSON.parse(await decryptEntityCrypt(
+        recipient.profile_ciphertext,
+        masterKey
+      ));
+      const context = JSON.parse(item.context_json);
+      const content = notificationEmailContent(
+        item.event_type,
+        context,
+        env.ALLOWED_ORIGIN || DEFAULT_ORIGIN
+      );
+      await sendNotificationEmail(
+        env,
+        profile.email,
+        content,
+        "adjudication-discussion",
+        item.id
+      );
+      await env.DB.prepare(
+        `UPDATE notification_outbox
+            SET status = 'sent', attempts = attempts + 1,
+                sent_at = ?, last_error = NULL
+          WHERE id = ?`
+      ).bind(Date.now(), item.id).run();
+    } catch (error) {
+      const attempts = Number(item.attempts || 0) + 1;
+      const terminal = attempts >= 5;
+      const retryAt = Date.now()
+        + Math.min(60, 2 ** attempts) * 60 * 1000;
+      console.error("ADG notification delivery failed", {
+        notificationId: item.id,
+        eventType: item.event_type,
+        attempts,
+        message: error?.message
+      });
+      await env.DB.prepare(
+        `UPDATE notification_outbox
+            SET status = ?, attempts = ?, next_attempt_at = ?,
+                last_error = ?
+          WHERE id = ?`
+      ).bind(
+        terminal ? "failed" : "pending",
+        attempts,
+        retryAt,
+        String(error?.message || "Notification delivery failed.")
+          .slice(0, 400),
+        item.id
+      ).run();
+    }
+  }
+}
+
+function graphMailTransportAvailable(env) {
+  if (!env?.MAILER_TENANT_ID
+      || !env?.MAILER_CLIENT_ID
+      || !env?.MAILER_CLIENT_SECRET) {
+    return false;
+  }
+  try {
+    return Boolean(configuredMailerSenderAddress(env));
+  } catch {
+    return false;
+  }
+}
+
+function azureMailTransportAvailable(env) {
+  return Boolean(
+    env.ACS_EMAIL_ENDPOINT
+    && env.ACS_EMAIL_SENDER_ADDRESS
+    && env.AZURE_TENANT_ID
+    && env.AZURE_CLIENT_ID
+    && env.AZURE_CLIENT_SECRET
+  );
+}
+
+function mailTransportAvailable(env) {
+  return graphMailTransportAvailable(env)
+    || azureMailTransportAvailable(env);
+}
+
+function evidenceStorageAvailable(env) {
+  return storageTargetAvailable(env, "submissions")
+    && storageTargetAvailable(env, "identities");
+}
+
+function notificationEmailAvailable(env) {
+  return String(env.NOTIFICATION_EMAIL_ENABLED).toLowerCase() === "true"
+    && Boolean(
+      env.DB
+      && mailTransportAvailable(env)
+      && secretCanBeResolved(env.ENTITYCRYPT_MASTER_KEY_SECRET_NAME, env)
+    );
+}
+
+function storageTargetAvailable(env, scope) {
+  switch (evidenceArchiveMode(env)) {
+    case "d1":
+      return true;
+    case "r2":
+      return Boolean(r2BucketForScope(env, scope));
+    case "azure":
+      return azureStorageScopeAvailable(env, scope);
+    default:
+      return false;
+  }
+}
+
+function storageUsesAzureSas(env, scope) {
+  return evidenceArchiveMode(env) === "azure"
+    && azureStorageScopeAvailable(env, scope);
+}
+
+function evidenceArchiveMode(env) {
+  const value = String(env?.EVIDENCE_ARCHIVE_MODE || "d1")
+    .trim()
+    .toLowerCase();
+  if (!EVIDENCE_ARCHIVE_MODES.has(value)) {
+    throw new Error(
+      "EVIDENCE_ARCHIVE_MODE must be one of d1, r2, azure."
+    );
+  }
+  return value;
+}
+
+function d1TimeTravelRetentionSummary(env) {
+  const retentionDays = Math.min(
+    365,
+    Math.max(
+      1,
+      Number.parseInt(
+        String(
+          env?.D1_TIME_TRAVEL_RETENTION_DAYS
+          ?? DEFAULT_D1_TIME_TRAVEL_RETENTION_DAYS
+        ),
+        10
+      ) || DEFAULT_D1_TIME_TRAVEL_RETENTION_DAYS
+    )
+  );
+  return { retentionDays };
+}
+
+function d1TimeTravelCompletionInfo(env, completedAt) {
+  const summary = d1TimeTravelRetentionSummary(env);
+  return {
+    ...summary,
+    providerBackupExpiresAfterUtc: new Date(
+      completedAt + summary.retentionDays * 24 * 60 * 60 * 1000
+    ).toISOString()
+  };
+}
+
+function azureStorageScopeAvailable(env, scope) {
+  return Boolean(
+    (scope === "submissions"
+      ? env.SUBMISSION_SAS_SECRET_NAME
+      : env.IDENTITY_SAS_SECRET_NAME)
+    && env.AZURE_TENANT_ID
+    && env.AZURE_CLIENT_ID
+    && env.AZURE_CLIENT_SECRET
+    && env.AZURE_KEY_VAULT_URL
+  );
+}
+
+function secretCanBeResolved(name, env) {
+  return Boolean(resolveDirectSecretBinding(name, env))
+    || Boolean(
+      name
+      && env.AZURE_TENANT_ID
+      && env.AZURE_CLIENT_ID
+      && env.AZURE_CLIENT_SECRET
+      && env.AZURE_KEY_VAULT_URL
+    );
+}
+
+async function sendNotificationEmail(
+  env,
+  recipientEmail,
+  content,
+  messageType,
+  correlationId
+) {
+  if (graphMailTransportAvailable(env)) {
+    await sendGraphMail(
+      env,
+      recipientEmail,
+      content,
+      messageType,
+      correlationId
+    );
+    return;
+  }
+  await sendAzureEmail(
+    env,
+    recipientEmail,
+    content,
+    messageType
+  );
+}
+
+async function sendGraphMail(
+  env,
+  recipientEmail,
+  content,
+  messageType,
+  correlationId
+) {
+  const senderAddress = configuredMailerSenderAddress(env);
+  const token = await getMailerGraphToken(env);
+  const internetMessageHeaders = [{
+    name: "X-ADG-Notification-Type",
+    value: String(messageType || "notification")
+  }];
+  if (correlationId) {
+    internetMessageHeaders.push({
+      name: "X-ADG-Correlation-Id",
+      value: String(correlationId)
+    });
+  }
+  const response = await fetchWithTimeout(
+    `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(
+      senderAddress
+    )}/sendMail`,
+    {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${token}`,
+        accept: "application/json",
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        message: {
+          subject: String(content?.subject || ""),
+          body: {
+            contentType: "HTML",
+            content: String(
+              content?.html
+              || `<pre>${escapeEmailHtml(content?.plainText || "")}</pre>`
+            )
+          },
+          toRecipients: [{
+            emailAddress: {
+              address: recipientEmail
+            }
+          }],
+          internetMessageHeaders
+        },
+        saveToSentItems: true
+      })
+    },
+    GRAPH_MAIL_TIMEOUT_MS,
+    "Microsoft Graph sendMail"
+  );
+  if (response.status !== 202) {
+    const detail = await safeResponseText(response);
+    throw new Error(
+      `Microsoft Graph sendMail returned ${response.status}: `
+        + detail.slice(0, 300)
+    );
+  }
+}
+
+async function sendAzureEmail(
+  env,
+  recipientEmail,
+  content,
+  messageType
+) {
+  const endpoint = String(env.ACS_EMAIL_ENDPOINT || "").replace(/\/+$/, "");
+  const senderAddress = String(env.ACS_EMAIL_SENDER_ADDRESS || "");
+  if (!endpoint || !senderAddress) {
+    throw new Error("Azure email notification settings are missing.");
+  }
+  const token = await getAzureToken(
+    env,
+    env.ACS_EMAIL_SCOPE || "https://communication.azure.com/.default"
+  );
+  const operationId = crypto.randomUUID();
+  const response = await fetch(
+    `${endpoint}/emails:send?api-version=2023-03-31`,
+    {
+      method: "POST",
+      headers: {
+        authorization: "Bearer " + token,
+        "content-type": "application/json",
+        "operation-id": operationId,
+        "x-ms-client-request-id": operationId
+      },
+      body: JSON.stringify({
+        senderAddress,
+        content,
+        recipients: {
+          to: [{ address: recipientEmail }]
+        },
+        headers: {
+          "X-ADG-Notification-Type": messageType
+        },
+        userEngagementTrackingDisabled: true
+      })
+    }
+  );
+  if (response.status !== 202) {
+    const detail = await response.text();
+    throw new Error(
+      `Azure email returned ${response.status}: ${detail.slice(0, 300)}`
+    );
+  }
+}
+
+function configuredMailerSenderAddress(env) {
+  const value = String(env?.MAILER_SENDER_ADDRESS || "");
+  try {
+    return normalizeVerificationEmail(value);
+  } catch {
+    throw new Error("MAILER_SENDER_ADDRESS is invalid.");
+  }
+}
+
+async function getMailerGraphToken(env) {
+  return getMicrosoftGraphClientToken({
+    tenantId: env.MAILER_TENANT_ID,
+    clientId: env.MAILER_CLIENT_ID,
+    clientSecret: env.MAILER_CLIENT_SECRET,
+    scope: GRAPH_APP_SCOPE,
+    cacheKey: `mailer:${String(env.MAILER_TENANT_ID || "")}:`
+      + String(env.MAILER_CLIENT_ID || ""),
+    label: "Microsoft Graph mail token"
+  });
+}
+
+async function getMicrosoftGraphClientToken({
+  tenantId,
+  clientId,
+  clientSecret,
+  scope,
+  cacheKey,
+  label,
+  validateAccessToken
+}) {
+  const normalizedTenantId = String(tenantId || "").trim();
+  const normalizedClientId = String(clientId || "").trim();
+  const normalizedClientSecret = String(clientSecret || "");
+  const resolvedScope = String(scope || GRAPH_APP_SCOPE).trim();
+  if (!normalizedTenantId
+      || !normalizedClientId
+      || !normalizedClientSecret
+      || !resolvedScope) {
+    throw new Error(`${label} settings are missing.`);
+  }
+  const key = `${cacheKey}:${resolvedScope}`;
+  const cached = graphAppTokenCache.get(key);
+  if (cached?.expiresAt > Date.now()) {
+    return cached.value;
+  }
+  const response = await fetchWithTimeout(
+    `https://login.microsoftonline.com/${normalizedTenantId}`
+      + "/oauth2/v2.0/token",
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded"
+      },
+      body: new URLSearchParams({
+        client_id: normalizedClientId,
+        client_secret: normalizedClientSecret,
+        scope: resolvedScope,
+        grant_type: "client_credentials"
+      })
+    },
+    GRAPH_MAIL_TIMEOUT_MS,
+    label
+  );
+  if (!response.ok) {
+    throw new Error(`${label} returned ${response.status}.`);
+  }
+  const result = await response.json();
+  if (typeof result.access_token !== "string") {
+    throw new Error(`${label} was not issued.`);
+  }
+  const accessToken = await validateAccessToken?.(result.access_token)
+    ?? result.access_token;
+  const token = {
+    value: accessToken,
+    expiresAt: Date.now()
+      + Math.max(60, Number(result.expires_in) - 300) * 1000
+  };
+  graphAppTokenCache.set(key, token);
+  return token.value;
+}
+
+async function fetchWithTimeout(input, init, timeoutMs, label) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, {
+      ...init,
+      signal: controller.signal
+    });
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      throw new Error(`${label} timed out after ${timeoutMs}ms.`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+async function safeResponseText(response) {
+  try {
+    return String(await response.text() || "");
+  } catch {
+    return "";
+  }
+}
+
+function resolveDirectSecretBinding(name, env) {
+  if (!name) return null;
+  for (const [nameField, valueField] of [
+    ["ENTITYCRYPT_MASTER_KEY_SECRET_NAME", "ENTITYCRYPT_MASTER_KEY"],
+    ["SUBMISSION_HMAC_SECRET_NAME", "SUBMISSION_HMAC_KEY"],
+    [
+      "REPOSITORY_RECEIPT_HMAC_SECRET_NAME",
+      "REPOSITORY_RECEIPT_HMAC_KEY"
+    ],
+    [
+      "EMAIL_VERIFICATION_HMAC_SECRET_NAME",
+      "EMAIL_VERIFICATION_HMAC_KEY"
+    ],
+    ["ENTRA_CLIENT_SECRET_NAME", "ENTRA_CLIENT_SECRET"]
+  ]) {
+    if (env?.[nameField] === name && env?.[valueField]) {
+      return env[valueField];
+    }
+  }
+  return null;
 }
 
 async function verifyTurnstile(token, remoteIp, env) {
@@ -2039,8 +6347,10 @@ async function verifyTurnstile(token, remoteIp, env) {
   return response.json();
 }
 
-async function getVaultSecret(name, env) {
+export async function getVaultSecret(name, env) {
   if (!name) throw new Error("A Key Vault secret name is missing.");
+  const directValue = resolveDirectSecretBinding(name, env);
+  if (directValue) return directValue;
   const cached = secretCache.get(name);
   if (cached && cached.expiresAt > Date.now()) return cached.value;
 
@@ -2067,14 +6377,18 @@ async function getVaultSecret(name, env) {
   return result.value;
 }
 
-async function getAzureToken(env) {
-  if (azureTokenCache && azureTokenCache.expiresAt > Date.now()) {
-    return azureTokenCache.value;
+async function getAzureToken(
+  env,
+  scope = "https://vault.azure.net/.default"
+) {
+  const cached = azureTokenCache.get(scope);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.value;
   }
   const body = new URLSearchParams({
     client_id: env.AZURE_CLIENT_ID,
     client_secret: env.AZURE_CLIENT_SECRET,
-    scope: "https://vault.azure.net/.default",
+    scope,
     grant_type: "client_credentials"
   });
   const response = await fetch(
@@ -2092,12 +6406,127 @@ async function getAzureToken(env) {
     throw new Error(`Azure token endpoint returned ${response.status}.`);
   }
   const result = await response.json();
-  azureTokenCache = {
+  const token = {
     value: result.access_token,
     expiresAt: Date.now()
       + Math.max(60, Number(result.expires_in) - 300) * 1000
   };
-  return azureTokenCache.value;
+  azureTokenCache.set(scope, token);
+  return token.value;
+}
+
+async function putEvidenceBlob(env, scope, fileName, content, containerSasUrl) {
+  switch (evidenceArchiveMode(env)) {
+    case "d1":
+      return;
+    case "r2": {
+      const bucket = r2BucketForScope(env, scope);
+      if (!bucket) {
+        throw new Error(`R2 ${scope} binding is missing.`);
+      }
+      await putR2EvidenceObject(bucket, scope, fileName, content);
+      return;
+    }
+    case "azure":
+      await putBlob(containerSasUrl, fileName, content);
+      return;
+    default:
+      throw new Error("Unsupported evidence archive mode.");
+  }
+}
+
+async function deleteEvidenceBlob(env, scope, fileName, containerSasUrl) {
+  switch (evidenceArchiveMode(env)) {
+    case "d1":
+      return;
+    case "r2": {
+      const bucket = r2BucketForScope(env, scope);
+      if (!bucket) {
+        throw new Error(`R2 ${scope} binding is missing.`);
+      }
+      await deleteR2EvidenceObject(bucket, scope, fileName);
+      return;
+    }
+    case "azure":
+      await deleteBlob(containerSasUrl, fileName);
+      return;
+    default:
+      throw new Error("Unsupported evidence archive mode.");
+  }
+}
+
+function r2BucketForScope(env, scope) {
+  const bucket = scope === "submissions"
+    ? env?.SUBMISSION_OBJECTS
+    : scope === "identities"
+      ? env?.IDENTITY_OBJECTS
+      : null;
+  return bucket
+    && typeof bucket.put === "function"
+    && typeof bucket.delete === "function"
+    ? bucket
+    : null;
+}
+
+function validateEvidenceObjectName(scope, fileName) {
+  const value = String(fileName || "");
+  const patterns = scope === "identities"
+    ? [{
+      pattern: /^([0-9a-f-]{36})\.json$/i,
+      objectKind: "identity-envelope",
+      privacyTier: "protected"
+    }]
+    : [{
+      pattern: /^([0-9a-f-]{36})\.json$/i,
+      objectKind: "submission",
+      privacyTier: "public"
+    }, {
+      pattern: /^comment-([0-9a-f-]{36})\.json$/i,
+      objectKind: "comment",
+      privacyTier: "public"
+    }, {
+      pattern: /^([0-9a-f-]{36})\.state\.json$/i,
+      objectKind: "task-state",
+      privacyTier: "public"
+    }];
+  for (const descriptor of patterns) {
+    const match = value.match(descriptor.pattern);
+    if (match && isUuid(match[1])) {
+      return descriptor;
+    }
+  }
+  throw new Error(`Invalid ${scope} evidence object name.`);
+}
+
+async function putR2EvidenceObject(bucket, scope, fileName, content) {
+  const descriptor = validateEvidenceObjectName(scope, fileName);
+  try {
+    await bucket.put(fileName, content, {
+      httpMetadata: {
+        contentType: JSON_OBJECT_CONTENT_TYPE
+      },
+      customMetadata: {
+        "adg-scope": scope,
+        "adg-object-kind": descriptor.objectKind,
+        "adg-privacy-tier": descriptor.privacyTier
+      }
+    });
+  } catch (error) {
+    throw new Error(
+      `R2 ${scope} upload failed: ${String(error?.message || error)}`
+    );
+  }
+}
+
+async function deleteR2EvidenceObject(bucket, scope, fileName) {
+  validateEvidenceObjectName(scope, fileName);
+  try {
+    await bucket.delete(fileName);
+  } catch (error) {
+    throw new Error(
+      `R2 ${scope} deletion failed: ${String(error?.message || error)}`
+    );
+  }
 }
 
 async function putBlob(containerSasUrl, fileName, content) {
@@ -2106,7 +6535,7 @@ async function putBlob(containerSasUrl, fileName, content) {
   const response = await fetch(url, {
     method: "PUT",
     headers: {
-      "content-type": "application/json; charset=utf-8",
+      "content-type": JSON_OBJECT_CONTENT_TYPE,
       "x-ms-blob-type": "BlockBlob",
       "x-ms-version": "2023-11-03"
     },
@@ -2114,6 +6543,20 @@ async function putBlob(containerSasUrl, fileName, content) {
   });
   if (!response.ok) {
     throw new Error(`Azure Blob upload returned ${response.status}.`);
+  }
+}
+
+async function deleteBlob(containerSasUrl, fileName) {
+  const url = new URL(containerSasUrl);
+  url.pathname = `${url.pathname.replace(/\/+$/, "")}/${fileName}`;
+  const response = await fetch(url, {
+    method: "DELETE",
+    headers: {
+      "x-ms-version": "2023-11-03"
+    }
+  });
+  if (!response.ok && response.status !== 404) {
+    throw new Error(`Azure Blob deletion returned ${response.status}.`);
   }
 }
 
@@ -2132,6 +6575,31 @@ async function hmacSha256(secret, text) {
     encoder.encode(text)
   );
   return toHex(signature);
+}
+
+async function verifyHmacSha256(secret, text, signatureHex) {
+  if (!/^[a-f0-9]{64}$/.test(signatureHex || "")) return false;
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["verify"]
+  );
+  return crypto.subtle.verify(
+    "HMAC",
+    key,
+    hexToBytes(signatureHex),
+    encoder.encode(text)
+  );
+}
+
+function hexToBytes(value) {
+  return Uint8Array.from(
+    value.match(/.{2}/g),
+    pair => Number.parseInt(pair, 16)
+  );
 }
 
 export async function encryptEntityCrypt(plainText, masterKey) {

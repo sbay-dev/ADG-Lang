@@ -1,0 +1,197 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: adg-postgres-d1-backup
+  namespace: adg-data-plane
+  labels:
+    app.kubernetes.io/name: adg-cpoly-postgres
+    app.kubernetes.io/component: backup
+    cpoly.sbay.sa/backup-destination: worker-d1
+spec:
+  schedule: "17 2 * * *"
+  timeZone: Etc/UTC
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 1800
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 14400
+      ttlSecondsAfterFinished: 604800
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: adg-cpoly-postgres
+            app.kubernetes.io/component: backup
+            cpoly.sbay.sa/network-client: portal-backup
+            cpoly.sbay.sa/backup-destination: worker-d1
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 999
+            runAsGroup: 999
+            fsGroup: 999
+            seccompProfile:
+              type: RuntimeDefault
+          initContainers:
+            - name: pg-dump
+              image: postgres:16-bookworm@sha256:60f4761b9035e0b8d5218f701a8c3382f641bf12b1604822574cf5be3baeb537
+              imagePullPolicy: IfNotPresent
+              command:
+                - /bin/sh
+                - /opt/cpoly/scripts/create-kv-binary-backup.sh
+              env:
+                - name: PGHOST
+                  value: adg-postgres-headless.adg-data-plane.svc.cluster.local
+                - name: PGPORT
+                  value: "5432"
+                - name: PGDATABASE
+                  value: adg_adjudication
+                - name: PGUSER
+                  value: adg_backup
+                - name: PGSSLMODE
+                  value: verify-full
+                - name: PGSSLROOTCERT
+                  value: /run/secrets/tls/postgres-ca.crt
+              resources:
+                requests:
+                  cpu: 250m
+                  memory: 256Mi
+                limits:
+                  cpu: "1"
+                  memory: 1Gi
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: [ALL]
+              volumeMounts:
+                - name: scripts
+                  mountPath: /opt/cpoly/scripts
+                  readOnly: true
+                - name: backup-work
+                  mountPath: /backup
+                - name: role-secrets
+                  mountPath: /run/secrets/roles
+                  readOnly: true
+                - name: tls-secrets
+                  mountPath: /run/secrets/tls
+                  readOnly: true
+                - name: tmp
+                  mountPath: /tmp
+            - name: postgres16-restore-verification
+              image: postgres:16-bookworm@sha256:60f4761b9035e0b8d5218f701a8c3382f641bf12b1604822574cf5be3baeb537
+              imagePullPolicy: IfNotPresent
+              command:
+                - /bin/sh
+                - /opt/cpoly/scripts/verify-binary-backup-job.sh
+              env:
+                - name: BACKUP_ROOT
+                  value: /backup
+                - name: BINARY_ARCHIVE
+                  value: /backup/adg-adjudication.dump
+                - name: VERIFY_ROOT
+                  value: /verify
+                - name: RESTORE_EVIDENCE_FILE
+                  value: /backup/restore-evidence.json
+              resources:
+                requests:
+                  cpu: 500m
+                  memory: 1Gi
+                limits:
+                  cpu: "2"
+                  memory: 4Gi
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: [ALL]
+              volumeMounts:
+                - name: scripts
+                  mountPath: /opt/cpoly/scripts
+                  readOnly: true
+                - name: backup-work
+                  mountPath: /backup
+                - name: restore-verify-data
+                  mountPath: /verify
+                - name: tmp
+                  mountPath: /tmp
+          containers:
+            - name: signed-upload
+              image: python:3.13-slim-bookworm@sha256:00faa2debb87529f9f0764e9491d8ba400a3678976616c3bd7cb193745ac20d1
+              imagePullPolicy: IfNotPresent
+              command:
+                - python
+                - /opt/cpoly/scripts/d1_backup_client.py
+                - upload
+                - --archive
+                - /backup/adg-adjudication.dump
+                - --manifest-base
+                - /backup/manifest-base.json
+                - --restore-evidence
+                - /backup/restore-evidence.json
+                - --archive-format
+                - postgres-custom
+                - --encryption-format
+                - none
+                - --database
+                - adg_adjudication
+              envFrom:
+                - configMapRef:
+                    name: adg-postgres-backup-settings
+              env:
+                - name: ADG_BACKUP_BASE_URL_FILE
+                  value: /run/secrets/portal-backup/base-url
+                - name: ADG_BACKUP_HMAC_KEY_FILE
+                  value: /run/secrets/portal-backup/hmac-key
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: [ALL]
+              volumeMounts:
+                - name: scripts
+                  mountPath: /opt/cpoly/scripts
+                  readOnly: true
+                - name: backup-work
+                  mountPath: /backup
+                  readOnly: true
+                - name: portal-backup-secrets
+                  mountPath: /run/secrets/portal-backup
+                  readOnly: true
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: scripts
+              configMap:
+                name: adg-postgres-scripts
+                defaultMode: 0555
+            - name: backup-work
+              emptyDir:
+                sizeLimit: 10Gi
+            - name: restore-verify-data
+              emptyDir:
+                sizeLimit: 10Gi
+            - name: role-secrets
+              secret:
+                secretName: adg-postgres-role-secrets
+                defaultMode: 0440
+            - name: tls-secrets
+              secret:
+                secretName: adg-postgres-server-tls
+                defaultMode: 0440
+            - name: portal-backup-secrets
+              secret:
+                secretName: adg-postgres-portal-backup-secrets
+                defaultMode: 0440
+            - name: tmp
+              emptyDir:
+                medium: Memory
+                sizeLimit: 64Mi

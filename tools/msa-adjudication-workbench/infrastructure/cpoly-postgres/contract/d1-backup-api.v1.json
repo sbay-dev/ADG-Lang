@@ -1,0 +1,180 @@
+{
+  "schema": "adg.cpoly-postgres.worker-recovery-contract.v1",
+  "basePaths": [
+    "/api/internal/cpoly-backups",
+    "/api/internal/cpoly-recovery"
+  ],
+  "authentication": {
+    "algorithm": "HMAC-SHA256",
+    "signatureEncoding": "lowercase-hex",
+    "timestamp": "Unix milliseconds",
+    "nonce": "UUIDv4",
+    "canonicalEncoding": "UTF-8",
+    "canonicalForm": "UPPERCASE_METHOD\\npath\\ntimestamp_ms\\nuuid_v4_nonce\\nbody_sha256",
+    "headers": [
+      "x-adg-timestamp",
+      "x-adg-nonce",
+      "x-adg-content-sha256",
+      "x-adg-signature"
+    ],
+    "emptyBodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "backupDescriptor": {
+    "schema": "adg.cpoly-postgres.backup.v1",
+    "sharedBy": [
+      "create",
+      "complete"
+    ],
+    "metadataSchema": "cpoly_postgres_backup_v1",
+    "attestationsSchema": "adg.cpoly-postgres.backup-attestations.v1",
+    "requiredCoverage": [
+      "snapshotGeneration",
+      "postgresReceiptWatermark"
+    ],
+    "archive": {
+      "database": "adg_adjudication",
+      "format": "postgres-custom",
+      "encryptionFormat": "none",
+      "objectStore": "CPOLY_BACKUPS KV",
+      "keyPolicy": "immutable versioned object key; never overwrite",
+      "consistency": "eventually consistent",
+      "metadataStore": "D1",
+      "maximumChunkBytes": 524288,
+      "maximumTotalBytesDefault": 33554432,
+      "maximumChunksDefault": 512,
+      "hash": "SHA-256"
+    }
+  },
+  "endpoints": [
+    {
+      "method": "POST",
+      "path": "/api/internal/cpoly-backups",
+      "request": {
+        "schema": "adg.cpoly-postgres.backup.v1",
+        "retentionHours": 168,
+        "metadata": "<cpoly_postgres_backup_v1>",
+        "archive": "<archive descriptor>",
+        "chunks": "<ordered contiguous chunk descriptors>"
+      },
+      "response": {
+        "ok": true,
+        "accepted": true,
+        "backup": {
+          "backupId": "<uuid-v4>",
+          "status": "uploading",
+          "snapshotGeneration": 1,
+          "snapshotWatermark": 0
+        }
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/api/internal/cpoly-backups/{backupId}/chunks/{index}",
+      "request": "raw PostgreSQL custom-format bytes matching the ordered descriptor; stored in CPOLY_BACKUPS KV under an immutable versioned backupId/index/uuid key",
+      "response": {
+        "ok": true,
+        "accepted": true,
+        "backupId": "<uuid-v4>",
+        "chunkIndex": 0,
+        "nextChunkIndex": 1
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/internal/cpoly-backups/{backupId}/complete",
+      "request": {
+        "schema": "adg.cpoly-postgres.backup.v1",
+        "backupId": "<uuid-v4>",
+        "chunkCount": 1,
+        "totalBytes": 1,
+        "sha256": "<hex>"
+      },
+      "response": {
+        "ok": true,
+        "status": "complete",
+        "backup": {
+          "backupId": "<uuid-v4>",
+          "status": "complete"
+        }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/internal/cpoly-backups/latest",
+      "response": {
+        "backup": {
+          "status": "complete",
+          "availableAfter": 1723636800000,
+          "metadata": "<descriptor only>",
+          "archive": "<descriptor only>",
+          "chunks": "<ordered descriptors only>"
+        },
+        "priorBackup": {
+          "status": "complete",
+          "availableAfter": 1723636740000,
+          "metadata": "<descriptor only>",
+          "archive": "<descriptor only>",
+          "chunks": "<ordered descriptors only>"
+        }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/internal/cpoly-backups/{backupId}/chunks/{index}",
+      "response": "byte-exact PostgreSQL custom-format chunk from CPOLY_BACKUPS KV; each fetch extends the restore lease"
+    },
+    {
+      "method": "POST",
+      "path": "/api/internal/cpoly-recovery/begin",
+      "request": {
+        "schema": "adg-cpoly-recovery-begin-v1",
+        "backupId": "<uuid-v4>",
+        "snapshotGeneration": 1,
+        "snapshotWatermark": 0
+      },
+      "response": {
+        "ok": true,
+        "recovery": {
+          "state": "recovering",
+          "recoveryId": "<uuid-v4>",
+          "targetGeneration": 2,
+          "restoreLeaseExpiresAtUtc": "<ISO-8601>"
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/internal/cpoly-recovery/complete",
+      "request": {
+        "schema": "adg-cpoly-recovery-complete-v1",
+        "recoveryId": "<uuid-v4>",
+        "backupId": "<uuid-v4>",
+        "snapshotGeneration": 1,
+        "snapshotWatermark": 0
+      },
+      "response": {
+        "ok": true,
+        "replay": {
+          "generation": 2,
+          "receiptSeq": 0,
+          "pending": 0
+        },
+        "recovery": {
+          "state": "ready",
+          "readyGeneration": 2
+        }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/internal/cpoly-recovery/status",
+      "response": {
+        "ok": true,
+        "recovery": {
+          "state": "ready",
+          "readyGeneration": 2
+        }
+      }
+    }
+  ]
+}

@@ -5,6 +5,7 @@ on:
     paths:
       - "tools/msa-adjudication-workbench/**"
       - "scripts/arabic-text/import-msa-portal-submission.mjs"
+      - "scripts/arabic-text/render-msa-github-evidence.mjs"
       - ".github/workflows/import-msa-adjudication.yml"
       - ".github/workflows/msa-adjudication-portal-security.yml"
   workflow_dispatch:
@@ -17,10 +18,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
           cache: npm
@@ -52,6 +53,7 @@ jobs:
           $forbiddenNames = @(
             ".dev.vars",
             ".env",
+            ".wrangler",
             "client-secret",
             "private-key",
             "participant-identities"
@@ -67,7 +69,7 @@ jobs:
             }
           }
           $matches = git grep -n -I -E `
-            'AZURE_CLIENT_SECRET=.+|ENTRA_CLIENT_SECRET=.+|TURNSTILE_SECRET=.+|gh[opusr]_[A-Za-z0-9_]{20,}' `
+            'AZURE_CLIENT_SECRET=.+|ENTRA_CLIENT_SECRET=.+|TURNSTILE_SECRET=.+|REPOSITORY_RECEIPT_HMAC=.+|sig=[A-Za-z0-9%/+_-]{20,}|gh[opusr]_[A-Za-z0-9_]{20,}' `
             -- . ':(exclude)*.example' `
             ':(exclude).github/workflows/msa-adjudication-portal-security.yml'
           if ($LASTEXITCODE -eq 0 -and $matches) {
@@ -78,25 +80,39 @@ jobs:
           } elseif ($LASTEXITCODE -gt 1) {
             throw "Credential scan failed with exit code $LASTEXITCODE."
           }
+          $absolutePaths = git grep -n -I -E `
+            '[A-Za-z]:[\\](Users|source|workspaces|repos)[\\]' `
+            -- tools/msa-adjudication-workbench `
+            scripts/arabic-text/import-msa-portal-submission.mjs `
+            scripts/arabic-text/render-msa-github-evidence.mjs
+          if ($LASTEXITCODE -eq 0 -and $absolutePaths) {
+            throw "Local absolute path found in the publication boundary."
+          }
+          if ($LASTEXITCODE -eq 1) {
+            $global:LASTEXITCODE = 0
+          } elseif ($LASTEXITCODE -gt 1) {
+            throw "Absolute-path scan failed with exit code $LASTEXITCODE."
+          }
 
       - name: Write security report
         shell: pwsh
         run: |
           New-Item -ItemType Directory security/reports -Force | Out-Null
           [ordered]@{
-            schema = "adg-msa-portal-security-report-v1"
+            schema = "adg-msa-portal-security-report-v2"
             commit = $env:GITHUB_SHA
             lockedInstall = $true
             javascriptChecks = $true
             tests = $true
             productionDependencyAudit = $true
             credentialSurfaceCheck = $true
+            absolutePathCheck = $true
             releaseManifestFresh = $true
           } | ConvertTo-Json -Compress |
             Set-Content security/reports/msa-adjudication-portal.json
 
       - name: Upload security report
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: msa-adjudication-portal-security
           path: security/reports/msa-adjudication-portal.json

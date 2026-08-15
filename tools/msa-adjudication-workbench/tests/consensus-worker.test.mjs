@@ -1,0 +1,1033 @@
+import assert from "node:assert/strict";
+import { createHash, createHmac } from "node:crypto";
+import { readFileSync } from "node:fs";
+import test from "node:test";
+import { DatabaseSync } from "node:sqlite";
+import worker, {
+  decryptEntityCryptForTest,
+  encryptEntityCrypt
+} from "../src/index.js";
+import {
+  RATIFICATION_SCHEMA,
+  computeAdjudicationMerkleRoot,
+  computeAnnotationMerkleRoot,
+  computePacketMerkleRoot,
+  sha256Json
+} from "../public/protocol.js";
+
+const origin = "https://adg-consensus.test";
+const repository = "sbay-dev/ADG-Lang";
+const exampleRoot = new URL(
+  "../../../examples/arabic-text/msa-adjudication-pilot-v1/",
+  import.meta.url
+);
+
+class D1Statement {
+  constructor(database, sql, bindings = []) {
+    this.database = database;
+    this.sql = sql;
+    this.bindings = bindings;
+  }
+
+  bind(...bindings) {
+    return new D1Statement(this.database, this.sql, bindings);
+  }
+
+  async first() {
+    return this.database.prepare(this.sql).get(...this.bindings) ?? null;
+  }
+
+  async all() {
+    return {
+      results: this.database.prepare(this.sql).all(...this.bindings)
+    };
+  }
+
+  async run() {
+    const result = this.database.prepare(this.sql).run(...this.bindings);
+    return {
+      success: true,
+      meta: {
+        changes: result.changes,
+        last_row_id: result.lastInsertRowid
+      }
+    };
+  }
+}
+
+class D1TestDatabase {
+  constructor() {
+    this.database = new DatabaseSync(":memory:");
+    for (const path of [
+      "migrations/0001_passkeys.sql",
+      "migrations/0002_admin_progress.sql",
+      "migrations/0003_results_discussion.sql",
+      "migrations/0004_consensus_state.sql",
+      "migrations/0005_cpoly_recovery.sql",
+      "migrations/0006_cpoly_backup_contract.sql",
+      "migrations/0007_cpoly_recovery_state.sql",
+      "migrations/0008_cpoly_backup_metadata_hash.sql",
+      "migrations/0009_cpoly_backup_kv_lane.sql"
+    ]) {
+      this.database.exec(readFileSync(path, "utf8"));
+    }
+  }
+
+  prepare(sql) {
+    return new D1Statement(this.database, sql);
+  }
+
+  async batch(statements) {
+    this.database.exec("BEGIN IMMEDIATE");
+    try {
+      const results = [];
+      for (const statement of statements) {
+        results.push(await statement.run());
+      }
+      this.database.exec("COMMIT");
+      return results;
+    } catch (error) {
+      this.database.exec("ROLLBACK");
+      throw error;
+    }
+  }
+}
+
+test("four independent accounts reach approved then repository-published", async () => {
+  const fixture = await createFixture("approved");
+  try {
+    const result = await submitConsensusSequence(fixture, "agree");
+    assert.equal(result.task.state, "approved");
+    assert.equal(result.task.current_round, 1);
+    assert.equal(result.participants.length, 4);
+    assert.equal(new Set(result.participants.map(row => row.user_id)).size, 4);
+    assert.deepEqual(
+      result.participants.map(row => row.role).sort(),
+      ["A", "B", "J1", "J2"]
+    );
+    assert.equal(result.metrics.policy_passed, 1);
+    assert.equal(result.final.status, "active");
+
+    fixture.db.database.prepare(
+      "UPDATE task_versions SET appeal_deadline_at = ? WHERE id = ?"
+    ).run(Date.now() - 1000, result.task.id);
+    const approvedEvent = fixture.db.database.prepare(
+      `SELECT id, round_id
+         FROM consensus_events
+        WHERE task_version_id = ? AND to_state = 'approved'
+        ORDER BY created_at DESC
+        LIMIT 1`
+    ).get(result.task.id);
+    const acceptedAtUtc = new Date().toISOString();
+    const receipt = {
+      schema: "adg-msa-repository-receipt-v1",
+      receiptId: "55555555-5555-4555-8555-555555555555",
+      taskVersionId: result.task.id,
+      roundId: approvedEvent.round_id,
+      finalMerkleRoot: result.final.final_merkle_root,
+      nonce: approvedEvent.id,
+      repository,
+      prNumber: 42,
+      prMergeSha: "a".repeat(40),
+      importerCommitSha: "b".repeat(40),
+      receivedAtUtc: acceptedAtUtc,
+      acceptedAtUtc
+    };
+    const response = await worker.fetch(
+      new Request(`${origin}/api/repository/receipts`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          ...receipt,
+          hmacSha256: createHmac(
+            "sha256",
+            fixture.secrets.repositoryReceipt
+          ).update(JSON.stringify(receipt)).digest("hex")
+        })
+      }),
+      fixture.env
+    );
+    assert.equal(response.status, 202, await response.text());
+    const published = { ...fixture.db.database.prepare(
+      "SELECT state, repository_status FROM task_versions WHERE id = ?"
+    ).get(result.task.id) };
+    assert.deepEqual(published, {
+      state: "published",
+      repository_status: "accepted"
+    });
+    assert.equal(
+      fixture.db.database.prepare(
+        "SELECT COUNT(*) AS count FROM repository_receipts"
+      ).get().count,
+      1
+    );
+
+    const submissionReceipt = fixture.db.database.prepare(
+      `SELECT receipt_id
+         FROM submissions
+        WHERE task_version_id = ? AND consensus_role = 'A'`
+    ).get(result.task.id).receipt_id;
+    const evidenceAcceptedAt = new Date().toISOString();
+    const evidenceReceipt = {
+      schema: "adg-msa-evidence-receipt-v1",
+      receiptId: "88888888-8888-4888-8888-888888888888",
+      evidenceKind: "submission",
+      relatedId: submissionReceipt,
+      repository,
+      prNumber: 41,
+      prMergeSha: "c".repeat(40),
+      importerCommitSha: "d".repeat(40),
+      acceptedAtUtc: evidenceAcceptedAt
+    };
+    const evidenceResponse = await worker.fetch(
+      new Request(`${origin}/api/repository/receipts`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          ...evidenceReceipt,
+          hmacSha256: createHmac(
+            "sha256",
+            fixture.secrets.repositoryReceipt
+          ).update(JSON.stringify(evidenceReceipt)).digest("hex")
+        })
+      }),
+      fixture.env
+    );
+    assert.equal(evidenceResponse.status, 202);
+    assert.equal(
+      fixture.db.database.prepare(
+        "SELECT repository_status FROM submissions WHERE receipt_id = ?"
+      ).get(submissionReceipt).repository_status,
+      "imported"
+    );
+  } finally {
+    fixture.restoreFetch();
+  }
+});
+
+test("independent evidence stays private until both roles are fixed", async () => {
+  const fixture = await createFixture("blind-quorum");
+  try {
+    const values = await independentArtifacts();
+    const first = await submitArtifact(
+      fixture,
+      "A",
+      values.participantIds.A,
+      values.artifactA
+    );
+    assert.equal(
+      first.repositoryImportStatus,
+      "held-for-independent-quorum"
+    );
+    assert.deepEqual(
+      fixture.db.database.prepare(
+        `SELECT status
+           FROM evidence_outbox
+          WHERE kind = 'submission'
+          ORDER BY created_at`
+      ).all().map(row => row.status),
+      ["held"]
+    );
+
+    const second = await submitArtifact(
+      fixture,
+      "B",
+      values.participantIds.B,
+      values.artifactB
+    );
+    assert.equal(second.repositoryImportStatus, "pending-validation");
+    assert.deepEqual(
+      fixture.db.database.prepare(
+        `SELECT status
+           FROM evidence_outbox
+          WHERE kind = 'submission'
+          ORDER BY created_at`
+      ).all().map(row => row.status),
+      ["pending", "pending"]
+    );
+  } finally {
+    fixture.restoreFetch();
+  }
+});
+
+test("D1 archive mode persists only encrypted identity payloads for submitted evidence", async () => {
+  const fixture = await createFixture("d1-archive");
+  fixture.env.EVIDENCE_ARCHIVE_MODE = "d1";
+  try {
+    const values = await independentArtifacts();
+    const result = await submitArtifact(
+      fixture,
+      "A",
+      values.participantIds.A,
+      values.artifactA
+    );
+    const stored = fixture.db.database.prepare(
+      `SELECT status, public_payload_json, identity_payload_json
+         FROM evidence_outbox
+        WHERE related_id = ?`
+    ).get(result.receiptId);
+    assert.equal(stored.status, "held");
+    assert.equal(
+      stored.public_payload_json.includes(fixture.accounts.get("A").profile.email),
+      false
+    );
+    assert.equal(
+      stored.identity_payload_json.includes(fixture.accounts.get("A").profile.email),
+      false
+    );
+    assert.equal(
+      stored.identity_payload_json.includes(fixture.accounts.get("A").profile.fullName),
+      false
+    );
+    const envelope = JSON.parse(stored.identity_payload_json);
+    assert.equal(envelope.schema, "adg-entitycrypt-data-room-envelope-v1");
+    assert.match(envelope.ciphertext, /^MK1:0:/);
+  } finally {
+    fixture.restoreFetch();
+  }
+});
+
+test("an incomplete independent round cancels its held public evidence", async () => {
+  const fixture = await createFixture("blind-expiry");
+  try {
+    const values = await independentArtifacts();
+    await submitArtifact(
+      fixture,
+      "A",
+      values.participantIds.A,
+      values.artifactA
+    );
+    fixture.db.database.prepare(
+      "UPDATE consensus_rounds SET deadline_at = ? WHERE round_number = 1"
+    ).run(Date.now() - 1000);
+    let maintenance;
+    await worker.scheduled(null, fixture.env, {
+      waitUntil(promise) {
+        maintenance = promise;
+      }
+    });
+    await maintenance;
+    assert.equal(
+      fixture.db.database.prepare(
+        `SELECT status
+           FROM evidence_outbox
+          WHERE kind = 'submission'`
+      ).get().status,
+      "cancelled"
+    );
+    assert.deepEqual(
+      { ...fixture.db.database.prepare(
+        "SELECT state, current_round FROM task_versions"
+      ).get() },
+      { state: "independent-review", current_round: 2 }
+    );
+  } finally {
+    fixture.restoreFetch();
+  }
+});
+
+test("failed bot protection leaves no consensus state behind", async () => {
+  const fixture = await createFixture("mutation-order");
+  try {
+    const values = await independentArtifacts();
+    await submitArtifact(
+      fixture,
+      "A",
+      values.participantIds.A,
+      values.artifactA,
+      {
+        turnstileToken: "invalid-turnstile",
+        expectedStatus: 403
+      }
+    );
+    for (const table of [
+      "task_versions",
+      "consensus_rounds",
+      "consensus_events",
+      "submissions",
+      "evidence_outbox"
+    ]) {
+      assert.equal(
+        fixture.db.database.prepare(
+          `SELECT COUNT(*) AS count FROM ${table}`
+        ).get().count,
+        0,
+        `${table} mutated before Turnstile validation`
+      );
+    }
+  } finally {
+    fixture.restoreFetch();
+  }
+});
+
+test("packet identifiers cannot be rebound to different evidence", async () => {
+  const fixture = await createFixture("packet-binding");
+  try {
+    const values = await independentArtifacts();
+    await submitArtifact(
+      fixture,
+      "A",
+      values.participantIds.A,
+      values.artifactA
+    );
+    const conflictingPacket = structuredClone(values.packet);
+    conflictingPacket.sentences[0].text += " نسخة متعارضة";
+    const conflictingAnnotation = structuredClone(values.annotationB);
+    conflictingAnnotation.packetMerkleRoot =
+      await computePacketMerkleRoot(conflictingPacket);
+    await submitArtifact(
+      fixture,
+      "B",
+      values.participantIds.B,
+      {
+        schema: "adg-msa-portal-artifact-v1",
+        kind: "independent-annotation",
+        packet: conflictingPacket,
+        annotation: conflictingAnnotation
+      },
+      { expectedStatus: 409 }
+    );
+    assert.equal(
+      fixture.db.database.prepare(
+        "SELECT COUNT(*) AS count FROM task_versions"
+      ).get().count,
+      1
+    );
+  } finally {
+    fixture.restoreFetch();
+  }
+});
+
+test("J2 disagreement preserves evidence and opens a fresh round", async () => {
+  const fixture = await createFixture("disagreement");
+  try {
+    const result = await submitConsensusSequence(fixture, "disagree");
+    assert.equal(result.task.state, "independent-review");
+    assert.equal(result.task.current_round, 2);
+    const rounds = fixture.db.database.prepare(
+      `SELECT round_number, status, reissue_reason
+         FROM consensus_rounds
+        WHERE task_version_id = ?
+        ORDER BY round_number`
+    ).all(result.task.id).map(row => ({ ...row }));
+    assert.deepEqual(rounds, [
+      {
+        round_number: 1,
+        status: "superseded",
+        reissue_reason: "j2-disagreement"
+      },
+      {
+        round_number: 2,
+        status: "open",
+        reissue_reason: "j2-disagreement"
+      }
+    ]);
+    assert.equal(
+      fixture.db.database.prepare(
+        "SELECT COUNT(*) AS count FROM submissions WHERE task_version_id = ?"
+      ).get(result.task.id).count,
+      4
+    );
+    assert.equal(
+      fixture.db.database.prepare(
+        `SELECT COUNT(*) AS count
+           FROM consensus_events
+          WHERE task_version_id = ? AND to_state = 'reissued'`
+      ).get(result.task.id).count,
+      1
+    );
+  } finally {
+    fixture.restoreFetch();
+  }
+});
+
+test("a pending appeal prevents repository publication", async () => {
+  const fixture = await createFixture("appeal-gate");
+  try {
+    const result = await submitConsensusSequence(fixture, "agree");
+    const account = fixture.accounts.get("A");
+    const appealResponse = await worker.fetch(
+      new Request(`${origin}/api/consensus/appeals`, {
+        method: "POST",
+        headers: {
+          origin,
+          cookie: `adg_session=${account.token}`,
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({
+          finalReceiptId: result.final.primary_receipt_id,
+          evidence:
+            "يوجد تعارض مادي موثق في القرار النهائي ويتطلب مراجعة مستقلة."
+        })
+      }),
+      fixture.env
+    );
+    assert.equal(appealResponse.status, 202, await appealResponse.text());
+    fixture.db.database.prepare(
+      "UPDATE task_versions SET appeal_deadline_at = ? WHERE id = ?"
+    ).run(Date.now() - 1000, result.task.id);
+    const approvedEvent = fixture.db.database.prepare(
+      `SELECT id, round_id
+         FROM consensus_events
+        WHERE task_version_id = ? AND to_state = 'approved'
+        ORDER BY created_at DESC
+        LIMIT 1`
+    ).get(result.task.id);
+    const acceptedAtUtc = new Date().toISOString();
+    const receipt = {
+      schema: "adg-msa-repository-receipt-v1",
+      receiptId: "99999999-9999-4999-8999-999999999999",
+      taskVersionId: result.task.id,
+      roundId: approvedEvent.round_id,
+      finalMerkleRoot: result.final.final_merkle_root,
+      nonce: approvedEvent.id,
+      repository,
+      prNumber: 51,
+      prMergeSha: "e".repeat(40),
+      importerCommitSha: "f".repeat(40),
+      receivedAtUtc: acceptedAtUtc,
+      acceptedAtUtc
+    };
+    const receiptResponse = await worker.fetch(
+      new Request(`${origin}/api/repository/receipts`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          ...receipt,
+          hmacSha256: createHmac(
+            "sha256",
+            fixture.secrets.repositoryReceipt
+          ).update(JSON.stringify(receipt)).digest("hex")
+        })
+      }),
+      fixture.env
+    );
+    assert.equal(receiptResponse.status, 202, await receiptResponse.text());
+    assert.deepEqual(
+      { ...fixture.db.database.prepare(
+        `SELECT state, repository_status
+           FROM task_versions
+          WHERE id = ?`
+      ).get(result.task.id) },
+      { state: "approved", repository_status: "accepted" }
+    );
+  } finally {
+    fixture.restoreFetch();
+  }
+});
+
+test("invalid repository receipt signatures return a bounded 401", async () => {
+  const fixture = await createFixture("receipt-rejection");
+  try {
+    const timestamp = new Date().toISOString();
+    const response = await worker.fetch(
+      new Request(`${origin}/api/repository/receipts`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          schema: "adg-msa-repository-receipt-v1",
+          receiptId: "12121212-1212-4212-8212-121212121212",
+          taskVersionId: "smoke:v1",
+          roundId: "smoke:v1:r1",
+          finalMerkleRoot: "a".repeat(64),
+          nonce: "13131313-1313-4313-8313-131313131313",
+          repository,
+          prNumber: 1,
+          prMergeSha: "b".repeat(40),
+          importerCommitSha: "c".repeat(40),
+          receivedAtUtc: timestamp,
+          acceptedAtUtc: timestamp,
+          hmacSha256: "d".repeat(64)
+        })
+      }),
+      fixture.env
+    );
+    assert.equal(response.status, 401);
+    assert.match(
+      (await response.json()).message,
+      /توقيع إيصال المستودع/
+    );
+  } finally {
+    fixture.restoreFetch();
+  }
+});
+
+test("identity erasure removes contact linkage after retention", async () => {
+  const fixture = await createFixture("erasure");
+  try {
+    const account = fixture.accounts.get("A");
+    const response = await worker.fetch(
+      new Request(`${origin}/api/account/privacy/erasure`, {
+        method: "POST",
+        headers: {
+          origin,
+          cookie: `adg_session=${account.token}`,
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({ confirm: true })
+      }),
+      fixture.env
+    );
+    assert.equal(response.status, 202, await response.text());
+    fixture.db.database.prepare(
+      `UPDATE identity_erasure_requests
+          SET eligible_after = ?
+        WHERE user_id = ?`
+    ).run(Date.now() - 1000, account.userId);
+
+    let maintenance;
+    await worker.scheduled(null, fixture.env, {
+      waitUntil(promise) {
+        maintenance = promise;
+      }
+    });
+    await maintenance;
+
+    const erased = fixture.db.database.prepare(
+      `SELECT profile_ciphertext, consent_json, verified_email_hash
+         FROM users
+        WHERE id = ?`
+    ).get(account.userId);
+    assert.equal(erased.verified_email_hash, null);
+    assert.deepEqual(JSON.parse(erased.consent_json), {
+      identityStorage: false,
+      futureContact: false,
+      discussionNotifications: false
+    });
+    const tombstone = JSON.parse(await decryptEntityCryptForTest(
+      erased.profile_ciphertext,
+      fixture.secrets.master
+    ));
+    assert.equal(tombstone.schema, "adg-erased-participant-v1");
+    assert.equal(
+      fixture.db.database.prepare(
+        "SELECT COUNT(*) AS count FROM sessions WHERE user_id = ?"
+      ).get(account.userId).count,
+      0
+    );
+    assert.equal(
+      fixture.db.database.prepare(
+        `SELECT status
+           FROM identity_erasure_requests
+          WHERE user_id = ?`
+      ).get(account.userId).status,
+      "completed"
+    );
+  } finally {
+    fixture.restoreFetch();
+  }
+});
+
+test("D1 erasure records active-store deletion with provider backup expiry boundary", async () => {
+  const fixture = await createFixture("erasure-d1-boundary");
+  fixture.env.EVIDENCE_ARCHIVE_MODE = "d1";
+  fixture.env.D1_TIME_TRAVEL_RETENTION_DAYS = "7";
+  try {
+    const account = fixture.accounts.get("A");
+    const response = await worker.fetch(
+      new Request(`${origin}/api/account/privacy/erasure`, {
+        method: "POST",
+        headers: {
+          origin,
+          cookie: `adg_session=${account.token}`,
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({ confirm: true })
+      }),
+      fixture.env
+    );
+    assert.equal(response.status, 202);
+    const request = await response.json();
+    assert.equal(request.deletionScope, "active-store-after-retention");
+    assert.equal(request.providerBackupRetentionDays, 7);
+    assert.match(request.message, /المخزن النشط/);
+    fixture.db.database.prepare(
+      `UPDATE identity_erasure_requests
+          SET eligible_after = ?
+        WHERE user_id = ?`
+    ).run(Date.now() - 1000, account.userId);
+
+    let maintenance;
+    await worker.scheduled(null, fixture.env, {
+      waitUntil(promise) {
+        maintenance = promise;
+      }
+    });
+    await maintenance;
+
+    const erased = fixture.db.database.prepare(
+      `SELECT profile_ciphertext
+         FROM users
+        WHERE id = ?`
+    ).get(account.userId);
+    const tombstone = JSON.parse(await decryptEntityCryptForTest(
+      erased.profile_ciphertext,
+      fixture.secrets.master
+    ));
+    assert.equal(tombstone.activeStoreDeletedAtUtc, tombstone.erasedAtUtc);
+    assert.equal(
+      tombstone.providerBackupRetention.provider,
+      "cloudflare-d1-time-travel"
+    );
+    assert.equal(tombstone.providerBackupRetention.retentionDays, 7);
+    assert.ok(
+      Date.parse(tombstone.providerBackupRetention.mayRemainRecoverableUntilUtc)
+        - Date.parse(tombstone.activeStoreDeletedAtUtc)
+        >= 7 * 24 * 60 * 60 * 1000
+    );
+  } finally {
+    fixture.restoreFetch();
+  }
+});
+
+test("identity erasure request blocks later identity submissions", async () => {
+  const fixture = await createFixture("erasure-block");
+  try {
+    const account = fixture.accounts.get("A");
+    const response = await worker.fetch(
+      new Request(`${origin}/api/account/privacy/erasure`, {
+        method: "POST",
+        headers: {
+          origin,
+          cookie: `adg_session=${account.token}`,
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({ confirm: true })
+      }),
+      fixture.env
+    );
+    assert.equal(response.status, 202, await response.text());
+    const values = await independentArtifacts();
+    await submitArtifact(
+      fixture,
+      "A",
+      values.participantIds.A,
+      values.artifactA,
+      { expectedStatus: 409 }
+    );
+    assert.equal(
+      fixture.db.database.prepare(
+        "SELECT COUNT(*) AS count FROM submissions"
+      ).get().count,
+      0
+    );
+  } finally {
+    fixture.restoreFetch();
+  }
+});
+
+async function createFixture(tag) {
+  const db = new D1TestDatabase();
+  const secrets = {
+    master: `master-key-${tag}-with-sufficient-entropy`,
+    submission: `submission-hmac-${tag}`,
+    repositoryReceipt: `repository-receipt-hmac-${tag}`,
+    identitySas:
+      "https://storage.example.test/identities?sp=rd&sig=test"
+  };
+  const secretNames = {
+    master: `master-${tag}`,
+    submission: `submission-${tag}`,
+    repositoryReceipt: `repository-${tag}`,
+    identitySas: `identity-sas-${tag}`
+  };
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input, init) => {
+    const url = String(input);
+    if (url.includes("login.microsoftonline.com")) {
+      return Response.json({
+        access_token: `azure-token-${tag}`,
+        expires_in: 3600
+      });
+    }
+    if (url.includes(".vault.azure.net/secrets/")) {
+      const name = decodeURIComponent(
+        new URL(url).pathname.split("/").at(-1)
+      );
+      const values = new Map([
+        [secretNames.master, secrets.master],
+        [secretNames.submission, secrets.submission],
+        [secretNames.repositoryReceipt, secrets.repositoryReceipt],
+        [secretNames.identitySas, secrets.identitySas]
+      ]);
+      assert.ok(values.has(name), `Unexpected secret: ${name}`);
+      return Response.json({ value: values.get(name) });
+    }
+    if (url.includes("challenges.cloudflare.com/turnstile")) {
+      return Response.json({
+        success: init?.body?.get("response") !== "invalid-turnstile"
+      });
+    }
+    throw new Error(`Unexpected fetch in consensus test: ${url}`);
+  };
+  const env = {
+    DB: db,
+    ALLOWED_ORIGIN: origin,
+    SUBMISSION_ENABLED: "true",
+    EVIDENCE_ARCHIVE_MODE: "azure",
+    MAX_SUBMISSION_BYTES: "900000",
+    TURNSTILE_SECRET: "turnstile-test",
+    GITHUB_REPOSITORY: repository,
+    ENTITYCRYPT_MASTER_KEY_SECRET_NAME: secretNames.master,
+    SUBMISSION_HMAC_SECRET_NAME: secretNames.submission,
+    REPOSITORY_RECEIPT_HMAC_SECRET_NAME:
+      secretNames.repositoryReceipt,
+    IDENTITY_SAS_SECRET_NAME: secretNames.identitySas,
+    IDENTITY_RETENTION_DAYS: "30",
+    AZURE_TENANT_ID: "tenant",
+    AZURE_CLIENT_ID: "client",
+    AZURE_CLIENT_SECRET: "client-secret",
+    AZURE_KEY_VAULT_URL: "https://consensus-test.vault.azure.net"
+  };
+  const accounts = new Map();
+  for (const [role, index] of [
+    ["A", 1],
+    ["B", 2],
+    ["J1", 3],
+    ["J2", 4]
+  ]) {
+    const token = `session-${tag}-${role}`;
+    const userId = `user-${tag}-${role}`;
+    const profile = {
+      fullName: `محكم ${role}`,
+      email: `${tag}-${role.toLowerCase()}@example.test`,
+      experienceYears: 10 + index,
+      specialization: "grammar",
+      affiliation: null,
+      socialAccounts: {}
+    };
+    db.database.prepare(
+      `INSERT INTO users
+        (id, profile_ciphertext, consent_json, verified_email_hash,
+         created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    ).run(
+      userId,
+      await encryptEntityCrypt(JSON.stringify(profile), secrets.master),
+      JSON.stringify({
+        identityStorage: true,
+        futureContact: false,
+        discussionNotifications: false
+      }),
+      createHash("sha256").update(profile.email).digest("hex"),
+      Date.now(),
+      Date.now()
+    );
+    db.database.prepare(
+      `INSERT INTO sessions
+        (token_hash, user_id, expires_at, created_at)
+       VALUES (?, ?, ?, ?)`
+    ).run(
+      createHash("sha256").update(token).digest("hex"),
+      userId,
+      Date.now() + 60 * 60 * 1000,
+      Date.now()
+    );
+    accounts.set(role, { token, userId, profile });
+  }
+  return {
+    db,
+    env,
+    accounts,
+    secrets,
+    restoreFetch() {
+      globalThis.fetch = originalFetch;
+    }
+  };
+}
+
+async function submitConsensusSequence(fixture, ratificationDecision) {
+  const packet = readJson("packet.json");
+  const annotationA = readJson("annotation-a.synthetic.json");
+  const annotationB = readJson("annotation-b.synthetic.json");
+  const adjudication = readJson("adjudication.synthetic.json");
+  const participantIds = {
+    A: "11111111-1111-4111-8111-111111111111",
+    B: "22222222-2222-4222-8222-222222222222",
+    J1: "33333333-3333-4333-8333-333333333333",
+    J2: "44444444-4444-4444-8444-444444444444"
+  };
+  annotationA.annotatorPseudonym =
+    `human-${participantIds.A.slice(0, 12)}-A`;
+  annotationB.annotatorPseudonym =
+    `human-${participantIds.B.slice(0, 12)}-B`;
+  adjudication.adjudicatorPseudonym =
+    `human-${participantIds.J1.slice(0, 12)}-J1`;
+  adjudication.annotationAMerkleRoot =
+    await computeAnnotationMerkleRoot(packet, annotationA);
+  adjudication.annotationBMerkleRoot =
+    await computeAnnotationMerkleRoot(packet, annotationB);
+  const artifactA = {
+    schema: "adg-msa-portal-artifact-v1",
+    kind: "independent-annotation",
+    packet,
+    annotation: annotationA
+  };
+  const artifactB = {
+    schema: "adg-msa-portal-artifact-v1",
+    kind: "independent-annotation",
+    packet,
+    annotation: annotationB
+  };
+  await submitArtifact(fixture, "A", participantIds.A, artifactA);
+  await submitArtifact(fixture, "B", participantIds.B, artifactB);
+  const primaryArtifact = {
+    schema: "adg-msa-portal-artifact-v1",
+    kind: "adjudication-package",
+    packet,
+    annotationA,
+    annotationB,
+    adjudication
+  };
+  const primaryResponse = await submitArtifact(
+    fixture,
+    "J1",
+    participantIds.J1,
+    primaryArtifact
+  );
+  const finalRoot = await computeAdjudicationMerkleRoot(
+    packet,
+    annotationA,
+    annotationB,
+    adjudication
+  );
+  const ratification = {
+    schema: RATIFICATION_SCHEMA,
+    taskId: packet.taskId,
+    taskVersion: packet.taskVersion,
+    packetId: packet.packetId,
+    holdoutId: packet.holdoutId,
+    protocolVersion: packet.protocolVersion,
+    packetMerkleRoot: await computePacketMerkleRoot(packet),
+    primaryReceiptId: primaryResponse.receiptId,
+    primaryAdjudicationMerkleRoot: finalRoot,
+    reviewerSlot: "J2",
+    reviewerPseudonym:
+      `human-${participantIds.J2.slice(0, 12)}-J2`,
+    reviewerIsHuman: true,
+    reviewerIsSynthetic: false,
+    independentFromImplementationTeam: true,
+    decision: ratificationDecision,
+    rationale:
+      ratificationDecision === "agree"
+        ? "راجعت الجذر النهائي وجميع الأدلة ووافقت على الحسم الموثق."
+        : "لا أوافق على الحسم الحالي ويجب إعادة طرح المهمة بجولة مستقلة."
+  };
+  await submitArtifact(
+    fixture,
+    "J2",
+    participantIds.J2,
+    {
+      schema: "adg-msa-portal-artifact-v1",
+      kind: "ratification-package",
+      primaryArtifact,
+      ratification
+    }
+  );
+  const task = fixture.db.database.prepare(
+    "SELECT * FROM task_versions WHERE packet_id = ?"
+  ).get(packet.packetId);
+  return {
+    task,
+    participants: fixture.db.database.prepare(
+      `SELECT user_id, role, status
+         FROM task_participations
+        WHERE task_version_id = ?
+        ORDER BY role`
+    ).all(task.id),
+    metrics: fixture.db.database.prepare(
+      "SELECT * FROM consensus_metrics WHERE task_version_id = ?"
+    ).get(task.id),
+    final: fixture.db.database.prepare(
+      "SELECT * FROM final_results WHERE task_version_id = ?"
+    ).get(task.id)
+  };
+}
+
+async function submitArtifact(
+  fixture,
+  role,
+  participantId,
+  artifact,
+  options = {}
+) {
+  const account = fixture.accounts.get(role);
+  const payload = {
+    schema: "adg-msa-portal-submission-v1",
+    participantId,
+    profile: account.profile,
+    consent: {
+      identityStorage: true,
+      futureContact: false,
+      discussionNotifications: false
+    },
+    attestation: {
+      independent: true,
+      blind: true,
+      authentic: true
+    },
+    turnstileToken:
+      options.turnstileToken ?? `turnstile-${role}`,
+    clientVersion: "consensus-worker-test-v1",
+    artifactType: artifact.kind,
+    artifactSha256: await sha256Json(artifact),
+    artifact
+  };
+  const response = await worker.fetch(
+    new Request(`${origin}/api/submissions`, {
+      method: "POST",
+      headers: {
+        origin,
+        cookie: `adg_session=${account.token}`,
+        "content-type": "application/json",
+        "CF-Connecting-IP": "203.0.113.44"
+      },
+      body: JSON.stringify(payload)
+    }),
+    fixture.env
+  );
+  const result = await response.json();
+  assert.equal(
+    response.status,
+    options.expectedStatus ?? 202,
+    JSON.stringify(result)
+  );
+  return result;
+}
+
+async function independentArtifacts() {
+  const packet = readJson("packet.json");
+  const annotationA = readJson("annotation-a.synthetic.json");
+  const annotationB = readJson("annotation-b.synthetic.json");
+  const participantIds = {
+    A: "11111111-1111-4111-8111-111111111111",
+    B: "22222222-2222-4222-8222-222222222222"
+  };
+  annotationA.annotatorPseudonym =
+    `human-${participantIds.A.slice(0, 12)}-A`;
+  annotationB.annotatorPseudonym =
+    `human-${participantIds.B.slice(0, 12)}-B`;
+  return {
+    packet,
+    annotationA,
+    annotationB,
+    participantIds,
+    artifactA: {
+      schema: "adg-msa-portal-artifact-v1",
+      kind: "independent-annotation",
+      packet,
+      annotation: annotationA
+    },
+    artifactB: {
+      schema: "adg-msa-portal-artifact-v1",
+      kind: "independent-annotation",
+      packet,
+      annotation: annotationB
+    }
+  };
+}
+
+function readJson(name) {
+  return JSON.parse(readFileSync(new URL(name, exampleRoot), "utf8"));
+}
+

@@ -1,0 +1,56 @@
+{
+  "schema": "cpoly.workbench.external-cluster.execution.v1",
+  "packageId": "adg-msa-adjudication-postgres",
+  "selectedRuntime": "external-kubernetes-statefulset",
+  "managementPlane": {
+    "workbenchProfile": "cpoly-kubernetes-workbench",
+    "helmInstallPath": "CpolyKubernetesWorkbench.Commercial/deploy/helm/cpoly-kubernetes-workbench",
+    "helmInstallCommand": "helm upgrade --install cpoly-workbench <workbench-chart> --namespace cpoly-system --create-namespace --set kubernetesControl.mode=read-only --set rbac.create=true",
+    "standaloneKubernetesMode": {
+      "isKubernetesDataPlane": false,
+      "role": "workbench-application-with-control-disabled"
+    },
+    "cloudflareContainerMode": {
+      "isKubernetesDataPlane": false,
+      "role": "mock-control-workbench",
+      "providerMode": "mock",
+      "persistentDatabaseEligible": false
+    }
+  },
+  "workbenchApi": {
+    "basePath": "/api/cpoly/v1",
+    "statusEndpoint": "/api/cpoly/v1/status",
+    "kubectlEndpoint": "/api/cpoly/v1/tools/kubectl",
+    "shippedControlModes": [
+      "disabled",
+      "read-only"
+    ],
+    "packageApplySupported": false,
+    "blockedApplyArguments": [
+      "--filename",
+      "--kustomize",
+      "-f",
+      "-k"
+    ],
+    "deploymentAuthority": "external-governed-kubernetes-credential"
+  },
+  "dataPlane": {
+    "workloadKind": "StatefulSet",
+    "persistence": "PersistentVolumeClaim",
+    "backupRestore": {
+      "primary": "Worker-private-KV-signed-pg-dump-custom",
+      "metadataAndGate": "D1",
+      "entityCryptProtectedValues": true,
+      "optionalQdrantOpenPgp": true,
+      "optionalSecondCopy": "WAL-G-S3-compatible",
+      "maximumChunkBytes": 524288,
+      "exactSnapshotWatermark": true,
+      "workerRecoveryReadinessGate": true
+    },
+    "renderCommand": "kubectl kustomize infrastructure/cpoly-postgres",
+    "serverDryRunCommand": "kubectl --context <remote-context> apply --server-side --dry-run=server -k infrastructure/cpoly-postgres",
+    "applyCommand": "kubectl --context <remote-context> apply --server-side -k infrastructure/cpoly-postgres",
+    "deploymentScript": "kubernetes/operations/Deploy-CpolyPostgres.ps1",
+    "workbenchProbeScript": "kubernetes/operations/Test-CpolyWorkbenchTarget.ps1"
+  }
+}

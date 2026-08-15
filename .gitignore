@@ -19,5 +19,7 @@ examples/apps/**/artifacts/
 **/.env.*
 !**/.dev.vars.example
 !**/.env.example
+**/.migration-work/
+**/tests/.work/
 tools/msa-adjudication-workbench/wrangler.jsonc
 tools/msa-adjudication-workbench/wrangler.staging.jsonc

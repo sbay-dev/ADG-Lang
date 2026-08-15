@@ -155,6 +155,10 @@
   margin-bottom: .2rem;
 }
 
+.participants-panel > h3 {
+  margin: 1.4rem 0 .65rem;
+}
+
 .admin-filters {
   display: grid;
   grid-template-columns: minmax(220px, 1fr) minmax(150px, .55fr);
@@ -191,6 +195,21 @@
   color: var(--green-800);
   background: #f2f6f3;
   font-size: .8rem;
+}
+
+.admin-table td > select,
+.admin-table td > input,
+.admin-table td > textarea,
+.admin-table td > .button {
+  display: block;
+  width: 100%;
+  margin-bottom: .45rem;
+}
+
+.admin-table td p {
+  max-width: 46rem;
+  margin: .35rem 0 0;
+  white-space: pre-wrap;
 }
 
 .participant-name strong,

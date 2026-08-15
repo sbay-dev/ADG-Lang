@@ -255,11 +255,28 @@
                   <input id="full-name" name="fullName" autocomplete="name"
                          maxlength="120" required>
                 </label>
-                <label>
-                  البريد الإلكتروني
-                  <input id="email" name="email" type="email"
-                         autocomplete="email" maxlength="160" required>
-                </label>
+                <div class="email-verification-field">
+                  <label for="email">البريد الإلكتروني</label>
+                  <div class="input-action-row">
+                    <input id="email" name="email" type="email"
+                           autocomplete="email" maxlength="160" required>
+                    <button id="send-email-code" class="button secondary compact"
+                            type="button">إرسال رمز</button>
+                  </div>
+                  <div id="email-code-row" class="input-action-row" hidden>
+                    <input id="email-code" type="text" inputmode="numeric"
+                           autocomplete="one-time-code" maxlength="6"
+                           pattern="[0-9]{6}" dir="ltr"
+                           aria-label="رمز التحقق المكون من ستة أرقام"
+                           placeholder="000000">
+                    <button id="verify-email-code"
+                            class="button primary compact"
+                            type="button">تأكيد الرمز</button>
+                  </div>
+                  <output id="email-verification-status"
+                          class="inline-status"
+                          aria-live="polite"></output>
+                </div>
                 <label>
                   سنوات الخبرة في تعليم العربية
                   <input id="experience-years" name="experienceYears"
@@ -382,9 +399,20 @@
                   <input id="contact-consent" type="checkbox">
                   <span>أوافق على التواصل معي في جولات تقييم لاحقة.</span>
                 </label>
+                <label class="check-row">
+                  <input id="discussion-consent" type="checkbox">
+                  <span>
+                    أوافق على تلقي إشعارات البريد المتعلقة بالنقاش العلمي
+                    والردود والمنشن والنتائج النهائية للمهام التي شاركت فيها.
+                  </span>
+                </label>
                 <p>
                   تُحفظ الهوية منفصلة عن النتيجة، ويصل إلى GitHub معرف
                   عشوائي لا يكشف اسمك أو بريدك أو حساباتك التواصلية.
+                  يمكنك إيقاف إشعارات النقاش في أي وقت من هذه الصفحة.
+                  ويخضع حفظ البيانات
+                  <a href="https://sbay.sa/privacy" target="_blank"
+                     rel="noopener noreferrer">لسياسة خصوصية sbay</a>.
                 </p>
               </div>
             </section>
@@ -417,6 +445,10 @@
                           type="button" disabled>لدي حساب: دخول</button>
                   <button id="logout-account" class="button ghost"
                           type="button" hidden>تسجيل الخروج</button>
+                  <button id="request-erasure" class="button ghost"
+                          type="button" hidden>
+                    طلب محو ارتباط الهوية
+                  </button>
                 </div>
                 <output id="account-status" class="status"
                         aria-live="polite"></output>
@@ -545,10 +577,18 @@
                 </label>
                 <label class="choice-card">
                   <input type="radio" name="role" value="adjudication">
-                  <strong>المحكّم الثالث</strong>
+                  <strong>المحكّم الأول J1</strong>
                   <span>
                     لا تختره إلا إذا تسلمت الحزمة وملفي A وB؛ ستقارن
                     القرارين وتكتب سبب الحسم عند الخلاف.
+                  </span>
+                </label>
+                <label class="choice-card">
+                  <input type="radio" name="role" value="ratification">
+                  <strong>المراجع المستقل J2</strong>
+                  <span>
+                    يراجع الجذر النهائي الذي أعده J1 ويوافق عليه أو
+                    يعترض أو يتنحى. لا يجوز أن يكون A أو B أو J1.
                   </span>
                 </label>
               </fieldset>
@@ -593,6 +633,13 @@
                 <label>
                   ملف المعلّق B
                   <input id="annotation-b-file" type="file"
+                         accept=".json,application/json">
+                </label>
+              </div>
+              <div id="ratification-files" class="form-grid" hidden>
+                <label>
+                  حزمة التحكيم الأولية من J1
+                  <input id="primary-adjudication-file" type="file"
                          accept=".json,application/json">
                 </label>
               </div>
@@ -699,6 +746,123 @@
               </div>
               <output id="submission-status" class="status"
                       aria-live="polite"></output>
+              <section id="discussion" class="discussion-panel" hidden
+                       aria-labelledby="discussion-title">
+                <div class="discussion-heading">
+                  <div>
+                    <span class="eyebrow">بعد إتمام المهمة</span>
+                    <h4 id="discussion-title">
+                      النتائج السابقة والنقاش العلمي
+                    </h4>
+                  </div>
+                  <a class="button ghost"
+                     href="https://github.com/sbay-dev/ADG-Lang"
+                     target="_blank" rel="noreferrer">
+                    المستودع التقني
+                  </a>
+                </div>
+                <p class="discussion-boundary">
+                  كُشف هذا القسم بعد تثبيت حكمك المستقل. تظهر المعرفات
+                  المستعارة والقرارات اللغوية فقط. الاختلاف ليس خطأً
+                  معتمدًا حتى يصدر قرار إجماع نهائي مرتبط بالأدلة.
+                </p>
+                <section class="consensus-status-card"
+                         aria-labelledby="consensus-status-title">
+                  <h5 id="consensus-status-title">حالة الإجماع الرسمية</h5>
+                  <output id="task-consensus-status"
+                          aria-live="polite">
+                    جارٍ تحميل حالة المهمة…
+                  </output>
+                  <div id="appeal-panel" class="appeal-panel" hidden>
+                    <label>
+                      دليل الاستئناف
+                      <textarea id="appeal-evidence" rows="4"
+                                minlength="40" maxlength="4000"
+                                placeholder="اشرح الخلل المادي واربطه بقرار أو جملة أو وحدة محددة."></textarea>
+                    </label>
+                    <button id="submit-appeal" class="button secondary"
+                            type="button">تقديم استئناف موثّق</button>
+                    <output id="appeal-status" class="status"
+                            aria-live="polite"></output>
+                  </div>
+                </section>
+                <div id="previous-results" class="result-list"></div>
+
+                <div class="discussion-heading compact">
+                  <div>
+                    <span class="eyebrow">مساحة المشاركين</span>
+                    <h5>سجل النقاش</h5>
+                  </div>
+                </div>
+                <div id="discussion-thread" class="discussion-thread"></div>
+
+                <div id="discussion-composer" class="discussion-composer">
+                  <div id="reply-context" class="reply-context" hidden>
+                    <span id="reply-context-text"></span>
+                    <button id="cancel-reply" class="button ghost"
+                            type="button">إلغاء الرد</button>
+                  </div>
+                  <div class="discussion-fields">
+                    <label>
+                      النتيجة المقصودة
+                      <select id="discussion-target">
+                        <option value="">نقاش عام للمهمة</option>
+                      </select>
+                    </label>
+                    <label>
+                      نوع المداخلة
+                      <select id="discussion-category">
+                        <option value="question">سؤال علمي</option>
+                        <option value="clarification">طلب توضيح</option>
+                        <option value="agreement">اتفاق معلّل</option>
+                        <option value="disagreement">اختلاف معلّل</option>
+                        <option value="evidence">دليل أو شاهد</option>
+                        <option value="consensus-proposal">مقترح إجماع</option>
+                        <option value="escalation">طلب تصعيد</option>
+                        <option value="appeal">اعتراض موثق</option>
+                        <option value="recusal">تنحٍّ لتعارض المصالح</option>
+                        <option value="final-result">
+                          تعليق على نتيجة نهائية
+                        </option>
+                      </select>
+                    </label>
+                    <label>
+                      معرف الجملة (اختياري)
+                      <input id="discussion-sentence" maxlength="120"
+                             autocomplete="off" dir="ltr">
+                    </label>
+                    <label>
+                      رقم الوحدة (اختياري)
+                      <input id="discussion-token" type="number"
+                             min="1" max="100000" inputmode="numeric">
+                    </label>
+                    <label>
+                      منشن المشاركين (اختياري)
+                      <select id="discussion-mentions" multiple size="4">
+                      </select>
+                    </label>
+                    <label>
+                      الإشارة إلى النتائج (اختياري)
+                      <select id="discussion-references" multiple size="4">
+                      </select>
+                    </label>
+                  </div>
+                  <label class="discussion-body-label">
+                    نص المداخلة
+                    <textarea id="discussion-body" rows="5"
+                              minlength="20" maxlength="4000"
+                              placeholder="اشرح موضع الاتفاق أو الاختلاف، واستشهد بالجملة أو الوحدة عند الحاجة. لا تكتب بيانات تواصل شخصية."></textarea>
+                  </label>
+                  <div class="submission-actions">
+                    <button id="submit-discussion"
+                            class="button primary" type="button">
+                      نشر المداخلة المجهّلة
+                    </button>
+                  </div>
+                  <output id="discussion-status" class="status"
+                          aria-live="polite"></output>
+                </div>
+              </section>
             </section>
 
             <output id="wizard-status" class="status wizard-status"
@@ -726,6 +890,8 @@
            target="_blank" rel="noreferrer">الإعلان السابق للمشروع</a>
         <a href="https://github.com/sbay-dev/ADG-Lang/pull/1"
            target="_blank" rel="noreferrer">نقاش النشر والتقييم</a>
+        <a href="https://sbay.sa/privacy"
+           target="_blank" rel="noopener noreferrer">سياسة الخصوصية</a>
       </div>
     </div>
   </footer>

@@ -1,13 +1,16 @@
 import {
   ADJUDICATION_SCHEMA,
   ANNOTATION_SCHEMA,
+  RATIFICATION_SCHEMA,
   computeAdjudicationMerkleRoot,
   computeAnnotationMerkleRoot,
   computePacketMerkleRoot,
+  computeRatificationMerkleRoot,
   decisionNeedsResolution,
   sha256Json,
   tokenDecisionKey,
   validatePacket,
+  validateRatificationBinding,
   validateSubmissionBinding
 } from "./protocol.js";
 
@@ -111,15 +114,35 @@ const state = {
   packet: null,
   annotationA: null,
   annotationB: null,
+  primaryArtifact: null,
   config: {
     submissionEnabled: false,
     maxSubmissionBytes: 900000,
     turnstileSiteKey: null,
-    accountEnabled: false
+    accountEnabled: false,
+    emailVerificationEnabled: false
   },
   account: {
     authenticated: false,
-    userId: null
+    userId: null,
+    email: null,
+    emailVerified: false,
+    erasureRequested: false
+  },
+  emailVerification: {
+    email: null,
+    verificationId: null,
+    token: null,
+    verified: false,
+    busy: false,
+    cooldownUntil: 0,
+    timer: null
+  },
+  discussion: {
+    sourceReceiptId: null,
+    data: null,
+    replyTo: null,
+    taskStatus: null
   },
   autosaveTimer: null,
   draftSaving: false,
@@ -134,6 +157,9 @@ const packetFile = document.querySelector("#packet-file");
 const annotationAFile = document.querySelector("#annotation-a-file");
 const annotationBFile = document.querySelector("#annotation-b-file");
 const adjudicationFiles = document.querySelector("#adjudication-files");
+const ratificationFiles = document.querySelector("#ratification-files");
+const primaryAdjudicationFile =
+  document.querySelector("#primary-adjudication-file");
 const packetSummary = document.querySelector("#packet-summary");
 const workspace = document.querySelector("#workspace");
 const completionValue = document.querySelector("#completion-value");
@@ -146,9 +172,17 @@ const quickLoginButton = document.querySelector("#quick-login");
 const registerPasskeyButton = document.querySelector("#register-passkey");
 const loginPasskeyButton = document.querySelector("#login-passkey");
 const logoutAccountButton = document.querySelector("#logout-account");
+const requestErasureButton = document.querySelector("#request-erasure");
 const accountTitle = document.querySelector("#account-title");
 const accountDescription = document.querySelector("#account-description");
 const accountStatus = document.querySelector("#account-status");
+const emailInput = document.querySelector("#email");
+const sendEmailCodeButton = document.querySelector("#send-email-code");
+const emailCodeRow = document.querySelector("#email-code-row");
+const emailCodeInput = document.querySelector("#email-code");
+const verifyEmailCodeButton = document.querySelector("#verify-email-code");
+const emailVerificationStatus =
+  document.querySelector("#email-verification-status");
 const saveDraftButton = document.querySelector("#save-draft");
 const draftStatus = document.querySelector("#draft-status");
 const savedDrafts = document.querySelector("#saved-drafts");
@@ -157,6 +191,29 @@ const shareWhatsapp = document.querySelector("#share-whatsapp");
 const shareX = document.querySelector("#share-x");
 const copyInvitationButton = document.querySelector("#copy-invitation");
 const shareStatus = document.querySelector("#share-status");
+const discussionPanel = document.querySelector("#discussion");
+const previousResults = document.querySelector("#previous-results");
+const discussionThread = document.querySelector("#discussion-thread");
+const discussionTarget = document.querySelector("#discussion-target");
+const discussionCategory = document.querySelector("#discussion-category");
+const discussionSentence = document.querySelector("#discussion-sentence");
+const discussionToken = document.querySelector("#discussion-token");
+const discussionMentions = document.querySelector("#discussion-mentions");
+const discussionReferences =
+  document.querySelector("#discussion-references");
+const discussionBody = document.querySelector("#discussion-body");
+const submitDiscussionButton =
+  document.querySelector("#submit-discussion");
+const discussionStatus = document.querySelector("#discussion-status");
+const replyContext = document.querySelector("#reply-context");
+const replyContextText = document.querySelector("#reply-context-text");
+const cancelReplyButton = document.querySelector("#cancel-reply");
+const taskConsensusStatus =
+  document.querySelector("#task-consensus-status");
+const appealPanel = document.querySelector("#appeal-panel");
+const appealEvidence = document.querySelector("#appeal-evidence");
+const submitAppealButton = document.querySelector("#submit-appeal");
+const appealStatus = document.querySelector("#appeal-status");
 
 document.querySelectorAll('input[name="role"]').forEach(control => {
   control.addEventListener("change", syncRoleControls);
@@ -171,8 +228,22 @@ quickLoginButton.addEventListener("click", loginWithPasskey);
 registerPasskeyButton.addEventListener("click", registerPasskey);
 loginPasskeyButton.addEventListener("click", loginWithPasskey);
 logoutAccountButton.addEventListener("click", logoutAccount);
+requestErasureButton.addEventListener("click", requestIdentityErasure);
+sendEmailCodeButton.addEventListener("click", sendEmailVerificationCode);
+verifyEmailCodeButton.addEventListener("click", verifyEmailVerificationCode);
+emailInput.addEventListener("input", handleEmailInput);
+emailCodeInput.addEventListener("keydown", event => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    void verifyEmailVerificationCode();
+  }
+});
+emailCodeInput.addEventListener("input", renderEmailVerificationState);
 saveDraftButton.addEventListener("click", saveDraft);
 copyInvitationButton.addEventListener("click", copyInvitation);
+submitDiscussionButton.addEventListener("click", submitDiscussionComment);
+cancelReplyButton.addEventListener("click", clearDiscussionReply);
+submitAppealButton.addEventListener("click", submitConsensusAppeal);
 workspace.addEventListener("input", () => {
   updateCompletion();
   scheduleAutosave();
@@ -232,6 +303,13 @@ async function initialize() {
   }
   await restoreAccount();
   await configureTurnstile();
+  const discussionReceipt =
+    new URL(location.href).searchParams.get("discussion");
+  if (state.account.authenticated
+      && /^[0-9a-f-]{36}$/i.test(discussionReceipt || "")) {
+    showStep(5);
+    await loadDiscussion(discussionReceipt);
+  }
 }
 
 function applyRoleFromQuery() {
@@ -239,6 +317,8 @@ function applyRoleFromQuery() {
   const normalized = role?.toLowerCase();
   const value = normalized === "b"
     ? "B"
+    : ["ratification", "j2"].includes(normalized)
+      ? "ratification"
     : normalized === "adjudication"
       ? "adjudication"
       : "A";
@@ -253,6 +333,9 @@ async function goNext() {
   try {
     if (state.step === 1) {
       validateProfile();
+      if (state.account.authenticated) {
+        await updateAccountPreferences();
+      }
     } else if (state.step === 2) {
       if (!state.account.authenticated) {
         throw new Error(
@@ -307,7 +390,7 @@ function showStep(step) {
 
 function validateProfile() {
   const fullName = value("full-name");
-  const email = value("email");
+  const email = normalizedCurrentEmail();
   const years = Number(value("experience-years"));
   requireText(fullName, "الاسم الكامل");
   requireText(email, "البريد الإلكتروني");
@@ -322,12 +405,181 @@ function validateProfile() {
   if (!checked("privacy-consent")) {
     throw new Error("الموافقة على حفظ بيانات التواصل مطلوبة للإرسال.");
   }
+  if (!currentEmailIsVerified()) {
+    throw new Error(
+      "أرسل رمز التحقق إلى بريدك وأكّد الرمز قبل المتابعة."
+    );
+  }
+}
+
+function normalizedCurrentEmail() {
+  return value("email").normalize("NFKC").trim().toLowerCase();
+}
+
+function currentEmailIsVerified() {
+  const email = normalizedCurrentEmail();
+  if (!email) return false;
+  if (state.emailVerification.verified
+      && state.emailVerification.email === email
+      && state.emailVerification.token) {
+    return true;
+  }
+  return state.account.authenticated
+    && state.account.emailVerified
+    && state.account.email === email;
+}
+
+function handleEmailInput() {
+  const email = normalizedCurrentEmail();
+  if (state.emailVerification.email
+      && state.emailVerification.email !== email) {
+    resetEmailVerification();
+    setEmailVerificationStatus("", false);
+  }
+  if (!state.emailVerification.verificationId
+      && state.account.authenticated) {
+    const originalVerified = state.account.emailVerified
+      && state.account.email === email;
+    setEmailVerificationStatus(
+      originalVerified
+        ? "البريد موثّق لهذا الحساب."
+        : "وثّق العنوان الجديد قبل حفظه.",
+      !originalVerified
+    );
+  }
+  renderEmailVerificationState();
+}
+
+function resetEmailVerification() {
+  if (state.emailVerification.timer !== null) {
+    clearInterval(state.emailVerification.timer);
+  }
+  state.emailVerification.email = null;
+  state.emailVerification.verificationId = null;
+  state.emailVerification.token = null;
+  state.emailVerification.verified = false;
+  state.emailVerification.busy = false;
+  state.emailVerification.cooldownUntil = 0;
+  state.emailVerification.timer = null;
+  emailCodeInput.value = "";
+}
+
+function renderEmailVerificationState() {
+  const email = normalizedCurrentEmail();
+  const syntacticallyValid =
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+    && email.length <= 160;
+  const verified = currentEmailIsVerified();
+  const remaining = Math.max(
+    0,
+    Math.ceil((state.emailVerification.cooldownUntil - Date.now()) / 1000)
+  );
+
+  emailCodeRow.hidden = !state.emailVerification.verificationId || verified;
+  sendEmailCodeButton.textContent = verified
+    ? "البريد موثّق"
+    : remaining > 0
+      ? `إعادة الإرسال خلال ${remaining} ث`
+      : "إرسال رمز";
+  sendEmailCodeButton.disabled =
+    verified
+    || state.emailVerification.busy
+    || remaining > 0
+    || !syntacticallyValid
+    || !state.config.emailVerificationEnabled;
+  verifyEmailCodeButton.disabled =
+    state.emailVerification.busy
+    || !state.emailVerification.verificationId
+    || !/^\d{6}$/.test(emailCodeInput.value.trim());
+}
+
+function startEmailCooldown(seconds) {
+  state.emailVerification.cooldownUntil = Date.now() + seconds * 1000;
+  if (state.emailVerification.timer !== null) {
+    clearInterval(state.emailVerification.timer);
+  }
+  state.emailVerification.timer = setInterval(() => {
+    renderEmailVerificationState();
+    if (Date.now() >= state.emailVerification.cooldownUntil) {
+      clearInterval(state.emailVerification.timer);
+      state.emailVerification.timer = null;
+    }
+  }, 1000);
+}
+
+async function sendEmailVerificationCode() {
+  const email = normalizedCurrentEmail();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    setEmailVerificationStatus("أدخل بريدًا إلكترونيًا صالحًا أولًا.", true);
+    return;
+  }
+  state.emailVerification.busy = true;
+  setEmailVerificationStatus("جارٍ إرسال رمز التحقق الآمن...", false);
+  renderEmailVerificationState();
+  try {
+    const result = await apiJson("/api/account/email/send-code", {
+      method: "POST",
+      body: { email }
+    });
+    resetEmailVerification();
+    state.emailVerification.email = email;
+    state.emailVerification.verificationId = result.verificationId;
+    startEmailCooldown(Number(result.resendAfterSeconds || 60));
+    setEmailVerificationStatus(result.message, false);
+    emailCodeInput.focus();
+  } catch (error) {
+    state.emailVerification.busy = false;
+    setEmailVerificationStatus(error.message, true);
+  } finally {
+    state.emailVerification.busy = false;
+    renderEmailVerificationState();
+  }
+}
+
+async function verifyEmailVerificationCode() {
+  const code = emailCodeInput.value.trim();
+  if (!state.emailVerification.verificationId
+      || !/^\d{6}$/.test(code)) {
+    setEmailVerificationStatus(
+      "أدخل رمز التحقق المكون من ستة أرقام.",
+      true
+    );
+    return;
+  }
+  state.emailVerification.busy = true;
+  setEmailVerificationStatus("جارٍ تأكيد الرمز...", false);
+  renderEmailVerificationState();
+  try {
+    const result = await apiJson("/api/account/email/verify-code", {
+      method: "POST",
+      body: {
+        verificationId: state.emailVerification.verificationId,
+        code
+      }
+    });
+    state.emailVerification.email = normalizedCurrentEmail();
+    state.emailVerification.token = result.verificationToken;
+    state.emailVerification.verified = result.verified === true;
+    setEmailVerificationStatus(result.message, false);
+  } catch (error) {
+    setEmailVerificationStatus(error.message, true);
+  } finally {
+    state.emailVerification.busy = false;
+    renderEmailVerificationState();
+  }
+}
+
+function setEmailVerificationStatus(message, error) {
+  emailVerificationStatus.textContent = message || "";
+  emailVerificationStatus.className = `inline-status${message
+    ? error ? " error" : " success"
+    : ""}`;
 }
 
 function accountProfile() {
   return {
     fullName: value("full-name"),
-    email: value("email"),
+    email: normalizedCurrentEmail(),
     experienceYears: Number(value("experience-years")),
     specialization: value("specialization"),
     affiliation: nullable(value("affiliation")),
@@ -387,8 +639,26 @@ function validateSocialAccounts(accounts) {
 function accountConsent() {
   return {
     identityStorage: checked("privacy-consent"),
-    futureContact: checked("contact-consent")
+    futureContact: checked("contact-consent"),
+    discussionNotifications: checked("discussion-consent")
   };
+}
+
+async function updateAccountPreferences() {
+  const result = await apiJson("/api/account/preferences", {
+    method: "PUT",
+    body: {
+      profile: accountProfile(),
+      consent: accountConsent(),
+      emailVerificationToken: state.emailVerification.token
+    }
+  });
+  state.account.email = normalizedCurrentEmail();
+  state.account.emailVerified = result.emailVerified === true;
+  resetEmailVerification();
+  setEmailVerificationStatus("البريد موثّق لهذا الحساب.", false);
+  renderEmailVerificationState();
+  setAccountStatus(result.message, false);
 }
 
 async function restoreAccount() {
@@ -401,6 +671,21 @@ async function restoreAccount() {
     state.account.authenticated = true;
     state.account.userId = account.userId;
     fillProfile(account.profile, account.consent);
+    state.account.email = String(account.profile?.email || "")
+      .normalize("NFKC")
+      .trim()
+      .toLowerCase();
+    state.account.emailVerified = account.emailVerified === true;
+    state.account.erasureRequested =
+      account.identityErasure?.requested === true;
+    resetEmailVerification();
+    setEmailVerificationStatus(
+      state.account.emailVerified
+        ? "البريد موثّق لهذا الحساب."
+        : "يلزم توثيق البريد مرة واحدة قبل متابعة التحكيم.",
+      !state.account.emailVerified
+    );
+    renderEmailVerificationState();
     renderAccountState();
     await refreshDraftList();
   } catch (error) {
@@ -409,6 +694,12 @@ async function restoreAccount() {
     }
     state.account.authenticated = false;
     state.account.userId = null;
+    state.account.email = null;
+    state.account.emailVerified = false;
+    state.account.erasureRequested = false;
+    resetEmailVerification();
+    setEmailVerificationStatus("", false);
+    renderEmailVerificationState();
     renderAccountState();
   }
 }
@@ -435,6 +726,8 @@ function fillProfile(profile, consent) {
     consent?.identityStorage === true;
   document.querySelector("#contact-consent").checked =
     consent?.futureContact === true;
+  document.querySelector("#discussion-consent").checked =
+    consent?.discussionNotifications === true;
 }
 
 function renderAccountState() {
@@ -445,6 +738,8 @@ function renderAccountState() {
   registerPasskeyButton.hidden = authenticated;
   loginPasskeyButton.hidden = authenticated;
   logoutAccountButton.hidden = !authenticated;
+  requestErasureButton.hidden =
+    !authenticated || state.account.erasureRequested;
   quickLoginButton.hidden = authenticated;
   registerPasskeyButton.disabled = !available;
   loginPasskeyButton.disabled = !available;
@@ -459,13 +754,15 @@ function renderAccountState() {
   }
   accountTitle.textContent = "أنشئ حسابك الآمن";
   accountDescription.textContent = available
-    ? "ستُشفّر بيانات التعريف والمسودات قبل حفظها، ولا توجد كلمة مرور."
+    ? "وثّق بريدك برمز قصير، ثم احفظ الدخول بمفتاح مرور بلا كلمة مرور."
     : "هذا المتصفح أو خدمة الحساب لا يدعم مفتاح المرور حاليًا.";
+  renderEmailVerificationState();
 }
 
 async function registerPasskey() {
   clearStatus();
   setAccountStatus("", false);
+  let verificationReserved = false;
   try {
     validateProfile();
     ensureWebAuthn();
@@ -476,10 +773,12 @@ async function registerPasskey() {
         method: "POST",
         body: {
           profile: accountProfile(),
-          consent: accountConsent()
+          consent: accountConsent(),
+          emailVerificationToken: state.emailVerification.token
         }
       }
     );
+    verificationReserved = true;
     const credential = await navigator.credentials.create({
       publicKey: registrationOptions(start.options)
     });
@@ -498,10 +797,24 @@ async function registerPasskey() {
     );
     state.account.authenticated = true;
     state.account.userId = result.userId;
+    state.account.email = normalizedCurrentEmail();
+    state.account.emailVerified = true;
+    state.account.erasureRequested = false;
+    resetEmailVerification();
+    setEmailVerificationStatus("البريد موثّق لهذا الحساب.", false);
+    renderEmailVerificationState();
     renderAccountState();
     setAccountStatus(result.message, false);
     await refreshDraftList();
   } catch (error) {
+    if (verificationReserved || error.status === 403 || error.status === 409) {
+      resetEmailVerification();
+      setEmailVerificationStatus(
+        "أرسل رمزًا جديدًا قبل إعادة محاولة إنشاء مفتاح المرور.",
+        true
+      );
+      renderEmailVerificationState();
+    }
     setAccountStatus(passkeyErrorMessage(error), true);
   } finally {
     setAccountBusy(false);
@@ -549,6 +862,41 @@ async function loginWithPasskey(event) {
   }
 }
 
+async function requestIdentityErasure() {
+  const confirmed = window.confirm(
+    "سيُجدول محو بيانات التواصل ومفاتيح الدخول بعد إغلاق المهام "
+    + "وانقضاء مدة الاحتفاظ، مع بقاء الأدلة العلمية مجهّلة. وفي نمط D1 "
+    + "قد تبقى لقطات Time Travel القابلة للاسترجاع حتى انتهاء نافذة الخطة. "
+    + "هل تتابع؟"
+  );
+  if (!confirmed) return;
+  try {
+    setAccountBusy(true);
+    const result = await apiJson(
+      "/api/account/privacy/erasure",
+      {
+        method: "POST",
+        body: { confirm: true }
+      }
+    );
+    setAccountStatus(
+      `سُجل الطلب. يصبح مؤهلًا لحذف المخزن النشط في `
+      + `${formatDate(result.eligibleAfterUtc)}.`
+      + (result.providerBackupRetentionDays
+        ? ` وقد تبقى لقطات D1 القابلة للاسترجاع حتى انقضاء `
+          + `${result.providerBackupRetentionDays} يومًا من تاريخ التنفيذ.`
+        : ""),
+      false
+    );
+    state.account.erasureRequested = true;
+    requestErasureButton.hidden = true;
+  } catch (error) {
+    setAccountStatus(error.message, true);
+  } finally {
+    setAccountBusy(false);
+  }
+}
+
 async function logoutAccount() {
   try {
     setAccountBusy(true);
@@ -558,15 +906,22 @@ async function logoutAccount() {
     );
     state.account.authenticated = false;
     state.account.userId = null;
+    state.account.email = null;
+    state.account.emailVerified = false;
+    state.account.erasureRequested = false;
     state.packet = null;
     state.annotationA = null;
     state.annotationB = null;
+    state.primaryArtifact = null;
     workspace.replaceChildren();
     packetSummary.hidden = true;
     savedDrafts.hidden = true;
     form.reset();
+    resetEmailVerification();
+    setEmailVerificationStatus("", false);
     applyRoleFromQuery();
     syncRoleControls();
+    renderEmailVerificationState();
     renderAccountState();
     showStep(1);
   } catch (error) {
@@ -581,7 +936,14 @@ function setAccountBusy(busy) {
   loginPasskeyButton.disabled = busy;
   quickLoginButton.disabled = busy;
   logoutAccountButton.disabled = busy;
-  if (!busy) renderAccountState();
+  requestErasureButton.disabled = busy;
+  if (busy) {
+    sendEmailCodeButton.disabled = true;
+    verifyEmailCodeButton.disabled = true;
+  } else {
+    renderAccountState();
+    renderEmailVerificationState();
+  }
 }
 
 function setAccountStatus(message, error) {
@@ -783,7 +1145,9 @@ async function prepareCase() {
     throw new Error("حمّل العينة التجريبية أو حزمة منسق التقييم أولًا.");
   }
   validatePacket(state.packet);
-  if (selectedRole() === "adjudication") {
+  const role = selectedRole();
+  if (role === "adjudication") {
+    state.primaryArtifact = null;
     state.annotationA = await readJson(
       annotationAFile.files[0],
       "ملف المعلّق A"
@@ -798,9 +1162,36 @@ async function prepareCase() {
       throw new Error("ملفا التعليق يحملان الدور نفسه.");
     }
     renderAdjudication();
+  } else if (role === "ratification") {
+    state.annotationA = null;
+    state.annotationB = null;
+    const loaded = await readJson(
+      primaryAdjudicationFile.files[0],
+      "حزمة التحكيم الأولية"
+    );
+    state.primaryArtifact = loaded?.artifact ?? loaded;
+    if (!state.primaryArtifact
+        || state.primaryArtifact.kind !== "adjudication-package") {
+      throw new Error("الملف لا يحتوي حزمة تحكيم أولية صالحة من J1.");
+    }
+    const sourceRoot = await computePacketMerkleRoot(
+      state.primaryArtifact.packet
+    );
+    const selectedRoot = await computePacketMerkleRoot(state.packet);
+    if (sourceRoot !== selectedRoot) {
+      throw new Error("حزمة J1 لا تخص نسخة المهمة المحمّلة.");
+    }
+    await computeAdjudicationMerkleRoot(
+      state.primaryArtifact.packet,
+      state.primaryArtifact.annotationA,
+      state.primaryArtifact.annotationB,
+      state.primaryArtifact.adjudication
+    );
+    await renderRatification();
   } else {
     state.annotationA = null;
     state.annotationB = null;
+    state.primaryArtifact = null;
     renderAnnotation();
   }
   updateCompletion();
@@ -832,6 +1223,7 @@ async function saveDraft(options = {}) {
           packet: state.packet,
           annotationA: state.annotationA,
           annotationB: state.annotationB,
+          primaryArtifact: state.primaryArtifact,
           fields: captureWorkspace()
         }
       }
@@ -927,6 +1319,7 @@ async function resumeDraft(packetId, role) {
     state.packet = draft.packet;
     state.annotationA = draft.annotationA ?? null;
     state.annotationB = draft.annotationB ?? null;
+    state.primaryArtifact = draft.primaryArtifact ?? null;
 
     if (draft.role === "adjudication") {
       if (!state.annotationA || !state.annotationB) {
@@ -935,6 +1328,11 @@ async function resumeDraft(packetId, role) {
       await validateSubmissionBinding(state.packet, state.annotationA);
       await validateSubmissionBinding(state.packet, state.annotationB);
       renderAdjudication();
+    } else if (draft.role === "ratification") {
+      if (!state.primaryArtifact) {
+        throw new Error("حزمة J1 غير موجودة في المسودة.");
+      }
+      await renderRatification();
     } else {
       renderAnnotation();
     }
@@ -952,6 +1350,17 @@ async function resumeDraft(packetId, role) {
 }
 
 function captureWorkspace() {
+  if (selectedRole() === "ratification") {
+    return [{
+      kind: "ratification",
+      primaryReceiptId:
+        controlValue(workspace, ".primary-receipt"),
+      decision:
+        controlValue(workspace, ".ratification-decision"),
+      rationale:
+        controlValue(workspace, ".ratification-rationale")
+    }];
+  }
   return [...workspace.querySelectorAll(".sentence")].map(sentence => ({
     sentenceId: sentence.dataset.sentenceId,
     structural: controlValue(sentence, "select.structural"),
@@ -972,6 +1381,26 @@ function captureWorkspace() {
 }
 
 function applyWorkspace(fields) {
+  if (selectedRole() === "ratification") {
+    const saved = (fields || []).find(item => item.kind === "ratification");
+    if (!saved) return;
+    setControlValue(
+      workspace,
+      ".primary-receipt",
+      saved.primaryReceiptId
+    );
+    setControlValue(
+      workspace,
+      ".ratification-decision",
+      saved.decision
+    );
+    setControlValue(
+      workspace,
+      ".ratification-rationale",
+      saved.rationale
+    );
+    return;
+  }
   const sentenceStates = new Map(
     (fields || []).map(item => [String(item.sentenceId), item])
   );
@@ -1032,6 +1461,7 @@ function formatDate(valueToFormat) {
 
 function syncRoleControls() {
   adjudicationFiles.hidden = selectedRole() !== "adjudication";
+  ratificationFiles.hidden = selectedRole() !== "ratification";
 }
 
 function renderAnnotation() {
@@ -1095,6 +1525,61 @@ function renderAdjudication() {
       bSentences.get(sentence.sentenceId)
     ));
   });
+}
+
+async function renderRatification() {
+  workspace.replaceChildren();
+  const primaryRoot = await computeAdjudicationMerkleRoot(
+    state.primaryArtifact.packet,
+    state.primaryArtifact.annotationA,
+    state.primaryArtifact.annotationB,
+    state.primaryArtifact.adjudication
+  );
+  const heading = document.createElement("section");
+  heading.className = "task-instructions";
+  heading.innerHTML = `
+    <strong>مراجعة مستقلة للجذر النهائي</strong>
+    <p>
+      راجع أدلة A وB وأسباب J1. لا تصبح النتيجة معتمدة إلا إذا وقّعت
+      أنت الجذر نفسه دون تعديل.
+    </p>
+    <p dir="ltr"><code>${escapeHtml(primaryRoot)}</code></p>`;
+  workspace.append(heading);
+  workspace.append(createResultCard({
+    receiptId: "primary-adjudication",
+    participantPseudonym:
+      state.primaryArtifact.adjudication.adjudicatorPseudonym,
+    role: "adjudication",
+    isFinal: false,
+    githubStatus: "awaiting-j2",
+    submittedAtUtc: new Date().toISOString(),
+    artifactSha256: await sha256Json(state.primaryArtifact),
+    artifact: state.primaryArtifact
+  }));
+
+  const controls = document.createElement("section");
+  controls.className = "ratification-controls";
+  controls.innerHTML = `
+    <label>
+      معرف استلام حزمة J1
+      <input class="primary-receipt" dir="ltr" autocomplete="off"
+             placeholder="00000000-0000-4000-8000-000000000000">
+    </label>
+    <label>
+      قرار المراجع J2
+      <select class="ratification-decision">
+        <option value="">اختر القرار</option>
+        <option value="agree">أوافق على الجذر النهائي نفسه</option>
+        <option value="disagree">أعترض وأطلب التصعيد</option>
+        <option value="recuse">أتنحى لتعارض مصالح</option>
+      </select>
+    </label>
+    <label>
+      التعليل العلمي <small>(20 حرفًا على الأقل)</small>
+      <textarea class="ratification-rationale" rows="5"
+                maxlength="4000"></textarea>
+    </label>`;
+  workspace.append(controls);
 }
 
 function createAdjudicationSentence(source, annotationA, annotationB) {
@@ -1188,6 +1673,8 @@ function adjudicationTokenCard(
 async function validateWorkspace() {
   if (selectedRole() === "adjudication") {
     await collectAdjudication(false);
+  } else if (selectedRole() === "ratification") {
+    await collectRatification(false);
   } else {
     await collectAnnotation(false);
   }
@@ -1213,6 +1700,19 @@ async function buildArtifactBundle() {
       adjudication: decision
     };
   }
+  if (role === "ratification") {
+    const ratification = await collectRatification(true);
+    await computeRatificationMerkleRoot(
+      state.primaryArtifact,
+      ratification
+    );
+    return {
+      schema: "adg-msa-portal-artifact-v1",
+      kind: "ratification-package",
+      primaryArtifact: state.primaryArtifact,
+      ratification
+    };
+  }
 
   const annotation = await collectAnnotation(true);
   await computeAnnotationMerkleRoot(state.packet, annotation);
@@ -1221,6 +1721,55 @@ async function buildArtifactBundle() {
     kind: "independent-annotation",
     packet: state.packet,
     annotation
+  };
+}
+
+async function collectRatification(finalize) {
+  if (!state.primaryArtifact) {
+    throw new Error("حمّل حزمة J1 قبل المراجعة الثانية.");
+  }
+  const primaryReceiptId = workspace
+    .querySelector(".primary-receipt")?.value.trim();
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+    .test(primaryReceiptId || "")) {
+    throw new Error("أدخل معرف استلام حزمة J1 الصحيح.");
+  }
+  const decision = workspace
+    .querySelector(".ratification-decision")?.value;
+  if (!["agree", "disagree", "recuse"].includes(decision)) {
+    throw new Error("اختر قرار المراجع J2.");
+  }
+  const rationale = workspace
+    .querySelector(".ratification-rationale")?.value.trim() || "";
+  if (rationale.length < 20) {
+    throw new Error("اكتب تعليلًا علميًا من 20 حرفًا على الأقل.");
+  }
+  const packet = state.primaryArtifact.packet;
+  return {
+    schema: RATIFICATION_SCHEMA,
+    taskId: packet.taskId,
+    taskVersion: packet.taskVersion,
+    packetId: packet.packetId,
+    holdoutId: packet.holdoutId,
+    protocolVersion: packet.protocolVersion,
+    packetMerkleRoot: await computePacketMerkleRoot(packet),
+    primaryReceiptId,
+    primaryAdjudicationMerkleRoot:
+      await computeAdjudicationMerkleRoot(
+        packet,
+        state.primaryArtifact.annotationA,
+        state.primaryArtifact.annotationB,
+        state.primaryArtifact.adjudication
+      ),
+    reviewerSlot: "J2",
+    reviewerPseudonym:
+      `human-${state.participantId.slice(0, 12)}-J2`,
+    reviewerIsHuman: true,
+    reviewerIsSynthetic: false,
+    independentFromImplementationTeam:
+      finalize && checked("attest-independent"),
+    decision,
+    rationale
   };
 }
 
@@ -1239,9 +1788,14 @@ async function collectAnnotation(finalize) {
     }));
   return {
     schema: ANNOTATION_SCHEMA,
+    taskId: state.packet.taskId,
+    taskVersion: state.packet.taskVersion,
     packetId: state.packet.packetId,
     holdoutId: state.packet.holdoutId,
     protocolId: state.packet.protocolId,
+    guidelineVersion: state.packet.guidelineVersion,
+    dataVersion: state.packet.dataVersion,
+    protocolVersion: state.packet.protocolVersion,
     packetMerkleRoot: await computePacketMerkleRoot(state.packet),
     annotatorSlot: slot,
     annotatorPseudonym: `human-${state.participantId.slice(0, 12)}-${slot}`,
@@ -1310,9 +1864,14 @@ async function collectAdjudication(finalize) {
     });
   return {
     schema: ADJUDICATION_SCHEMA,
+    taskId: state.packet.taskId,
+    taskVersion: state.packet.taskVersion,
     packetId: state.packet.packetId,
     holdoutId: state.packet.holdoutId,
     protocolId: state.packet.protocolId,
+    guidelineVersion: state.packet.guidelineVersion,
+    dataVersion: state.packet.dataVersion,
+    protocolVersion: state.packet.protocolVersion,
     packetMerkleRoot: await computePacketMerkleRoot(state.packet),
     annotationAMerkleRoot:
       await computeAnnotationMerkleRoot(state.packet, state.annotationA),
@@ -1320,7 +1879,8 @@ async function collectAdjudication(finalize) {
       await computeAnnotationMerkleRoot(state.packet, state.annotationB),
     annotationASlot: state.annotationA.annotatorSlot,
     annotationBSlot: state.annotationB.annotatorSlot,
-    adjudicatorPseudonym: `human-${state.participantId.slice(0, 12)}-J`,
+    adjudicatorSlot: "J1",
+    adjudicatorPseudonym: `human-${state.participantId.slice(0, 12)}-J1`,
     adjudicatorIsHuman: true,
     adjudicatorIsSynthetic: false,
     independentFromImplementationTeam:
@@ -1460,12 +2020,478 @@ async function submitEvaluation() {
       + "ستظهر النتيجة المجهّلة في المستودع بعد الفحص الآلي.",
       false
     );
+    await loadDiscussion(result.receiptId);
   } catch (error) {
     showStatus(error.message, true);
   } finally {
     submitButton.disabled = false;
     resetTurnstile();
   }
+}
+
+async function loadDiscussion(receiptId) {
+  const query = new URLSearchParams({ receiptId });
+  const data = await apiJson(`/api/results?${query}`);
+  state.discussion.sourceReceiptId = receiptId;
+  state.discussion.data = data;
+  state.discussion.replyTo = null;
+  discussionPanel.hidden = false;
+  renderPreviousResults(data);
+  renderDiscussionThread(data.comments || []);
+  populateDiscussionControls(data.results || []);
+  await loadTaskStatus(data.source.receiptId);
+  clearDiscussionReply();
+  const currentUrl = new URL(location.href);
+  currentUrl.searchParams.set("discussion", receiptId);
+  history.replaceState(null, "", currentUrl);
+  discussionPanel.scrollIntoView({
+    behavior: "smooth",
+    block: "start"
+  });
+}
+
+async function loadTaskStatus(receiptId) {
+  try {
+    const query = new URLSearchParams({ receiptId });
+    const status = await apiJson(`/api/tasks/status?${query}`);
+    state.discussion.taskStatus = status.found ? status : null;
+    renderTaskStatus(status);
+  } catch (error) {
+    state.discussion.taskStatus = null;
+    taskConsensusStatus.textContent =
+      `تعذر تحميل حالة الإجماع: ${error.message}`;
+    appealPanel.hidden = true;
+  }
+}
+
+function renderTaskStatus(status) {
+  if (!status.found) {
+    taskConsensusStatus.textContent =
+      "هذه نتيجة قديمة لا ترتبط بعد بآلة الإجماع الرسمية.";
+    appealPanel.hidden = true;
+    return;
+  }
+  const submittedRoles = new Set(
+    status.slots
+      .filter(slot => slot.status === "submitted")
+      .map(slot => slot.role)
+  );
+  const roleProgress = ["A", "B", "J1", "J2"]
+    .map(role => `${role}: ${submittedRoles.has(role) ? "مكتمل" : "منتظر"}`)
+    .join(" · ");
+  const agreement = status.agreement
+    ? ` · الاتفاق الخام ${formatMetric(
+      status.agreement.macroRawAgreement
+    )}`
+      + ` · كابا ${status.agreement.macroDefinedKappa !== null
+        ? formatMetric(status.agreement.macroDefinedKappa)
+        : "غير معرّفة"}`
+    : "";
+  taskConsensusStatus.textContent =
+    `الحالة: ${consensusStateLabel(status.state)} · `
+    + `الجولة ${status.round.number} · ${roleProgress}${agreement}`;
+
+  const deadline = status.appealDeadlineAtUtc
+    ? Date.parse(status.appealDeadlineAtUtc)
+    : 0;
+  const pendingAppeal = status.appeals
+    .some(appeal => appeal.status === "pending");
+  const canAppeal = status.state === "approved"
+    && Boolean(status.activeFinalReceiptId)
+    && deadline > Date.now()
+    && !pendingAppeal;
+  appealPanel.hidden = !canAppeal;
+  if (pendingAppeal) {
+    taskConsensusStatus.textContent +=
+      " · يوجد استئناف موثق قيد المراجعة.";
+  } else if (status.state === "approved" && deadline > Date.now()) {
+    taskConsensusStatus.textContent +=
+      ` · تنتهي مهلة الاستئناف ${formatDate(
+        status.appealDeadlineAtUtc
+      )}.`;
+  }
+}
+
+function consensusStateLabel(value) {
+  return {
+    draft: "مسودة",
+    open: "مفتوحة",
+    "independent-review": "تحكيم مستقل",
+    discussion: "نقاش علمي",
+    "final-review": "مراجعة J2",
+    approved: "معتمدة مؤقتًا",
+    published: "منشورة",
+    escalated: "مصعّدة",
+    reissued: "معاد طرحها",
+    revoked: "مسحوبة",
+    failed: "مغلقة دون إجازة"
+  }[value] || value;
+}
+
+function formatMetric(value) {
+  return Number.isFinite(Number(value))
+    ? Number(value).toFixed(3)
+    : "—";
+}
+
+async function submitConsensusAppeal() {
+  const status = state.discussion.taskStatus;
+  const evidence = appealEvidence.value.trim();
+  if (!status?.activeFinalReceiptId) {
+    setAppealStatus("لا توجد نتيجة نهائية قابلة للاستئناف.", true);
+    return;
+  }
+  if (evidence.length < 40) {
+    setAppealStatus(
+      "اكتب دليلًا محددًا من 40 حرفًا على الأقل.",
+      true
+    );
+    return;
+  }
+  submitAppealButton.disabled = true;
+  setAppealStatus("", false);
+  try {
+    const result = await apiJson(
+      "/api/consensus/appeals",
+      {
+        method: "POST",
+        body: {
+          finalReceiptId: status.activeFinalReceiptId,
+          evidence
+        }
+      }
+    );
+    appealEvidence.value = "";
+    setAppealStatus(
+      `سُجل الاستئناف برقم ${result.appealId}.`,
+      false
+    );
+    await loadTaskStatus(status.sourceReceiptId);
+  } catch (error) {
+    setAppealStatus(error.message, true);
+  } finally {
+    submitAppealButton.disabled = false;
+  }
+}
+
+function setAppealStatus(message, error) {
+  appealStatus.textContent = message;
+  appealStatus.className =
+    `status ${message ? (error ? "error" : "success") : ""}`;
+}
+
+function renderPreviousResults(data) {
+  previousResults.replaceChildren();
+  const heading = document.createElement("div");
+  heading.className = "task-discussion-summary";
+  heading.innerHTML = `
+    <strong>المهمة ${escapeHtml(data.source.packetId)}</strong>
+    <span>معرفك في هذه الجولة:
+      <code>${escapeHtml(data.source.participantPseudonym)}</code>
+    </span>`;
+  previousResults.append(heading);
+  if (!data.results.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty-discussion";
+    empty.textContent =
+      "أنت أول مساهم مكتمل في هذه المهمة. ستظهر النتائج اللاحقة هنا "
+      + "عند عودتك إلى رابط النقاش.";
+    previousResults.append(empty);
+    return;
+  }
+  data.results.forEach(result => {
+    previousResults.append(createResultCard(result));
+  });
+}
+
+function createResultCard(result) {
+  const card = document.createElement("article");
+  card.className = `result-card${result.isFinal ? " final" : ""}`;
+  card.id = `result-${result.receiptId}`;
+
+  const header = document.createElement("div");
+  header.className = "result-card-header";
+  const title = document.createElement("h6");
+  title.textContent = result.participantPseudonym;
+  const badges = document.createElement("div");
+  badges.className = "result-badges";
+  badges.append(
+    resultBadge(roleLabel(result.role)),
+    resultBadge(result.isFinal ? "نتيجة نهائية" : "تحكيم مستقل"),
+    resultBadge(
+      result.githubStatus === "pending-validation"
+        ? "قيد مراجعة GitHub"
+        : result.githubStatus
+    )
+  );
+  header.append(title, badges);
+  card.append(header);
+
+  const meta = document.createElement("p");
+  meta.className = "result-meta";
+  meta.textContent =
+    `${formatDate(result.submittedAtUtc)} · SHA-256 `
+    + result.artifactSha256.slice(0, 16);
+  card.append(meta);
+
+  const decision = result.artifact.kind === "adjudication-package"
+    ? result.artifact.adjudication
+    : result.artifact.kind === "ratification-package"
+      ? result.artifact.primaryArtifact.adjudication
+      : result.artifact.annotation;
+  const packet = result.artifact.kind === "ratification-package"
+    ? result.artifact.primaryArtifact.packet
+    : result.artifact.packet;
+  const packetSentences = new Map(
+    packet.sentences
+      .map(sentence => [sentence.sentenceId, sentence])
+  );
+  for (const sentence of decision.sentences || []) {
+    const details = document.createElement("details");
+    details.className = "result-sentence";
+    const summary = document.createElement("summary");
+    const source = packetSentences.get(sentence.sentenceId);
+    summary.textContent =
+      `${sentence.sentenceId}: ${source?.text || "جملة المهمة"}`;
+    details.append(summary);
+
+    const sentenceDecision = document.createElement("p");
+    sentenceDecision.textContent =
+      `سلامة التركيب: ${sentence.structurallyAcceptable ? "نعم" : "لا"} · `
+      + `اكتمال الإسناد: ${sentence.completePredicate ? "نعم" : "لا"}`;
+    details.append(sentenceDecision);
+    if (sentence.resolutionNote || sentence.note) {
+      const note = document.createElement("blockquote");
+      note.textContent = sentence.resolutionNote || sentence.note;
+      details.append(note);
+    }
+
+    const table = document.createElement("table");
+    table.className = "result-table";
+    table.innerHTML = `
+      <thead><tr>
+        <th>الكلمة</th><th>الصنف</th><th>الرأس</th>
+        <th>العلاقة</th><th>الإعراب</th>
+      </tr></thead>`;
+    const tbody = document.createElement("tbody");
+    const tokens = new Map(
+      (source?.tokens || []).map(token => [token.id, token.form])
+    );
+    for (const token of sentence.tokens || []) {
+      const row = document.createElement("tr");
+      [
+        tokens.get(token.tokenId) || token.tokenId,
+        token.universalPartOfSpeech,
+        token.headTokenId,
+        token.dependencyRelation,
+        token.irabNotApplicable
+          ? "غير منطبق"
+          : token.irabCategory
+      ].forEach(valueToWrite => {
+        const cell = document.createElement("td");
+        cell.textContent = String(valueToWrite ?? "");
+        row.append(cell);
+      });
+      tbody.append(row);
+      if (token.resolutionNote || token.note) {
+        const noteRow = document.createElement("tr");
+        noteRow.className = "result-note-row";
+        const noteCell = document.createElement("td");
+        noteCell.colSpan = 5;
+        noteCell.textContent = token.resolutionNote || token.note;
+        noteRow.append(noteCell);
+        tbody.append(noteRow);
+      }
+    }
+    table.append(tbody);
+    details.append(table);
+    card.append(details);
+  }
+  return card;
+}
+
+function resultBadge(text) {
+  const badge = document.createElement("span");
+  badge.textContent = text;
+  return badge;
+}
+
+function populateDiscussionControls(results) {
+  discussionTarget.replaceChildren(
+    optionElement("", "نقاش عام للمهمة")
+  );
+  discussionMentions.replaceChildren();
+  discussionReferences.replaceChildren();
+  results.forEach(result => {
+    const label =
+      `${result.participantPseudonym} · ${roleLabel(result.role)}`
+      + `${result.isFinal ? " · نهائية" : ""}`;
+    discussionTarget.append(optionElement(result.receiptId, label));
+    discussionMentions.append(
+      optionElement(result.receiptId, `@${label}`)
+    );
+    discussionReferences.append(
+      optionElement(result.receiptId, label)
+    );
+  });
+}
+
+function optionElement(valueToWrite, label) {
+  const option = document.createElement("option");
+  option.value = valueToWrite;
+  option.textContent = label;
+  return option;
+}
+
+function renderDiscussionThread(comments) {
+  discussionThread.replaceChildren();
+  if (!comments.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty-discussion";
+    empty.textContent =
+      "لا توجد مداخلات بعد. ابدأ بسؤال علمي أو اختلاف معلّل.";
+    discussionThread.append(empty);
+    return;
+  }
+  comments.forEach(comment => {
+    const article = document.createElement("article");
+    article.className = "discussion-comment";
+    article.id = `comment-${comment.commentId}`;
+    if (comment.parentCommentId) {
+      article.dataset.parentCommentId = comment.parentCommentId;
+    }
+    const header = document.createElement("div");
+    header.className = "discussion-comment-header";
+    const author = document.createElement("strong");
+    author.textContent = comment.participantPseudonym;
+    const meta = document.createElement("span");
+    meta.textContent =
+      `${discussionCategoryLabel(comment.category)} · `
+      + formatDate(comment.createdAtUtc);
+    header.append(author, meta);
+    const body = document.createElement("p");
+    body.textContent = comment.body;
+    article.append(header, body);
+
+    if (comment.location?.sentenceId || comment.location?.tokenId) {
+      const locationValue = document.createElement("small");
+      locationValue.textContent = [
+        comment.location.sentenceId
+          ? `الجملة: ${comment.location.sentenceId}`
+          : null,
+        comment.location.tokenId
+          ? `الوحدة: ${comment.location.tokenId}`
+          : null
+      ].filter(Boolean).join(" · ");
+      article.append(locationValue);
+    }
+    const links = document.createElement("div");
+    links.className = "discussion-links";
+    for (const mention of comment.mentions || []) {
+      const chip = document.createElement("code");
+      chip.textContent = `@${mention.pseudonym}`;
+      links.append(chip);
+    }
+    for (const reference of comment.resultReferences || []) {
+      const link = document.createElement("a");
+      link.href = `#result-${reference.receiptId}`;
+      link.textContent =
+        reference.isFinal
+          ? `النتيجة النهائية ${reference.receiptId.slice(0, 8)}`
+          : `النتيجة ${reference.receiptId.slice(0, 8)}`;
+      links.append(link);
+    }
+    if (links.childElementCount) article.append(links);
+
+    const reply = document.createElement("button");
+    reply.className = "button ghost discussion-reply";
+    reply.type = "button";
+    reply.textContent = "رد";
+    reply.addEventListener("click", () => {
+      state.discussion.replyTo = comment.commentId;
+      replyContext.hidden = false;
+      replyContextText.textContent =
+        `رد على ${comment.participantPseudonym}`;
+      discussionBody.focus();
+    });
+    article.append(reply);
+    discussionThread.append(article);
+  });
+}
+
+function discussionCategoryLabel(category) {
+  return {
+    agreement: "اتفاق معلّل",
+    disagreement: "اختلاف معلّل",
+    question: "سؤال علمي",
+    clarification: "طلب توضيح",
+    evidence: "دليل أو شاهد",
+    "final-result": "تعليق على نتيجة نهائية",
+    "consensus-proposal": "مقترح إجماع",
+    escalation: "طلب تصعيد",
+    appeal: "اعتراض موثق",
+    recusal: "تنحٍّ لتعارض المصالح"
+  }[category] || category;
+}
+
+async function submitDiscussionComment() {
+  submitDiscussionButton.disabled = true;
+  setDiscussionStatus("", false);
+  try {
+    if (!state.discussion.sourceReceiptId) {
+      throw new Error("افتح نتائج مهمة مكتملة أولًا.");
+    }
+    const result = await apiJson("/api/discussion/comments", {
+      method: "POST",
+      body: {
+        sourceReceiptId: state.discussion.sourceReceiptId,
+        targetReceiptId: discussionTarget.value || null,
+        parentCommentId: state.discussion.replyTo,
+        category: discussionCategory.value,
+        body: discussionBody.value,
+        sentenceId: discussionSentence.value || null,
+        tokenId: discussionToken.value || null,
+        mentionedReceiptIds: selectedValues(discussionMentions),
+        referencedReceiptIds: selectedValues(discussionReferences)
+      }
+    });
+    discussionBody.value = "";
+    discussionSentence.value = "";
+    discussionToken.value = "";
+    discussionMentions.selectedIndex = -1;
+    discussionReferences.selectedIndex = -1;
+    clearDiscussionReply();
+    setDiscussionStatus(
+      "نُشرت المداخلة بهوية مستعارة، وهي في انتظار فحص GitHub.",
+      false
+    );
+    await loadDiscussion(state.discussion.sourceReceiptId);
+    const comment = document.querySelector(
+      `#comment-${result.comment.commentId}`
+    );
+    comment?.scrollIntoView({ behavior: "smooth", block: "center" });
+  } catch (error) {
+    setDiscussionStatus(error.message, true);
+  } finally {
+    submitDiscussionButton.disabled = false;
+  }
+}
+
+function selectedValues(select) {
+  return [...select.selectedOptions].map(option => option.value);
+}
+
+function clearDiscussionReply() {
+  state.discussion.replyTo = null;
+  replyContext.hidden = true;
+  replyContextText.textContent = "";
+}
+
+function setDiscussionStatus(message, isError) {
+  discussionStatus.textContent = message || "";
+  discussionStatus.className = `status${message
+    ? isError ? " error" : " success"
+    : ""}`;
 }
 
 async function configureTurnstile() {
@@ -1515,6 +2541,18 @@ function loadScript(src) {
 }
 
 function updateCompletion() {
+  if (selectedRole() === "ratification") {
+    const receipt = controlValue(workspace, ".primary-receipt");
+    const decision = controlValue(workspace, ".ratification-decision");
+    const rationale = controlValue(workspace, ".ratification-rationale");
+    const completed = [
+      /^[0-9a-f-]{36}$/i.test(receipt),
+      Boolean(decision),
+      rationale.trim().length >= 20
+    ].filter(Boolean).length;
+    completionValue.textContent = `${Math.round(completed / 3 * 100)}%`;
+    return;
+  }
   const controls = [...workspace.querySelectorAll(
     "select.structural, select.predicate, select.upos, select.relation, "
     + "select.irab-category, .head, .irab-head"
@@ -1725,7 +2763,8 @@ function selectedRole() {
 function roleLabel(role) {
   if (role === "A") return "المعلّق المستقل A";
   if (role === "B") return "المعلّق المستقل B";
-  return "المحكّم الثالث";
+  if (role === "ratification") return "المراجع المستقل J2";
+  return "المحكّم الأول J1";
 }
 
 function requiredBoolean(control) {

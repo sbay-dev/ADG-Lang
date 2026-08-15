@@ -1,0 +1,31 @@
+name = "adg-cpoly-postgres"
+main = "src/index.js"
+compatibility_date = "2026-08-15"
+workers_dev = false
+
+[vars]
+CPOLY_BACKUP_BASE_URL = "https://REPLACE_PORTAL_WORKER_ORIGIN"
+CPOLY_ALLOW_FRESH_BOOTSTRAP = "false"
+CPOLY_RESUME_RECOVERY = "false"
+
+[[containers]]
+class_name = "CpolyAdgPostgresContainer"
+image = "../Dockerfile"
+max_instances = 1
+instance_type = "standard-1"
+
+[[durable_objects.bindings]]
+name = "ADG_CPOLY_POSTGRES"
+class_name = "CpolyAdgPostgresContainer"
+
+[[kv_namespaces]]
+binding = "CPOLY_BACKUPS"
+id = "0e505417a3404de2bb0a858ccfa007ae"
+preview_id = "992b46d4c4fb4aa0bd8d95698bbcbc87"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["CpolyAdgPostgresContainer"]
+
+[triggers]
+crons = ["17 */6 * * *"]

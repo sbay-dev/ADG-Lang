@@ -1,0 +1,241 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: adg-postgres-d1-restore
+  namespace: adg-data-plane
+  labels:
+    app.kubernetes.io/name: adg-cpoly-postgres
+    app.kubernetes.io/component: restore
+    cpoly.sbay.sa/backup-source: worker-d1
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 14400
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: adg-cpoly-postgres
+        app.kubernetes.io/component: restore
+        cpoly.sbay.sa/network-client: portal-backup
+        cpoly.sbay.sa/backup-source: worker-d1
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: recovery-begin-download
+          image: python:3.13-slim-bookworm@sha256:00faa2debb87529f9f0764e9491d8ba400a3678976616c3bd7cb193745ac20d1
+          imagePullPolicy: IfNotPresent
+          command:
+            - python
+            - /opt/cpoly/scripts/d1_backup_client.py
+            - download
+            - --begin-recovery
+            - --recovery-state
+            - /backup/recovery-state.json
+            - --output
+            - /backup/adg-adjudication.dump
+            - --manifest-output
+            - /backup/descriptor.json
+          env:
+            - name: ADG_BACKUP_BASE_URL_FILE
+              value: /run/secrets/portal-backup/base-url
+            - name: ADG_BACKUP_HMAC_KEY_FILE
+              value: /run/secrets/portal-backup/hmac-key
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: scripts
+              mountPath: /opt/cpoly/scripts
+              readOnly: true
+            - name: backup-work
+              mountPath: /backup
+            - name: portal-backup-secrets
+              mountPath: /run/secrets/portal-backup
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+        - name: restore-postgres
+          image: postgres:16-bookworm@sha256:60f4761b9035e0b8d5218f701a8c3382f641bf12b1604822574cf5be3baeb537
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - /opt/cpoly/scripts/restore-binary-backup.sh
+          env:
+            - name: BINARY_ARCHIVE
+              value: /backup/adg-adjudication.dump
+            - name: MIGRATIONS_DIR
+              value: /migrations/postgresql
+            - name: PGHOST
+              value: adg-postgres-recovery.adg-data-plane.svc.cluster.local
+            - name: PGPORT
+              value: "5432"
+            - name: PGDATABASE
+              value: adg_adjudication
+            - name: PGUSER
+              value: adg_migrator
+            - name: PGSSLMODE
+              value: verify-full
+            - name: PGSSLROOTCERT
+              value: /run/secrets/tls/postgres-ca.crt
+            - name: CPOLY_DESTRUCTIVE_RESTORE
+              value: "false"
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: scripts
+              mountPath: /opt/cpoly/scripts
+              readOnly: true
+            - name: backup-work
+              mountPath: /backup
+            - name: migrations
+              mountPath: /migrations/postgresql
+              readOnly: true
+            - name: role-secrets
+              mountPath: /run/secrets/roles
+              readOnly: true
+            - name: tls-secrets
+              mountPath: /run/secrets/tls
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+        - name: recovery-complete-status
+          image: python:3.13-slim-bookworm@sha256:00faa2debb87529f9f0764e9491d8ba400a3678976616c3bd7cb193745ac20d1
+          imagePullPolicy: IfNotPresent
+          command:
+            - python
+            - /opt/cpoly/scripts/d1_backup_client.py
+            - recovery-complete
+            - --recovery-state
+            - /backup/recovery-state.json
+            - --ready-output
+            - /backup/recovery-ready.tsv
+            - --timeout-seconds
+            - "3600"
+            - --poll-seconds
+            - "5"
+          env:
+            - name: ADG_BACKUP_BASE_URL_FILE
+              value: /run/secrets/portal-backup/base-url
+            - name: ADG_BACKUP_HMAC_KEY_FILE
+              value: /run/secrets/portal-backup/hmac-key
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: scripts
+              mountPath: /opt/cpoly/scripts
+              readOnly: true
+            - name: backup-work
+              mountPath: /backup
+            - name: portal-backup-secrets
+              mountPath: /run/secrets/portal-backup
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      containers:
+        - name: open-postgres-readiness-gate
+          image: postgres:16-bookworm@sha256:60f4761b9035e0b8d5218f701a8c3382f641bf12b1604822574cf5be3baeb537
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - /opt/cpoly/scripts/mark-recovery-ready.sh
+          env:
+            - name: RECOVERY_READY_FILE
+              value: /backup/recovery-ready.tsv
+            - name: PGHOST
+              value: adg-postgres-recovery.adg-data-plane.svc.cluster.local
+            - name: PGPORT
+              value: "5432"
+            - name: PGDATABASE
+              value: adg_adjudication
+            - name: PGUSER
+              value: adg_migrator
+            - name: PGSSLMODE
+              value: verify-full
+            - name: PGSSLROOTCERT
+              value: /run/secrets/tls/postgres-ca.crt
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: scripts
+              mountPath: /opt/cpoly/scripts
+              readOnly: true
+            - name: backup-work
+              mountPath: /backup
+              readOnly: true
+            - name: role-secrets
+              mountPath: /run/secrets/roles
+              readOnly: true
+            - name: tls-secrets
+              mountPath: /run/secrets/tls
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: scripts
+          configMap:
+            name: adg-postgres-scripts
+            defaultMode: 0555
+        - name: backup-work
+          emptyDir:
+            sizeLimit: 10Gi
+        - name: migrations
+          configMap:
+            name: adg-postgres-migrations
+        - name: role-secrets
+          secret:
+            secretName: adg-postgres-role-secrets
+            defaultMode: 0440
+        - name: tls-secrets
+          secret:
+            secretName: adg-postgres-server-tls
+            defaultMode: 0440
+        - name: portal-backup-secrets
+          secret:
+            secretName: adg-postgres-portal-backup-secrets
+            defaultMode: 0440
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 64Mi

@@ -4,11 +4,10 @@ on:
   schedule:
     - cron: "*/15 * * * *"
   workflow_dispatch:
+  pull_request:
+    types: [closed]
 
-permissions:
-  contents: write
-  id-token: write
-  pull-requests: write
+permissions: {}
 
 concurrency:
   group: msa-adjudication-import
@@ -16,77 +15,273 @@ concurrency:
 
 jobs:
   import:
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment: msa-adjudication-production
+    permissions:
+      contents: write
+      id-token: write
+      pull-requests: write
+
     steps:
       - name: Check out repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Detect an open import pull request
+        if: ${{ (vars.ADG_PORTAL_IMPORT_SOURCE || 'portal-api') == 'portal-api' }}
+        id: portal_api_guard
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $openPrNumber = @(
+            gh api `
+              "repos/$env:REPOSITORY/pulls?state=open&per_page=100" `
+              --jq '.[] | select(.user.login == "github-actions[bot]" and (.head.ref | startswith("automation/msa-adjudication-"))) | .number'
+          ) | Select-Object -First 1
+          if ($openPrNumber) {
+            "skip=true" | Out-File $env:GITHUB_OUTPUT -Append
+            "number=$openPrNumber" | Out-File $env:GITHUB_OUTPUT -Append
+          } else {
+            "skip=false" | Out-File $env:GITHUB_OUTPUT -Append
+          }
 
       - name: Sign in to Azure with OIDC
-        uses: azure/login@v3
+        if: ${{ (vars.ADG_PORTAL_IMPORT_SOURCE || 'portal-api') != 'portal-api' }}
+        uses: azure/login@f5d393ae46f8fde4be8b75f32e3fc50e654ad0ca # v3.0.0
         with:
           client-id: ${{ vars.ADG_AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.ADG_AZURE_TENANT_ID }}
           subscription-id: ${{ vars.ADG_AZURE_SUBSCRIPTION_ID }}
 
-      - name: Download and validate pending submissions
+      - name: Download and validate pending public envelopes
         id: inbox
         shell: pwsh
         env:
+          IMPORT_SOURCE: ${{ vars.ADG_PORTAL_IMPORT_SOURCE || 'portal-api' }}
+          PORTAL_EVIDENCE_URL: ${{ vars.ADG_PORTAL_EVIDENCE_URL || 'https://adg.sbay.sa/api/repository/evidence/claim' }}
+          REPOSITORY: ${{ github.repository }}
           STORAGE_ACCOUNT: ${{ vars.ADG_AZURE_STORAGE_ACCOUNT }}
           KEY_VAULT: ${{ vars.ADG_AZURE_KEY_VAULT }}
+          SUBMISSION_HMAC: ${{ secrets.ADG_SUBMISSION_HMAC }}
+          REPOSITORY_RECEIPT_HMAC: ${{ secrets.ADG_REPOSITORY_RECEIPT_HMAC }}
         run: |
           $ErrorActionPreference = "Stop"
+          $importSource = [string]$env:IMPORT_SOURCE
+          if ($importSource -eq "portal-api"
+              -and "${{ steps.portal_api_guard.outputs.skip }}" -eq "true") {
+            "count=0" | Out-File $env:GITHUB_OUTPUT -Append
+            exit 0
+          }
           $pending = "adg-submissions-pending"
-          $output = Join-Path $PWD ".portal-inbox"
-          $raw = Join-Path $PWD ".portal-raw"
-          New-Item -ItemType Directory -Path $output, $raw -Force |
-            Out-Null
+          $stateDir = Join-Path $PWD ".portal-import"
+          $rawDir = Join-Path $stateDir "raw"
+          $validatedDir = Join-Path $stateDir "validated"
+          $recordsPath = Join-Path $stateDir "records.json"
+          New-Item -ItemType Directory `
+            -Path $rawDir, $validatedDir, "human-evidence/inbox", "human-evidence/comments", "human-evidence/task-state" `
+            -Force | Out-Null
 
-          $hmac = az keyvault secret show `
-            --vault-name $env:KEY_VAULT `
-            --name adg-github-submission-hmac `
-            --query value `
-            --output tsv
+          if ($importSource -eq "portal-api") {
+            $hmac = [string]$env:SUBMISSION_HMAC
+          } else {
+            $hmac = az keyvault secret show `
+              --vault-name $env:KEY_VAULT `
+              --name adg-github-submission-hmac `
+              --query value `
+              --output tsv
+          }
           if (-not $hmac) {
             throw "The submission HMAC key is unavailable."
           }
           Write-Output "::add-mask::$hmac"
           $env:ADG_SUBMISSION_HMAC = $hmac
 
-          $blobs = @(
-            az storage blob list `
-              --account-name $env:STORAGE_ACCOUNT `
-              --container-name $pending `
-              --auth-mode login `
-              --query "[].name" `
-              --output json |
-              ConvertFrom-Json
-          )
-          if ($blobs.Count -eq 0) {
-            "count=0" | Out-File $env:GITHUB_OUTPUT -Append
-            exit 0
+          $records = New-Object System.Collections.Generic.List[object]
+          function Add-ValidatedRecord {
+            param(
+              [Parameter(Mandatory = $true)] [string] $RawPath,
+              [Parameter(Mandatory = $true)] [string] $ValidatedPath,
+              [AllowNull()] [string] $BlobName,
+              [AllowNull()] [string] $ClaimNonce,
+              [AllowNull()] [string] $ClaimKind,
+              [AllowNull()] [string] $ClaimRelatedId
+            )
+            $metadataJson = node scripts/arabic-text/import-msa-portal-submission.mjs `
+              $RawPath $ValidatedPath
+            if (-not $metadataJson) {
+              throw "Validator returned no metadata for $RawPath"
+            }
+            $metadata = $metadataJson | ConvertFrom-Json
+            $relativeJsonPath = $metadata.relativeJsonPath
+            $relativeMarkdownPath = $metadata.relativeMarkdownPath
+            $destinationJson = Join-Path $PWD $relativeJsonPath
+            $destinationMarkdown = Join-Path $PWD $relativeMarkdownPath
+            New-Item -ItemType Directory `
+              -Path (Split-Path $destinationJson -Parent) `
+              -Force | Out-Null
+            Move-Item $ValidatedPath $destinationJson -Force
+            node scripts/arabic-text/render-msa-github-evidence.mjs `
+              $destinationJson $destinationMarkdown | Out-Null
+
+            $records.Add([pscustomobject]@{
+              blobName = $BlobName
+              rawPath = $RawPath
+              claimNonce = $ClaimNonce
+              claimKind = $ClaimKind
+              claimRelatedId = $ClaimRelatedId
+              evidenceType = $metadata.evidenceType
+              identifier = $metadata.identifier
+              packetId = $metadata.packetId
+              artifactType = $metadata.artifactType
+              artifactSha256 = $metadata.artifactSha256
+              category = $metadata.category
+              sourceReceiptId = $metadata.sourceReceiptId
+              targetReceiptId = $metadata.targetReceiptId
+              targetArtifactSha256 = $metadata.targetArtifactSha256
+              taskVersionId = $metadata.taskVersionId
+              state = $metadata.state
+              stateVersion = $metadata.stateVersion
+              eventId = $metadata.eventId
+              relativeJsonPath = $relativeJsonPath
+              relativeMarkdownPath = $relativeMarkdownPath
+            })
           }
 
-          foreach ($blob in $blobs) {
-            $rawPath = Join-Path $raw $blob
-            $targetPath = Join-Path $output $blob
-            az storage blob download `
-              --account-name $env:STORAGE_ACCOUNT `
-              --container-name $pending `
-              --name $blob `
-              --file $rawPath `
-              --auth-mode login `
-              --no-progress `
-              --output none
-            node scripts/arabic-text/import-msa-portal-submission.mjs `
-              $rawPath $targetPath
+          if ($importSource -eq "portal-api") {
+            if ("${{ steps.portal_api_guard.outputs.skip }}" -eq "true") {
+              "count=0" | Out-File $env:GITHUB_OUTPUT -Append
+              exit 0
+            }
+
+            $receiptKey = [string]$env:REPOSITORY_RECEIPT_HMAC
+            if (-not $receiptKey) {
+              throw "The repository receipt HMAC key is unavailable."
+            }
+            Write-Output "::add-mask::$receiptKey"
+
+            function Get-HmacHex {
+              param(
+                [Parameter(Mandatory = $true)] [string] $Key,
+                [Parameter(Mandatory = $true)] [string] $Text
+              )
+              $keyBytes = [Text.Encoding]::UTF8.GetBytes($Key)
+              $bodyBytes = [Text.Encoding]::UTF8.GetBytes($Text)
+              $hmac = [Security.Cryptography.HMACSHA256]::new($keyBytes)
+              try {
+                return [Convert]::ToHexString(
+                  $hmac.ComputeHash($bodyBytes)
+                ).ToLowerInvariant()
+              } finally {
+                $hmac.Dispose()
+              }
+            }
+
+            $claimNonce = [guid]::NewGuid().ToString()
+            $requestedAt = [DateTime]::UtcNow.ToString(
+              "yyyy-MM-ddTHH:mm:ss.fffZ"
+            )
+            $claimEnvelope = [ordered]@{
+              schema = "adg-msa-repository-evidence-claim-v1"
+              repository = $env:REPOSITORY
+              nonce = $claimNonce
+              requestedAtUtc = $requestedAt
+              maxItems = 50
+            }
+            $claimSignature = Get-HmacHex `
+              -Key $receiptKey `
+              -Text ($claimEnvelope | ConvertTo-Json -Compress)
+            $claimBody = [ordered]@{}
+            foreach ($entry in $claimEnvelope.GetEnumerator()) {
+              $claimBody[$entry.Key] = $entry.Value
+            }
+            $claimBody.hmacSha256 = $claimSignature
+            $claimResponse = Invoke-RestMethod `
+              -Method Post `
+              -Uri $env:PORTAL_EVIDENCE_URL `
+              -ContentType "application/json" `
+              -Body ($claimBody | ConvertTo-Json -Compress)
+            if (-not $claimResponse.accepted) {
+              throw "Portal evidence claim was rejected."
+            }
+            $items = @($claimResponse.items)
+            if ($items.Count -eq 0) {
+              "count=0" | Out-File $env:GITHUB_OUTPUT -Append
+              exit 0
+            }
+
+            $index = 0
+            foreach ($item in $items) {
+              $index += 1
+              if ($item.kind -notin @("submission", "comment", "task-state")) {
+                throw "Portal returned an unsupported evidence kind."
+              }
+              if ([string]::IsNullOrWhiteSpace([string]$item.publicPayloadJson)) {
+                throw "Portal returned an empty public evidence payload."
+              }
+              $rawPath = Join-Path $rawDir ("pending-{0:D4}.json" -f $index)
+              $validatedPath = Join-Path $validatedDir ("validated-{0:D4}.json" -f $index)
+              [System.IO.File]::WriteAllText(
+                $rawPath,
+                [string]$item.publicPayloadJson,
+                [System.Text.UTF8Encoding]::new($false)
+              )
+              Add-ValidatedRecord `
+                -RawPath $rawPath `
+                -ValidatedPath $validatedPath `
+                -BlobName $null `
+                -ClaimNonce $claimNonce `
+                -ClaimKind ([string]$item.kind) `
+                -ClaimRelatedId ([string]$item.relatedId)
+            }
+          } else {
+            $blobs = @(
+              az storage blob list `
+                --account-name $env:STORAGE_ACCOUNT `
+                --container-name $pending `
+                --auth-mode login `
+                --query "[].name" `
+                --output json |
+                ConvertFrom-Json
+            )
+            if ($blobs.Count -eq 0) {
+              "count=0" | Out-File $env:GITHUB_OUTPUT -Append
+              exit 0
+            }
+
+            $index = 0
+            foreach ($blob in $blobs) {
+              $index += 1
+              $rawPath = Join-Path $rawDir ("pending-{0:D4}.json" -f $index)
+              $validatedPath = Join-Path $validatedDir ("validated-{0:D4}.json" -f $index)
+
+              az storage blob download `
+                --account-name $env:STORAGE_ACCOUNT `
+                --container-name $pending `
+                --name $blob `
+                --file $rawPath `
+                --auth-mode login `
+                --no-progress `
+                --output none
+
+              Add-ValidatedRecord `
+                -RawPath $rawPath `
+                -ValidatedPath $validatedPath `
+                -BlobName $blob `
+                -ClaimNonce $null `
+                -ClaimKind $null `
+                -ClaimRelatedId $null
+            }
           }
 
-          "count=$($blobs.Count)" |
-            Out-File $env:GITHUB_OUTPUT -Append
+          $records |
+            ConvertTo-Json -Depth 8 |
+            Set-Content $recordsPath -Encoding UTF8
+          "count=$($records.Count)" | Out-File $env:GITHUB_OUTPUT -Append
 
-      - name: Create adjudication inbox pull request
+      - name: Create adjudication import pull request
         if: steps.inbox.outputs.count != '0'
         id: pull_request
         shell: pwsh
@@ -94,45 +289,402 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = "Stop"
+          $records = @(
+            Get-Content ".portal-import/records.json" -Raw |
+              ConvertFrom-Json
+          )
+          if ($records.Count -eq 0) {
+            throw "Import records were expected but none were found."
+          }
+
           $branch = "automation/msa-adjudication-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+          $submissions = @($records | Where-Object { $_.evidenceType -eq "submission" })
+          $comments = @($records | Where-Object { $_.evidenceType -eq "comment" })
+          $taskStates = @($records | Where-Object { $_.evidenceType -eq "task-state" })
+          $prBodyPath = ".portal-import/pr-body.md"
+          $codeOpen = "<code>"
+          $codeClose = "</code>"
+
+          $summaryRows = foreach ($record in $records) {
+            $binding = if ($record.evidenceType -eq "submission") {
+              "artifact=${codeOpen}$($record.artifactType)${codeClose}<br>sha256=${codeOpen}$($record.artifactSha256)${codeClose}"
+            } elseif ($record.evidenceType -eq "task-state") {
+              "taskVersion=${codeOpen}$($record.taskVersionId)${codeClose}<br>state=${codeOpen}$($record.state)${codeClose}<br>stateVersion=${codeOpen}$($record.stateVersion)${codeClose}<br>event=${codeOpen}$($record.eventId)${codeClose}"
+            } else {
+              $target = if ($null -ne $record.targetReceiptId -and $record.targetReceiptId -ne "") {
+                $record.targetReceiptId
+              } else {
+                "none"
+              }
+              $targetSha = if ($null -ne $record.targetArtifactSha256 -and $record.targetArtifactSha256 -ne "") {
+                $record.targetArtifactSha256
+              } else {
+                "none"
+              }
+              "category=${codeOpen}$($record.category)${codeClose}<br>source=${codeOpen}$($record.sourceReceiptId)${codeClose}<br>target=${codeOpen}$target${codeClose}<br>targetSha=${codeOpen}$targetSha${codeClose}"
+            }
+
+            "| ${codeOpen}$($record.evidenceType)${codeClose} | ${codeOpen}$($record.identifier)${codeClose} | ${codeOpen}$($record.packetId)${codeClose} | $binding | ${codeOpen}$($record.relativeJsonPath)${codeClose}<br>${codeOpen}$($record.relativeMarkdownPath)${codeClose} |"
+          }
+
+          @"
+          # Technical import summary
+
+          This PR imports signed public envelopes from adg.sbay.sa into the repository review queue.
+
+          - submissions: $($submissions.Count)
+          - comments: $($comments.Count)
+          - task-state records: $($taskStates.Count)
+          - review boundary: imported material remains untrusted until repository review confirms provenance, integrity, and bounded claims
+
+          | Evidence | Identifier | Packet | Binding | Files |
+          | --- | --- | --- | --- | --- |
+          $($summaryRows -join "`n")
+          "@ | Set-Content $prBodyPath -Encoding UTF8
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout -b $branch
-          New-Item -ItemType Directory `
-            -Path "human-evidence/inbox" `
-            -Force | Out-Null
-          Copy-Item ".portal-inbox/*.json" `
-            "human-evidence/inbox/" -Force
-          git add human-evidence/inbox
-          git commit -m "evidence: import anonymized MSA adjudication"
+          git add human-evidence/inbox human-evidence/comments human-evidence/task-state
+          git commit -m "evidence: import anonymized MSA adjudication and discussion"
           git push --set-upstream origin $branch
           $url = gh pr create `
             --base main `
             --head $branch `
-            --title "evidence: import anonymized MSA adjudication" `
-            --body "Imports signed, PII-free submissions from adg.sbay.sa. Human identity remains in private Azure storage. Every artifact still requires repository review before use."
+            --title "evidence: import anonymized MSA adjudication and discussion" `
+            --body-file $prBodyPath
           "url=$url" | Out-File $env:GITHUB_OUTPUT -Append
 
       - name: Archive accepted queue items
         if: steps.inbox.outputs.count != '0' && steps.pull_request.outputs.url != ''
         shell: pwsh
         env:
+          IMPORT_SOURCE: ${{ vars.ADG_PORTAL_IMPORT_SOURCE || 'portal-api' }}
           STORAGE_ACCOUNT: ${{ vars.ADG_AZURE_STORAGE_ACCOUNT }}
         run: |
           $ErrorActionPreference = "Stop"
-          Get-ChildItem ".portal-raw/*.json" | ForEach-Object {
+          if ([string]$env:IMPORT_SOURCE -eq "portal-api") {
+            exit 0
+          }
+          $records = @(
+            Get-Content ".portal-import/records.json" -Raw |
+              ConvertFrom-Json
+          )
+          foreach ($record in $records) {
             az storage blob upload `
               --account-name $env:STORAGE_ACCOUNT `
               --container-name adg-submissions-processed `
-              --name $_.Name `
-              --file $_.FullName `
+              --name $record.blobName `
+              --file $record.rawPath `
               --auth-mode login `
               --overwrite false `
               --output none
             az storage blob delete `
               --account-name $env:STORAGE_ACCOUNT `
               --container-name adg-submissions-pending `
-              --name $_.Name `
+              --name $record.blobName `
               --auth-mode login `
               --output none
+          }
+
+  confirm-merged-task-state:
+    if: >
+      github.event_name == 'pull_request'
+      && github.event.pull_request.merged == true
+      && github.event.pull_request.base.ref == 'main'
+      && github.event.pull_request.head.repo.full_name == github.repository
+      && github.event.pull_request.user.login == 'github-actions[bot]'
+      && startsWith(github.event.pull_request.head.ref, 'automation/msa-adjudication-')
+    runs-on: ubuntu-latest
+    environment: msa-adjudication-production
+    permissions:
+      contents: read
+      id-token: write
+      issues: write
+      pull-requests: read
+
+    steps:
+      - name: Check out merged evidence
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+
+      - name: Sign in to Azure with OIDC
+        if: ${{ (vars.ADG_PORTAL_IMPORT_SOURCE || 'portal-api') != 'portal-api' }}
+        uses: azure/login@f5d393ae46f8fde4be8b75f32e3fc50e654ad0ca # v3.0.0
+        with:
+          client-id: ${{ vars.ADG_AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.ADG_AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.ADG_AZURE_SUBSCRIPTION_ID }}
+
+      - name: Return signed repository acceptance receipts
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IMPORT_SOURCE: ${{ vars.ADG_PORTAL_IMPORT_SOURCE || 'portal-api' }}
+          KEY_VAULT: ${{ vars.ADG_AZURE_KEY_VAULT }}
+          SUBMISSION_HMAC: ${{ secrets.ADG_SUBMISSION_HMAC }}
+          REPOSITORY_RECEIPT_HMAC: ${{ secrets.ADG_REPOSITORY_RECEIPT_HMAC }}
+          RECEIPT_URL: ${{ vars.ADG_PORTAL_RECEIPT_URL || 'https://adg.sbay.sa/api/repository/receipts' }}
+          MERGE_SHA: ${{ github.event.pull_request.merge_commit_sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $importSource = [string]$env:IMPORT_SOURCE
+          if ($importSource -eq "portal-api") {
+            $receiptKey = [string]$env:REPOSITORY_RECEIPT_HMAC
+          } else {
+            $receiptKey = az keyvault secret show `
+              --vault-name $env:KEY_VAULT `
+              --name adg-repository-receipt-hmac `
+              --query value `
+              --output tsv
+          }
+          if (-not $receiptKey) {
+            throw "The repository receipt HMAC key is unavailable."
+          }
+          Write-Output "::add-mask::$receiptKey"
+          if ($importSource -eq "portal-api") {
+            $submissionKey = [string]$env:SUBMISSION_HMAC
+          } else {
+            $submissionKey = az keyvault secret show `
+              --vault-name $env:KEY_VAULT `
+              --name adg-github-submission-hmac `
+              --query value `
+              --output tsv
+          }
+          if (-not $submissionKey) {
+            throw "The submission HMAC key is unavailable."
+          }
+          Write-Output "::add-mask::$submissionKey"
+          $env:ADG_SUBMISSION_HMAC = $submissionKey
+
+          function Send-PortalReceipt {
+            param([Parameter(Mandatory = $true)] $Envelope)
+            $canonical = $Envelope | ConvertTo-Json -Compress
+            $keyBytes = [Text.Encoding]::UTF8.GetBytes($receiptKey)
+            $bodyBytes = [Text.Encoding]::UTF8.GetBytes($canonical)
+            $hmac = [Security.Cryptography.HMACSHA256]::new($keyBytes)
+            try {
+              $signature = [Convert]::ToHexString(
+                $hmac.ComputeHash($bodyBytes)
+              ).ToLowerInvariant()
+            } finally {
+              $hmac.Dispose()
+            }
+            $signedReceipt = [ordered]@{}
+            foreach ($entry in $Envelope.GetEnumerator()) {
+              $signedReceipt[$entry.Key] = $entry.Value
+            }
+            $signedReceipt.hmacSha256 = $signature
+            $response = Invoke-RestMethod `
+              -Method Post `
+              -Uri $env:RECEIPT_URL `
+              -ContentType "application/json" `
+              -Body ($signedReceipt | ConvertTo-Json -Compress)
+            if (-not $response.accepted) {
+              throw "Portal rejected repository receipt."
+            }
+          }
+
+          $files = @(
+            gh api `
+              --paginate `
+              "repos/$env:REPOSITORY/pulls/$env:PR_NUMBER/files" `
+              --jq '.[].filename'
+          )
+          $unexpectedFiles = @(
+            $files |
+              Where-Object {
+                $_ -notmatch '^human-evidence/(inbox|comments|task-state)/[A-Za-z0-9._/-]+\.(json|md)$'
+              }
+          )
+          if ($unexpectedFiles.Count -gt 0) {
+            throw "Import PR changed files outside the evidence boundary."
+          }
+          $jsonFiles = @($files | Where-Object { $_ -match '\.json$' })
+          $markdownFiles = @($files | Where-Object { $_ -match '\.md$' })
+          if ($jsonFiles.Count -eq 0
+              -or $jsonFiles.Count -ne $markdownFiles.Count) {
+            throw "Import PR must contain matching JSON and Markdown evidence."
+          }
+          foreach ($path in $jsonFiles) {
+            $markdownPath = [IO.Path]::ChangeExtension($path, ".md")
+            if ($markdownFiles -notcontains $markdownPath) {
+              throw "Missing rendered evidence pair for $path."
+            }
+            $validatedPath = Join-Path `
+              $env:RUNNER_TEMP `
+              "validated-$([guid]::NewGuid()).json"
+            $renderedPath = Join-Path `
+              $env:RUNNER_TEMP `
+              "rendered-$([guid]::NewGuid()).md"
+            try {
+              node scripts/arabic-text/import-msa-portal-submission.mjs `
+                $path $validatedPath | Out-Null
+              node scripts/arabic-text/render-msa-github-evidence.mjs `
+                $path $renderedPath | Out-Null
+              if ((Get-FileHash $markdownPath -Algorithm SHA256).Hash `
+                  -ne (Get-FileHash $renderedPath -Algorithm SHA256).Hash) {
+                throw "Rendered evidence does not match $markdownPath."
+              }
+            } finally {
+              Remove-Item $validatedPath, $renderedPath `
+                -Force -ErrorAction SilentlyContinue
+            }
+          }
+          $stateFiles = @(
+            $files |
+              Where-Object {
+                $_ -match '^human-evidence/task-state/.+\.json$'
+              }
+          )
+          $importerCommit = git log -1 --format=%H -- `
+            .github/workflows/import-msa-adjudication.yml `
+            scripts/arabic-text/import-msa-portal-submission.mjs
+          if ($importerCommit -notmatch '^[0-9a-f]{40}$') {
+            throw "Could not bind the importer commit."
+          }
+          $stateRecords = @(
+            foreach ($path in $stateFiles) {
+              $value = Get-Content $path -Raw | ConvertFrom-Json
+              [pscustomobject]@{
+                path = $path
+                value = $value
+              }
+            }
+          ) | Sort-Object `
+            { $_.value.taskVersionId }, `
+            { [int]$_.value.stateVersion }
+
+          gh label create "adjudication:task" `
+            --color "0E8A16" `
+            --description "Bound ADG adjudication task" `
+            --force | Out-Null
+
+          foreach ($record in $stateRecords) {
+            $path = $record.path
+            $signedState = $record.value
+            if ($signedState.schema -ne "adg-msa-task-state-v1") {
+              throw "Unexpected task-state schema in $path."
+            }
+            $stateLabel = "adjudication:state/$($signedState.toState)"
+            gh label create $stateLabel `
+              --color "1D76DB" `
+              --description "ADG adjudication workflow state" `
+              --force | Out-Null
+            $marker = "<!-- adg-task-version:$($signedState.taskVersionId) -->"
+            $issueBody = Join-Path `
+              $env:RUNNER_TEMP `
+              "adg-task-$([guid]::NewGuid()).md"
+            @"
+          $marker
+          # ADG adjudication task state
+
+          - task version: ``$($signedState.taskVersionId)``
+          - packet: ``$($signedState.packetId)``
+          - holdout: ``$($signedState.holdoutId)``
+          - protocol: ``$($signedState.protocolVersion)``
+          - state: ``$($signedState.toState)``
+          - state version: ``$($signedState.stateVersion)``
+          - round: ``$($signedState.round)``
+          - event: ``$($signedState.nonce)``
+          - evidence: [$path](https://github.com/$env:REPOSITORY/blob/$env:MERGE_SHA/$path)
+
+          GitHub mirrors the signed platform evidence; it is not the authoritative workflow database.
+          "@ | Set-Content $issueBody -Encoding UTF8
+
+            $issueNumber = gh issue list `
+              --state all `
+              --label "adjudication:task" `
+              --search "`"$($signedState.taskVersionId)`" in:body" `
+              --limit 1 `
+              --json number `
+              --jq '.[0].number'
+            if (-not $issueNumber) {
+              $issueUrl = gh issue create `
+                --title "[ADG adjudication] $($signedState.packetId)" `
+                --body-file $issueBody `
+                --label "adjudication:task,$stateLabel"
+              $issueNumber = [int]($issueUrl -replace '^.*/', '')
+            } else {
+              $issueNumber = [int]$issueNumber
+              $oldStateLabels = @(
+                gh issue view $issueNumber `
+                  --json labels `
+                  --jq '.labels[].name' |
+                  Where-Object { $_ -like 'adjudication:state/*' }
+              )
+              foreach ($oldLabel in $oldStateLabels) {
+                if ($oldLabel -ne $stateLabel) {
+                  gh issue edit $issueNumber `
+                    --remove-label $oldLabel | Out-Null
+                }
+              }
+              gh issue edit $issueNumber `
+                --body-file $issueBody `
+                --add-label $stateLabel | Out-Null
+            }
+            if ($signedState.toState -ne "approved") {
+              continue
+            }
+            $finalRoot = [string]$signedState.evidence.finalMerkleRoot
+            if ($finalRoot -notmatch '^[0-9a-f]{64}$') {
+              throw "Approved task state lacks a final Merkle root: $path"
+            }
+            $receiptId = [guid]::NewGuid().ToString()
+            $acceptedAt = [DateTime]::UtcNow.ToString(
+              "yyyy-MM-ddTHH:mm:ss.fffZ"
+            )
+            $envelope = [ordered]@{
+              schema = "adg-msa-repository-receipt-v1"
+              receiptId = $receiptId
+              taskVersionId = $signedState.taskVersionId
+              roundId = $signedState.roundId
+              finalMerkleRoot = $finalRoot
+              nonce = $signedState.nonce
+              repository = $env:REPOSITORY
+              prNumber = [int]$env:PR_NUMBER
+              prMergeSha = $env:MERGE_SHA
+              importerCommitSha = $importerCommit
+              issueNumber = $issueNumber
+              receivedAtUtc = $acceptedAt
+              acceptedAtUtc = $acceptedAt
+            }
+            Send-PortalReceipt $envelope
+          }
+
+          $evidenceFiles = @(
+            $files |
+              Where-Object {
+                $_ -match '^human-evidence/(inbox|comments)/.+\.json$'
+              }
+          )
+          foreach ($path in $evidenceFiles) {
+            $signedEvidence = Get-Content $path -Raw | ConvertFrom-Json
+            if ($signedEvidence.schema -eq "adg-msa-github-inbox-v1") {
+              $kind = "submission"
+              $relatedId = [string]$signedEvidence.receiptId
+            } elseif ($signedEvidence.schema -eq "adg-msa-github-comment-v1") {
+              $kind = "comment"
+              $relatedId = [string]$signedEvidence.commentId
+            } else {
+              throw "Unexpected evidence schema in $path."
+            }
+            $acceptedAt = [DateTime]::UtcNow.ToString(
+              "yyyy-MM-ddTHH:mm:ss.fffZ"
+            )
+            $envelope = [ordered]@{
+              schema = "adg-msa-evidence-receipt-v1"
+              receiptId = [guid]::NewGuid().ToString()
+              evidenceKind = $kind
+              relatedId = $relatedId
+              repository = $env:REPOSITORY
+              prNumber = [int]$env:PR_NUMBER
+              prMergeSha = $env:MERGE_SHA
+              importerCommitSha = $importerCommit
+              acceptedAtUtc = $acceptedAt
+            }
+            Send-PortalReceipt $envelope
           }

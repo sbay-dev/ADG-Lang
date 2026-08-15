@@ -25,7 +25,14 @@ const repositoryFiles = [
   "EVALUATION-NOTICE.md",
   "README.md",
   "SECURITY.md",
-  "scripts/arabic-text/import-msa-portal-submission.mjs"
+  "examples/arabic-text/msa-adjudication-pilot-v1/README.md",
+  "examples/arabic-text/msa-adjudication-pilot-v1/adjudication.synthetic.json",
+  "examples/arabic-text/msa-adjudication-pilot-v1/annotation-a.synthetic.json",
+  "examples/arabic-text/msa-adjudication-pilot-v1/annotation-b.synthetic.json",
+  "examples/arabic-text/msa-adjudication-pilot-v1/human-usability-evaluation.template.json",
+  "examples/arabic-text/msa-adjudication-pilot-v1/packet.json",
+  "scripts/arabic-text/import-msa-portal-submission.mjs",
+  "scripts/arabic-text/render-msa-github-evidence.mjs"
 ];
 
 const portalFiles = await listPortalFiles(portalRoot);
@@ -128,23 +135,30 @@ async function listPortalFiles(directory) {
 }
 
 function excludedPortalPath(path, directory) {
-  const firstSegment = path.split("/")[0];
-  if (directory && [
+  const segments = path.split("/");
+  const name = segments.at(-1);
+  if (directory && (
+    [
     ".wrangler",
+    ".migration-work",
     "node_modules",
     "release"
-  ].includes(firstSegment)) {
+    ].includes(name)
+    || name.startsWith(".scratch")
+    || name.startsWith(".work")
+    || name.startsWith(".wrangler-dry-run")
+  )) {
     return true;
   }
   if ([
     ".dev.vars",
     "wrangler.jsonc",
     "wrangler.staging.jsonc"
-  ].includes(path)) {
+  ].includes(name)) {
     return true;
   }
-  return path.startsWith(".env")
-    && !path.endsWith(".example");
+  return name.startsWith(".env")
+    && !name.endsWith(".example");
 }
 
 function canonicalBytes(path, value) {

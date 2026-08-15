@@ -1,0 +1,81 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: adg-postgres-walg-restore
+  namespace: adg-data-plane
+  labels:
+    app.kubernetes.io/name: adg-cpoly-postgres
+    app.kubernetes.io/component: restore
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 14400
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: adg-cpoly-postgres
+        app.kubernetes.io/component: restore
+        cpoly.sbay.sa/network-client: walg-backup
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: restore
+          image: chekkan/wal-g:v3.0.7@sha256:a0bb7869eb7777aded6f5e51f22a4730a9f481485ee7225a3b75fa39f5d15c4b
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - /opt/cpoly/scripts/kubernetes-restore.sh
+          envFrom:
+            - configMapRef:
+                name: adg-postgres-walg-settings
+          env:
+            - name: CPOLY_RESTORE_CONFIRM
+              value: REPLACE_WITH_EXPLICIT_CONFIRMATION
+            - name: WALG_RESTORE_BACKUP
+              value: LATEST
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: scripts
+              mountPath: /opt/cpoly/scripts
+              readOnly: true
+            - name: backup-secrets
+              mountPath: /run/secrets/backup
+              readOnly: true
+            - name: restore-data
+              mountPath: /restore
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: scripts
+          configMap:
+            name: adg-postgres-scripts
+            defaultMode: 0555
+        - name: backup-secrets
+          secret:
+            secretName: adg-postgres-backup-secrets
+            defaultMode: 0440
+        - name: restore-data
+          persistentVolumeClaim:
+            claimName: data-adg-postgres-0
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 64Mi

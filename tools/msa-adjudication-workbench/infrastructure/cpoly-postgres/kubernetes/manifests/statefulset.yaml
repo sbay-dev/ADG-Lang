@@ -1,0 +1,210 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: adg-postgres
+  namespace: adg-data-plane
+  labels:
+    app.kubernetes.io/name: adg-cpoly-postgres
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: adg-msa-adjudication
+    app.kubernetes.io/managed-by: cpoly-kubernetes-workbench
+spec:
+  serviceName: adg-postgres-headless
+  replicas: 1
+  podManagementPolicy: OrderedReady
+  updateStrategy:
+    type: OnDelete
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: adg-cpoly-postgres
+      app.kubernetes.io/component: database
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: adg-cpoly-postgres
+        app.kubernetes.io/component: database
+        app.kubernetes.io/part-of: adg-msa-adjudication
+        cpoly.sbay.sa/data-plane: postgres
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 120
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    cpoly.sbay.sa/data-plane: postgres
+      containers:
+        - name: postgres
+          image: postgres:16-bookworm@sha256:60f4761b9035e0b8d5218f701a8c3382f641bf12b1604822574cf5be3baeb537
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - /opt/cpoly/scripts/cpoly-postgres-entrypoint.sh
+          args:
+            - postgres
+            - -c
+            - listen_addresses=*
+            - -c
+            - ssl=on
+            - -c
+            - ssl_cert_file=/var/lib/postgresql/cpoly-tls/server.crt
+            - -c
+            - ssl_key_file=/var/lib/postgresql/cpoly-tls/server.key
+            - -c
+            - ssl_ca_file=/var/lib/postgresql/cpoly-tls/ca.crt
+            - -c
+            - ssl_min_protocol_version=TLSv1.2
+            - -c
+            - password_encryption=scram-sha-256
+            - -c
+            - max_connections=80
+            - -c
+            - shared_buffers=512MB
+            - -c
+            - log_connections=on
+            - -c
+            - log_disconnections=on
+          env:
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+            - name: POSTGRES_USER
+              value: postgres
+            - name: POSTGRES_DB
+              value: postgres
+            - name: POSTGRES_PASSWORD_FILE
+              value: /run/secrets/roles/postgres-superuser-password
+            - name: POSTGRES_INITDB_ARGS
+              value: --auth-host=scram-sha-256 --auth-local=peer --data-checksums
+            - name: CPOLY_REQUIRE_CLIENT_CERT
+              value: "false"
+            - name: PGSSLMODE
+              value: verify-ca
+            - name: PGSSLROOTCERT
+              value: /var/lib/postgresql/cpoly-tls/ca.crt
+          ports:
+            - name: postgresql-tls
+              containerPort: 5432
+              protocol: TCP
+          startupProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - pg_isready -h 127.0.0.1 -p 5432 -U adg_runtime -d adg_adjudication
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - >-
+                  test "$(psql -h /var/run/postgresql -U postgres
+                  -d adg_adjudication -Atqc
+                  "SELECT CASE WHEN ready AND worker_status = 'ready'
+                  THEN 1 ELSE 0 END
+                  FROM adjudication.cpoly_recovery_state
+                  WHERE singleton = TRUE")" = "1"
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - pg_isready -h 127.0.0.1 -p 5432 -U adg_runtime -d adg_adjudication
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 5
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: "2"
+              memory: 4Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+            - name: scripts
+              mountPath: /opt/cpoly/scripts
+              readOnly: true
+            - name: scripts
+              mountPath: /docker-entrypoint-initdb.d/10-bootstrap-roles.sh
+              subPath: bootstrap-roles.sh
+              readOnly: true
+            - name: scripts
+              mountPath: /docker-entrypoint-initdb.d/20-render-hba.sh
+              subPath: render-hba.sh
+              readOnly: true
+            - name: role-secrets
+              mountPath: /run/secrets/roles
+              readOnly: true
+            - name: tls-secrets
+              mountPath: /run/secrets/tls
+              readOnly: true
+            - name: tls-runtime
+              mountPath: /var/lib/postgresql/cpoly-tls
+            - name: postgres-run
+              mountPath: /var/run/postgresql
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: scripts
+          configMap:
+            name: adg-postgres-scripts
+            defaultMode: 0555
+        - name: role-secrets
+          secret:
+            secretName: adg-postgres-role-secrets
+            defaultMode: 0440
+        - name: tls-secrets
+          secret:
+            secretName: adg-postgres-server-tls
+            defaultMode: 0440
+        - name: tls-runtime
+          emptyDir:
+            medium: Memory
+            sizeLimit: 16Mi
+        - name: postgres-run
+          emptyDir:
+            medium: Memory
+            sizeLimit: 16Mi
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 64Mi
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        labels:
+          app.kubernetes.io/name: adg-cpoly-postgres
+          cpoly.sbay.sa/backup-required: "true"
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        storageClassName: cpoly-postgres-retain
+        resources:
+          requests:
+            storage: 50Gi

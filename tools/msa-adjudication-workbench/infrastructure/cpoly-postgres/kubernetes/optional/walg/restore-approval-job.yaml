@@ -1,0 +1,55 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: adg-postgres-walg-restore-approval
+  namespace: adg-data-plane
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: adg-cpoly-postgres
+        app.kubernetes.io/component: restore
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: approve
+          image: postgres:16-bookworm@sha256:60f4761b9035e0b8d5218f701a8c3382f641bf12b1604822574cf5be3baeb537
+          command:
+            - /bin/sh
+            - -c
+            - >-
+              test "$CPOLY_RESTORE_APPROVE" =
+              "APPROVE_DESTRUCTIVE_RESTORE_AFTER_CSI_SNAPSHOT" &&
+              test -s /restore/pgdata/PG_VERSION &&
+              : > /restore/.cpoly-restore-approved
+          env:
+            - name: CPOLY_RESTORE_APPROVE
+              value: REPLACE_WITH_EXPLICIT_APPROVAL
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          volumeMounts:
+            - name: restore-data
+              mountPath: /restore
+      volumes:
+        - name: restore-data
+          persistentVolumeClaim:
+            claimName: data-adg-postgres-0
