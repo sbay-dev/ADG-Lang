@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import worker, {
   adminCallbackUri,
@@ -10,6 +11,25 @@ import worker, {
   validateAccountConsent,
   validateAccountProfile
 } from "../src/index.js";
+
+test("hidden wizard controls stay hidden against button display styles", () => {
+  const styles = readFileSync(
+    new URL("../public/styles.css", import.meta.url),
+    "utf8"
+  );
+  const application = readFileSync(
+    new URL("../public/app.js", import.meta.url),
+    "utf8"
+  );
+
+  assert.match(
+    styles,
+    /\[hidden\]\s*\{\s*display:\s*none\s*!important;\s*\}/u
+  );
+  assert.match(application, /nextButton\.hidden = step === 5;/u);
+  assert.match(application, /showPendingStatus\(/u);
+  assert.match(application, /result\.duplicate/u);
+});
 
 test("config exposes no server secrets", async () => {
   const response = await worker.fetch(

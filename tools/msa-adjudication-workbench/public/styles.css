@@ -205,6 +205,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 html {
   scroll-behavior: smooth;
 }
@@ -2170,6 +2174,12 @@ label small {
   color: var(--success-fg);
   border-color: var(--success-emphasis);
   background: var(--success-subtle);
+}
+
+.status.pending {
+  color: var(--attention-fg);
+  border-color: var(--attention-emphasis);
+  background: var(--attention-subtle);
 }
 
 .status.error {

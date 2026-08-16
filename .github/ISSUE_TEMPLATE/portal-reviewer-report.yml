@@ -52,7 +52,7 @@ body:
     id: portal_version
     attributes:
       label: إصدار المنصّة إن ظهر لك
-      placeholder: 15.2.0
+      placeholder: 15.2.1
   - type: checkboxes
     id: privacy
     attributes:
