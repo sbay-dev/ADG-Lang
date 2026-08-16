@@ -350,7 +350,7 @@ function validReport(reportId, overrides = {}) {
       "سجلت الدخول ثم انتقلت إلى الخطوة الثالثة وضغطت تحديث القائمة.",
     privacyConfirmed: true,
     context: {
-      portalVersion: "15.2.0",
+      portalVersion: "15.2.1",
       step: 3,
       taskVersionId: "msa-adjudication-pilot:v1",
       taskLane: "operational-test",

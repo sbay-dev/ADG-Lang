@@ -82,7 +82,7 @@ const IRAB = [
 ];
 
 const PUBLIC_PORTAL_URL = "https://adg.sbay.sa/";
-const PORTAL_VERSION = "15.2.0";
+const PORTAL_VERSION = "15.2.1";
 const BASELINE_PILOT_PACKET_ID = "msa-adjudication-pilot-v1";
 const OPERATIONAL_TEST_REQUESTED =
   new URL(location.href).searchParams.get("mode") === "operational-test";
@@ -2725,6 +2725,11 @@ async function downloadEvaluation() {
 async function submitEvaluation() {
   clearStatus();
   submitButton.disabled = true;
+  submitButton.setAttribute("aria-busy", "true");
+  submitButton.textContent = "جارٍ الإرسال…";
+  showPendingStatus(
+    "جارٍ تثبيت استلام المهمة وإرسال النتيجة. لا تغلق الصفحة."
+  );
   try {
     validateProfile();
     if (!state.account.authenticated) {
@@ -2789,18 +2794,30 @@ async function submitEvaluation() {
     if (!response.ok) {
       throw new Error(result.message || "تعذر إرسال التقييم.");
     }
-    showStatus(operationalTest
-      ? `تم استلام الاختبار التشغيلي برقم ${result.receiptId}. `
+    const successMessage = operationalTest
+      ? `${result.duplicate ? "سبق استلام" : "تم استلام"} `
+        + `الاختبار التشغيلي برقم ${result.receiptId}. `
         + "سيظهر في المستودع موسومًا بأنه غير مستقل ولا يدخل الإجماع."
       : `تم استلام تقييمك برقم ${result.receiptId}. `
-        + "ستظهر النتيجة المجهّلة في المستودع بعد الفحص الآلي.",
-    false);
-    await loadDiscussion(result.receiptId);
-    await refreshTaskInbox();
+        + "ستظهر النتيجة المجهّلة في المستودع بعد الفحص الآلي.";
+    showStatus(successMessage, false);
+    const followUp = await Promise.allSettled([
+      loadDiscussion(result.receiptId),
+      refreshTaskInbox()
+    ]);
+    if (followUp.some(result => result.status === "rejected")) {
+      showStatus(
+        `${successMessage} تم الإرسال، لكن تعذر تحديث العرض الآن؛ `
+          + "حدّث الصفحة لعرض الحالة المحفوظة.",
+        false
+      );
+    }
   } catch (error) {
     showStatus(error.message, true);
   } finally {
     submitButton.disabled = false;
+    submitButton.removeAttribute("aria-busy");
+    submitButton.textContent = "إرسال التقييم بأمان";
     resetTurnstile();
   }
 }
@@ -3639,6 +3656,14 @@ function showStatus(message, isError) {
   const target = state.step === 5 ? submissionStatus : wizardStatus;
   target.textContent = message;
   target.className = `status ${isError ? "error" : "success"}${
+    target === wizardStatus ? " wizard-status" : ""
+  }`;
+}
+
+function showPendingStatus(message) {
+  const target = state.step === 5 ? submissionStatus : wizardStatus;
+  target.textContent = message;
+  target.className = `status pending${
     target === wizardStatus ? " wizard-status" : ""
   }`;
 }

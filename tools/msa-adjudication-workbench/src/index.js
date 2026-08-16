@@ -6272,7 +6272,7 @@ async function receiveOperationalTest(request, env) {
   const packetRoot = await computePacketMerkleRoot(packet);
   const operationalTaskId = taskVersionIdentity(packet, packetRoot).id;
   const operationalCatalog = await env.DB.prepare(
-    `SELECT task_version_id
+    `SELECT task_version_id, assignment_mode
        FROM repository_task_packets
       WHERE task_version_id = ?
         AND packet_merkle_root = ?
@@ -6286,27 +6286,45 @@ async function receiveOperationalTest(request, env) {
     );
   }
   const operationalClaim = await env.DB.prepare(
-    `SELECT id
+    `SELECT id, status
        FROM operational_task_claims
       WHERE task_version_id = ? AND user_id = ?
         AND status IN ('claimed', 'submitted')`
   ).bind(operationalTaskId, account.user_id).first();
-  if (!operationalClaim) {
-    throw new PublicError(
-      "استلم الاختبار التشغيلي من القائمة قبل إرسال النتيجة.",
-      403
-    );
-  }
   const internalPacketId = `${packet.packetId}:operational-test`;
   const existingOperationalTest = await env.DB.prepare(
-    `SELECT receipt_id
+    `SELECT receipt_id, artifact_sha256, repository_status
        FROM submissions
       WHERE user_id = ? AND packet_id = ?`
   ).bind(account.user_id, internalPacketId).first();
   if (existingOperationalTest) {
+    if (existingOperationalTest.artifact_sha256 === actualArtifactSha256) {
+      return json({
+        accepted: true,
+        receiptId: existingOperationalTest.receipt_id,
+        repositoryImportStatus:
+          existingOperationalTest.repository_status,
+        previousResultsAvailable: 1,
+        operationalTest: true,
+        duplicate: true
+      });
+    }
     throw new PublicError(
-      "سبق لهذا الحساب اختبار الحزمة نفسها.",
+      "سبق لهذا الحساب إرسال نتيجة مختلفة للحزمة نفسها.",
       409
+    );
+  }
+  if (operationalClaim?.status === "submitted") {
+    throw new PublicError(
+      "حالة الاختبار محفوظة كمرسلة دون إيصال متاح. أبلغ عن الخلل.",
+      409
+    );
+  }
+  if (!operationalClaim
+      && operationalCatalog.assignment_mode !== "open") {
+    throw new PublicError(
+      "استلم الاختبار المسند من قائمة مهامك قبل إرسال النتيجة.",
+      403
     );
   }
   const entityCryptMasterKey = await getVaultSecret(
@@ -6373,6 +6391,33 @@ async function receiveOperationalTest(request, env) {
     ciphertext: encryptedIdentity
   };
   const deliveryId = crypto.randomUUID();
+  const claimWrite = operationalClaim
+    ? env.DB.prepare(
+      `UPDATE operational_task_claims
+          SET status = 'submitted', submission_receipt_id = ?,
+              submitted_at = ?, updated_at = ?
+        WHERE id = ? AND user_id = ? AND status = 'claimed'`
+    ).bind(
+      receiptId,
+      receivedAt,
+      receivedAt,
+      operationalClaim.id,
+      account.user_id
+    )
+    : env.DB.prepare(
+      `INSERT INTO operational_task_claims
+        (id, task_version_id, user_id, role, status,
+         submission_receipt_id, claimed_at, submitted_at, updated_at)
+       VALUES (?, ?, ?, 'A', 'submitted', ?, ?, ?, ?)`
+    ).bind(
+      crypto.randomUUID(),
+      operationalTaskId,
+      account.user_id,
+      receiptId,
+      receivedAt,
+      receivedAt,
+      receivedAt
+    );
   let writeResults;
   try {
     writeResults = await env.DB.batch([
@@ -6417,28 +6462,27 @@ async function receiveOperationalTest(request, env) {
         receivedAt,
         receivedAt
       ),
-      env.DB.prepare(
-        `UPDATE operational_task_claims
-            SET status = 'submitted', submission_receipt_id = ?,
-                submitted_at = ?, updated_at = ?
-          WHERE id = ? AND user_id = ? AND status = 'claimed'`
-      ).bind(
-        receiptId,
-        receivedAt,
-        receivedAt,
-        operationalClaim.id,
-        account.user_id
-      )
+      claimWrite
     ]);
   } catch (error) {
     const duplicate = await env.DB.prepare(
-      `SELECT receipt_id
+      `SELECT receipt_id, artifact_sha256, repository_status
          FROM submissions
         WHERE user_id = ? AND packet_id = ?`
     ).bind(account.user_id, internalPacketId).first();
+    if (duplicate?.artifact_sha256 === actualArtifactSha256) {
+      return json({
+        accepted: true,
+        receiptId: duplicate.receipt_id,
+        repositoryImportStatus: duplicate.repository_status,
+        previousResultsAvailable: 1,
+        operationalTest: true,
+        duplicate: true
+      });
+    }
     if (duplicate) {
       throw new PublicError(
-        "سبق لهذا الحساب اختبار الحزمة نفسها.",
+        "سبق لهذا الحساب إرسال نتيجة مختلفة للحزمة نفسها.",
         409
       );
     }

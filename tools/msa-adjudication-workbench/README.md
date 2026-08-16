@@ -386,7 +386,7 @@ provider image plus any chosen Hyperdrive rollback binding.
 
 ## Release integrity
 
-`release\portal-15.2.0.json` binds the sanitized portal, importer, workflows,
+`release\portal-15.2.1.json` binds the sanitized portal, importer, workflows,
 tests, and documentation with canonical LF-normalized SHA-256 records. Regenerate
 it deterministically from a clean clone with:
 

@@ -288,7 +288,8 @@ test("operational pilot test imports without occupying consensus roles", async (
       fixture,
       values.packet,
       "operational-test",
-      "A"
+      "A",
+      false
     );
     const standardTasks = await accountJson(
       fixture,
@@ -298,7 +299,7 @@ test("operational pilot test imports without occupying consensus roles", async (
     assert.equal(standardTasks.tasks.length, 1);
     assert.equal(standardTasks.tasks[0].lane, "operational-test");
     assert.equal(standardTasks.tasks[0].baseline, true);
-    assert.equal(standardTasks.tasks[0].status, "claimed");
+    assert.equal(standardTasks.tasks[0].status, "new");
     const operationalTasks = await accountJson(
       fixture,
       "A",
@@ -306,7 +307,7 @@ test("operational pilot test imports without occupying consensus roles", async (
     );
     assert.equal(operationalTasks.tasks.length, 1);
     assert.equal(operationalTasks.tasks[0].lane, "operational-test");
-    assert.equal(operationalTasks.tasks[0].status, "claimed");
+    assert.equal(operationalTasks.tasks[0].status, "new");
     const result = await submitOperationalTest(
       fixture,
       "A",
@@ -385,9 +386,21 @@ test("operational pilot test imports without occupying consensus roles", async (
       "A",
       values.participantIds.A,
       artifact,
+      200
+    );
+    assert.equal(duplicate.duplicate, true);
+    assert.equal(duplicate.receiptId, result.receiptId);
+    const changedArtifact = structuredClone(artifact);
+    changedArtifact.annotation.sentences[0].note =
+      "نتيجة تشغيلية مختلفة لا يجوز أن تستبدل الإرسال المثبت.";
+    const conflictingDuplicate = await submitOperationalTest(
+      fixture,
+      "A",
+      values.participantIds.A,
+      changedArtifact,
       409
     );
-    assert.match(duplicate.message, /سبق لهذا الحساب/);
+    assert.match(conflictingDuplicate.message, /نتيجة مختلفة/);
     assert.equal(
       fixture.db.database.prepare(
         `SELECT COUNT(*) AS count
@@ -1677,7 +1690,8 @@ async function registerRepositoryTask(
   fixture,
   packet,
   lane,
-  accountRole
+  accountRole,
+  claim = true
 ) {
   const packetMerkleRoot = await computePacketMerkleRoot(packet);
   const manifest = {
@@ -1702,6 +1716,7 @@ async function registerRepositoryTask(
       ? "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
       : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
   );
+  if (!claim) return manifest;
   return claimRepositoryTask(
     fixture,
     accountRole,
