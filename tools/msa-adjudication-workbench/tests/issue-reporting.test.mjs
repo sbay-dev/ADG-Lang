@@ -47,7 +47,8 @@ test("issue reports reject identity, links, credentials, and unknown fields", ()
   );
   assert.throws(
     () => validatePortalIssueReportInput(validInput({
-      details: "ظهر الخطأ مع الرمز ghp_123456789012345678901234567890"
+      details: "ظهر الخطأ مع الرمز "
+        + ["ghp", "123456789012345678901234567890"].join("_")
     })),
     /مفاتيح/u
   );

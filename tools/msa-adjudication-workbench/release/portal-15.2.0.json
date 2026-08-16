@@ -14,7 +14,7 @@
   "integrity": {
     "algorithm": "SHA-256 canonical file-list root",
     "fileCount": 194,
-    "releaseRoot": "3ff634852043c54d087c2bb362125bdfb55b2472ec9e44417a5ab70012ddc30c"
+    "releaseRoot": "7772d92699956673ec98ec2f2a67c9cd36ef581c22685f1d96541f029de2f43a"
   },
   "exclusions": [
     "release/ (self-referential generated output)",
@@ -958,8 +958,8 @@
     },
     {
       "path": "tools/msa-adjudication-workbench/tests/issue-reporting.test.mjs",
-      "bytes": 7848,
-      "sha256": "714e928d6ce6cc384b785a50f7d0e2349acee558078e849fa72cf9e9a0354773"
+      "bytes": 7876,
+      "sha256": "f169d1470bd7f30f403441b6ea5f2745884032dd143955612e70396bce976f81"
     },
     {
       "path": "tools/msa-adjudication-workbench/tests/migrations.test.mjs",
