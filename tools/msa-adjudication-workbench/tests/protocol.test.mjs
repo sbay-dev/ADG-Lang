@@ -8,6 +8,7 @@ import {
   computePacketMerkleRoot,
   computeRatificationMerkleRoot,
   decisionNeedsResolution,
+  inferLoadedPacketLane,
   unpackPortalFile,
   validateAdjudicationBinding,
   validatePublicArtifactText,
@@ -68,6 +69,18 @@ test("download wrapper is recognized as a recoverable annotation artifact", asyn
   assert.equal(recovered.packet.packetId, packet.packetId);
   assert.equal(recovered.annotation.annotatorSlot, "A");
   await validateSubmissionBinding(recovered.packet, recovered.annotation);
+});
+
+test("pilot packets always remain in the isolated operational lane", () => {
+  assert.equal(
+    inferLoadedPacketLane({ pilotOnly: true }, false),
+    "operational-test"
+  );
+  assert.equal(
+    inferLoadedPacketLane({ pilotOnly: false }, true),
+    "operational-test"
+  );
+  assert.equal(inferLoadedPacketLane({ pilotOnly: false }, false), null);
 });
 
 test("adjudication and J2 ratification bind the exact final root", async () => {

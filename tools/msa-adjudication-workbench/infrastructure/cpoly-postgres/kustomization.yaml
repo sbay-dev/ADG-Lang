@@ -33,6 +33,7 @@ configMapGenerator:
     files:
       - 0001_portal_v15.sql=migrations/postgresql/0001_portal_v15.sql
       - 0002_repository_task_catalog.sql=migrations/postgresql/0002_repository_task_catalog.sql
+      - 0003_portal_issue_reports.sql=migrations/postgresql/0003_portal_issue_reports.sql
 generatorOptions:
   disableNameSuffixHash: true
   labels:

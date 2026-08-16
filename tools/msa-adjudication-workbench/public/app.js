@@ -7,6 +7,7 @@ import {
   computePacketMerkleRoot,
   computeRatificationMerkleRoot,
   decisionNeedsResolution,
+  inferLoadedPacketLane,
   sha256Json,
   tokenDecisionKey,
   unpackPortalFile,
@@ -81,6 +82,8 @@ const IRAB = [
 ];
 
 const PUBLIC_PORTAL_URL = "https://adg.sbay.sa/";
+const PORTAL_VERSION = "15.2.0";
+const BASELINE_PILOT_PACKET_ID = "msa-adjudication-pilot-v1";
 const OPERATIONAL_TEST_REQUESTED =
   new URL(location.href).searchParams.get("mode") === "operational-test";
 const INVITATION_TEXT =
@@ -119,10 +122,13 @@ const state = {
   annotationB: null,
   primaryArtifact: null,
   currentTaskVersionId: null,
+  currentTaskLane: null,
+  issueReportId: crypto.randomUUID(),
   config: {
     submissionEnabled: false,
     maxSubmissionBytes: 900000,
     turnstileSiteKey: null,
+    repository: "sbay-dev/ADG-Lang",
     accountEnabled: false,
     emailVerificationEnabled: false
   },
@@ -234,6 +240,30 @@ const attestBlindLabel =
 const attestAuthenticLabel =
   document.querySelector("#attest-authentic-label");
 const appealStatus = document.querySelector("#appeal-status");
+const openIssueReportButton =
+  document.querySelector("#open-issue-report");
+const issueReportDialog =
+  document.querySelector("#issue-report-dialog");
+const issueReportForm =
+  document.querySelector("#issue-report-form");
+const closeIssueReportButton =
+  document.querySelector("#close-issue-report");
+const issueReportCategory =
+  document.querySelector("#issue-report-category");
+const issueReportSummary =
+  document.querySelector("#issue-report-summary");
+const issueReportDetails =
+  document.querySelector("#issue-report-details");
+const issueReportSteps =
+  document.querySelector("#issue-report-steps");
+const issueReportPrivacy =
+  document.querySelector("#issue-report-privacy");
+const submitIssueReportButton =
+  document.querySelector("#submit-issue-report");
+const issueReportStatus =
+  document.querySelector("#issue-report-status");
+const recentIssueReports =
+  document.querySelector("#recent-issue-reports");
 
 document.querySelectorAll('input[name="role"]').forEach(control => {
   control.addEventListener("change", syncRoleControls);
@@ -266,6 +296,11 @@ copyInvitationButton.addEventListener("click", copyInvitation);
 submitDiscussionButton.addEventListener("click", submitDiscussionComment);
 cancelReplyButton.addEventListener("click", clearDiscussionReply);
 submitAppealButton.addEventListener("click", submitConsensusAppeal);
+openIssueReportButton.addEventListener("click", openIssueReport);
+closeIssueReportButton.addEventListener("click", () => {
+  issueReportDialog.close();
+});
+issueReportForm.addEventListener("submit", submitIssueReport);
 workspace.addEventListener("input", () => {
   state.workspaceRevision += 1;
   updateCompletion();
@@ -312,6 +347,110 @@ async function copyInvitation() {
   } catch {
     shareStatus.textContent =
       "تعذر النسخ الآلي؛ استخدم خيار واتساب أو X.";
+  }
+}
+
+function openIssueReport() {
+  issueReportStatus.textContent = "";
+  issueReportStatus.className = "status";
+  submitIssueReportButton.disabled = !state.account.authenticated;
+  if (!state.account.authenticated) {
+    issueReportStatus.textContent =
+      "يتطلب الإرسال الآلي تسجيل الدخول. إذا كان الخلل يمنع الدخول، "
+      + "فاستخدم نموذج GitHub الاحتياطي.";
+    issueReportStatus.className = "status error";
+    recentIssueReports.replaceChildren();
+  } else {
+    void refreshIssueReports();
+  }
+  if (!issueReportDialog.open) issueReportDialog.showModal();
+}
+
+async function submitIssueReport(event) {
+  event.preventDefault();
+  issueReportStatus.textContent = "";
+  issueReportStatus.className = "status";
+  submitIssueReportButton.disabled = true;
+  try {
+    if (!state.account.authenticated) {
+      throw new Error(
+        "سجّل الدخول لإرسال البلاغ آليًا، أو استخدم نموذج GitHub الاحتياطي."
+      );
+    }
+    const result = await apiJson("/api/issue-reports", {
+      method: "POST",
+      body: {
+        schema: "adg-portal-issue-report-v1",
+        reportId: state.issueReportId,
+        category: issueReportCategory.value,
+        summary: issueReportSummary.value,
+        details: issueReportDetails.value,
+        reproductionSteps: issueReportSteps.value || null,
+        privacyConfirmed: issueReportPrivacy.checked,
+        context: {
+          portalVersion: PORTAL_VERSION,
+          step: state.step,
+          taskVersionId: state.currentTaskVersionId,
+          taskLane: state.currentTaskLane,
+          operationalMode: OPERATIONAL_TEST_REQUESTED
+            || state.currentTaskLane === "operational-test"
+        }
+      }
+    });
+    issueReportStatus.textContent = result.duplicate
+      ? "سبق استلام هذا البلاغ، وحالته محفوظة دون إنشاء نسخة مكررة."
+      : "استُلم البلاغ. ستنشئه قناة المستودع كمسألة عامة دون بيانات هويتك.";
+    issueReportStatus.className = "status success";
+    state.issueReportId = crypto.randomUUID();
+    issueReportForm.reset();
+    await refreshIssueReports();
+  } catch (error) {
+    issueReportStatus.textContent = error.message;
+    issueReportStatus.className = "status error";
+  } finally {
+    submitIssueReportButton.disabled = !state.account.authenticated;
+  }
+}
+
+async function refreshIssueReports() {
+  recentIssueReports.replaceChildren();
+  if (!state.account.authenticated) return;
+  try {
+    const result = await apiJson("/api/issue-reports");
+    const reports = result.reports || [];
+    if (reports.length === 0) {
+      const empty = document.createElement("p");
+      empty.textContent = "لا توجد بلاغات سابقة لهذا الحساب.";
+      recentIssueReports.append(empty);
+      return;
+    }
+    reports.forEach(report => {
+      const item = document.createElement("article");
+      item.className = "recent-issue-report";
+      const summary = document.createElement("strong");
+      summary.textContent = report.summary;
+      const status = document.createElement("small");
+      status.textContent = report.status === "published"
+        ? `نُشر في المستودع · ${formatDate(report.publishedAtUtc)}`
+        : report.status === "claimed"
+          ? "سحبته قناة المستودع ويجري نشره"
+          : "بانتظار قناة المستودع";
+      item.append(summary, status);
+      if (report.status === "published" && report.issueUrl) {
+        const link = document.createElement("a");
+        link.href = report.issueUrl;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        link.textContent = `Issue #${report.issueNumber}`;
+        item.append(link);
+      }
+      recentIssueReports.append(item);
+    });
+  } catch (error) {
+    const failure = document.createElement("p");
+    failure.className = "status error";
+    failure.textContent = error.message;
+    recentIssueReports.append(failure);
   }
 }
 
@@ -1169,6 +1308,9 @@ async function refreshTaskInbox() {
 function repositoryTaskCard(task) {
   const card = document.createElement("article");
   card.className = "task-card";
+  if (task.baseline || task.lane === "operational-test") {
+    card.classList.add("baseline");
+  }
   const main = document.createElement("div");
   main.className = "task-card-main";
   const heading = document.createElement("div");
@@ -1177,10 +1319,11 @@ function repositoryTaskCard(task) {
   title.textContent = task.title;
   heading.append(title);
   if (task.lane === "operational-test") {
-    heading.append(taskBadge("اختبار تشغيلي", "waiting"));
+    heading.append(taskBadge("العيّنة الأساسية", "complete"));
+    heading.append(taskBadge("معزولة عن الإجماع", "waiting"));
   }
   if (task.new) heading.append(taskBadge("جديدة"));
-  if (!task.ready) {
+  if (!task.ready && task.status !== "submitted") {
     heading.append(taskBadge("بانتظار المرحلة السابقة", "waiting"));
   }
   if (task.status === "submitted") {
@@ -1188,6 +1331,10 @@ function repositoryTaskCard(task) {
   }
   const summary = document.createElement("p");
   summary.textContent = task.summary;
+  const baselineNote = document.createElement("p");
+  baselineNote.className = "task-card-baseline-note";
+  baselineNote.textContent =
+    "ابدأ بهذه العيّنة للتأكد من سلامة الحفظ والإرسال قبل المهام العلمية.";
   const meta = document.createElement("div");
   meta.className = "task-card-meta";
   const role = document.createElement("small");
@@ -1207,7 +1354,9 @@ function repositoryTaskCard(task) {
       + formatDate(task.draft.updatedAtUtc);
     meta.append(draft);
   }
-  main.append(heading, summary, meta);
+  main.append(heading, summary);
+  if (task.lane === "operational-test") main.append(baselineNote);
+  main.append(meta);
 
   const button = document.createElement("button");
   button.type = "button";
@@ -1236,22 +1385,21 @@ async function openRepositoryTask(task, button) {
   clearStatus();
   button.disabled = true;
   try {
+    const mode = task.lane === "operational-test"
+      ? { mode: "operational-test" }
+      : {};
     const payload = task.status === "claimed"
       ? await apiJson(
         `/api/tasks/load?${new URLSearchParams({
           taskVersionId: task.taskVersionId,
-          ...(OPERATIONAL_TEST_REQUESTED
-            ? { mode: "operational-test" }
-            : {})
+          ...mode
         })}`
       )
       : await apiJson("/api/tasks/claim", {
         method: "POST",
         body: {
           taskVersionId: task.taskVersionId,
-          ...(OPERATIONAL_TEST_REQUESTED
-            ? { mode: "operational-test" }
-            : {})
+          ...mode
         }
       });
     await hydrateRepositoryTask(payload);
@@ -1271,6 +1419,7 @@ async function hydrateRepositoryTask(payload) {
   roleControl.checked = true;
   syncRoleControls();
   state.currentTaskVersionId = payload.taskVersionId;
+  state.currentTaskLane = payload.lane;
   state.packet = payload.packet;
   state.annotationA = payload.annotationA ?? null;
   state.annotationB = payload.annotationB ?? null;
@@ -1361,6 +1510,10 @@ async function restoreRecoveryFile() {
       roleControl.checked = true;
       syncRoleControls();
       state.currentTaskVersionId = null;
+      state.currentTaskLane = draftTaskLane({
+        packet: unpacked.packet,
+        role: unpacked.role
+      });
       state.packet = unpacked.packet;
       state.annotationA = null;
       state.annotationB = null;
@@ -1394,6 +1547,10 @@ async function restoreRecoveryFile() {
       roleControl.checked = true;
       syncRoleControls();
       state.currentTaskVersionId = null;
+      state.currentTaskLane = draftTaskLane({
+        packet: unpacked.packet,
+        role: "ratification"
+      });
       state.packet = unpacked.packet;
       state.annotationA = null;
       state.annotationB = null;
@@ -1420,6 +1577,10 @@ async function restoreRecoveryFile() {
       roleControl.checked = true;
       syncRoleControls();
       state.currentTaskVersionId = null;
+      state.currentTaskLane = draftTaskLane({
+        packet: unpacked.packet,
+        role: "ratification"
+      });
       state.packet = unpacked.packet;
       state.annotationA = null;
       state.annotationB = null;
@@ -1484,7 +1645,12 @@ async function loadPilot() {
     });
     if (!response.ok) throw new Error("تعذر تحميل العينة التجريبية.");
     state.packet = await response.json();
+    state.currentTaskVersionId = null;
     validatePacket(state.packet);
+    state.currentTaskLane = inferLoadedPacketLane(
+      state.packet,
+      OPERATIONAL_TEST_REQUESTED
+    );
     renderPacketSummary("العينة التجريبية الجاهزة");
   } catch (error) {
     showStatus(
@@ -1499,7 +1665,12 @@ async function loadPacketFile() {
   try {
     const loaded = await readJson(packetFile.files[0], "حزمة النص");
     state.packet = unpackPortalFile(loaded).packet;
+    state.currentTaskVersionId = null;
     validatePacket(state.packet);
+    state.currentTaskLane = inferLoadedPacketLane(
+      state.packet,
+      OPERATIONAL_TEST_REQUESTED
+    );
     renderPacketSummary("حزمة منسق التقييم");
   } catch (error) {
     state.packet = null;
@@ -1645,6 +1816,8 @@ function createDraftSnapshot(savedAtUtc = new Date().toISOString()) {
     savedAtUtc,
     participantId: state.participantId,
     role: selectedRole(),
+    taskVersionId: state.currentTaskVersionId,
+    taskLane: state.currentTaskLane,
     packet: state.packet,
     annotationA: state.annotationA,
     annotationB: state.annotationB,
@@ -1858,7 +2031,10 @@ async function restoreDraftObject(draft, sourceLabel, expectedRole = null) {
   if (!roleControl) throw new Error("دور المسودة غير مدعوم.");
   roleControl.checked = true;
   syncRoleControls();
-  state.currentTaskVersionId = null;
+  state.currentTaskVersionId = validTaskVersionId(draft.taskVersionId)
+    ? draft.taskVersionId
+    : null;
+  state.currentTaskLane = draftTaskLane(draft);
   state.participantId = draft.participantId || state.participantId;
   state.packet = draft.packet;
   state.annotationA = draft.annotationA ?? null;
@@ -1885,6 +2061,22 @@ async function restoreDraftObject(draft, sourceLabel, expectedRole = null) {
   renderPacketSummary(sourceLabel);
   updateCompletion();
   showStep(4);
+}
+
+function draftTaskLane(draft) {
+  if (["standard", "operational-test"].includes(draft?.taskLane)) {
+    return draft.taskLane;
+  }
+  return draft?.packet?.packetId === BASELINE_PILOT_PACKET_ID
+      && draft.packet.pilotOnly === true
+      && ["A", "B"].includes(draft.role)
+    ? "operational-test"
+    : null;
+}
+
+function validTaskVersionId(value) {
+  return typeof value === "string"
+    && /^[A-Za-z0-9][A-Za-z0-9._:-]{2,200}$/u.test(value);
 }
 
 function captureWorkspace() {
@@ -2538,6 +2730,14 @@ async function submitEvaluation() {
     if (!state.account.authenticated) {
       throw new Error("سجّل الدخول قبل إرسال التقييم.");
     }
+    if ((OPERATIONAL_TEST_REQUESTED
+          || state.currentTaskLane === "operational-test")
+        && !operationalTestMode()) {
+      throw new Error(
+        "العينة التشغيلية المعزولة تقبل دورَي A وB فقط، "
+        + "ولا يمكن إرسالها إلى مسار الإجماع."
+      );
+    }
     const artifact = await buildArtifactBundle();
     const artifactSha256 = await sha256Json(artifact);
     const turnstileToken = getTurnstileToken();
@@ -2568,7 +2768,7 @@ async function submitEvaluation() {
       artifactType: artifact.kind,
       artifactSha256,
       artifact,
-      clientVersion: "adg-v15.1",
+      clientVersion: `adg-v${PORTAL_VERSION}`,
       turnstileToken
     };
     const body = JSON.stringify(payload);
@@ -3349,7 +3549,8 @@ function selectedRole() {
 }
 
 function operationalTestMode() {
-  return OPERATIONAL_TEST_REQUESTED
+  return (OPERATIONAL_TEST_REQUESTED
+      || state.currentTaskLane === "operational-test")
     && state.packet?.pilotOnly === true
     && ["A", "B"].includes(selectedRole());
 }

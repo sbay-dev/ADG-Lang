@@ -15,7 +15,8 @@ function migratedDatabase() {
     "migrations/0007_cpoly_recovery_state.sql",
     "migrations/0008_cpoly_backup_metadata_hash.sql",
     "migrations/0009_cpoly_backup_kv_lane.sql",
-    "migrations/0010_repository_task_catalog.sql"
+    "migrations/0010_repository_task_catalog.sql",
+    "migrations/0011_portal_issue_reports.sql"
   ]) {
     database.exec(readFileSync(path, "utf8"));
   }
@@ -168,6 +169,30 @@ test("repository task migration isolates operational claims and draft history", 
   assert.match(operationalSql, /'claimed', 'submitted'/);
 });
 
+test("issue-report migration separates private linkage from public publishing", () => {
+  const database = migratedDatabase();
+  const tables = new Set(database.prepare(
+    `SELECT name
+       FROM sqlite_master
+      WHERE type = 'table'`
+  ).all().map(row => row.name));
+  assert.ok(tables.has("portal_issue_reports"));
+  assert.ok(tables.has("portal_issue_report_claims"));
+  const columns = new Set(database.prepare(
+    "PRAGMA table_info(portal_issue_reports)"
+  ).all().map(column => column.name));
+  for (const name of [
+    "user_id",
+    "payload_json",
+    "content_sha256",
+    "claim_nonce",
+    "github_issue_number",
+    "github_issue_url"
+  ]) {
+    assert.ok(columns.has(name), `missing ${name}`);
+  }
+});
+
 test("CPOLY migration ConfigMap ships every PostgreSQL schema step", () => {
   const kustomization = readFileSync(
     "infrastructure/cpoly-postgres/kustomization.yaml",
@@ -180,6 +205,10 @@ test("CPOLY migration ConfigMap ships every PostgreSQL schema step", () => {
   assert.match(
     kustomization,
     /0002_repository_task_catalog\.sql=migrations\/postgresql\/0002_repository_task_catalog\.sql/
+  );
+  assert.match(
+    kustomization,
+    /0003_portal_issue_reports\.sql=migrations\/postgresql\/0003_portal_issue_reports\.sql/
   );
 });
 

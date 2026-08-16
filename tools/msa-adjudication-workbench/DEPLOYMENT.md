@@ -280,6 +280,15 @@ are never returned on that path. Keep the Azure Blob configuration in place
 only as the rollback path until cutover import, receipt, export, hash, and
 restore verification all succeed.
 
+For portal defect reports,
+`.github\workflows\publish-portal-issue-reports.yml` uses the same
+`ADG_REPOSITORY_RECEIPT_HMAC` environment secret to claim sanitized reports and
+return receipts. It also needs the environment variable
+`ADG_PORTAL_ISSUE_REPORTS_URL` only when the production claim endpoint differs
+from `https://adg.sbay.sa/api/repository/issue-reports/claim`. The job receives
+only `issues: write` and `contents: read`; its short-lived `GITHUB_TOKEN` never
+enters the Worker or browser.
+
 ## Cloudflare D1
 
 Create separate production and staging databases and bind each as `DB`.
@@ -292,7 +301,11 @@ npx wrangler d1 migrations apply DB --remote
 D1 contains Passkey public credentials, hashed opaque sessions, encrypted
 profiles and drafts, non-sensitive completion counters, submission receipts,
 encrypted short-lived OIDC state, versioned consensus rounds, appeals,
-moderation decisions, repository receipts, and append-only state events.
+moderation decisions, repository receipts, append-only state events, and the
+private linkage/status for sanitized portal Issue reports. Migration `0011`
+adds only the two issue-report tables. PostgreSQL migration `0003` creates their
+authoritative counterparts and is applied checksum-first on both existing and
+new CPOLY disks.
 
 ## Cloudflare Worker secrets
 

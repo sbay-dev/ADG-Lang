@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: الإبلاغ الخاص عن ثغرة أمنية
+    url: https://github.com/sbay-dev/ADG-Lang/security/policy
+    about: لا تنشر الثغرات أو الاعتمادات أو بيانات المشاركين في مسألة عامة.

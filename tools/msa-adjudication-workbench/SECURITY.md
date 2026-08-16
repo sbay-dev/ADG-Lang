@@ -43,5 +43,14 @@
 
 ## Reporting
 
-Report vulnerabilities privately to `team@sbay.sa`. Do not include participant
-PII or live credentials in a report.
+Operational defects may be sent from the persistent in-portal report button.
+The authenticated endpoint accepts only bounded technical text and a small
+allowlist of safe context, rate-limits each account, and queues a payload that
+contains no account identifier, profile, email, draft, or linguistic decision.
+A least-privilege GitHub Action creates or reuses the matching public Issue and
+returns an HMAC-signed receipt. The repository Issue Form is a fallback when a
+login failure blocks the authenticated channel.
+
+Report vulnerabilities privately to `team@sbay.sa`. Do not publish security
+details, participant PII, drafts, linguistic decisions, or live credentials in
+an Issue.

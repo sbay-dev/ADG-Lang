@@ -66,6 +66,12 @@ import {
   routeCpolyBackupRequest
 } from "./cpoly-recovery.js";
 import { createRuntimeEnv } from "./database.js";
+import {
+  PORTAL_ISSUE_REPORT_CLAIM_SCHEMA,
+  PORTAL_ISSUE_REPORT_RECEIPT_SCHEMA,
+  buildPortalIssuePublicPayload,
+  validatePortalIssueReportInput
+} from "./issue-reporting.js";
 
 export { CpolyAdgPostgresContainer };
 
@@ -94,6 +100,11 @@ const REPOSITORY_EVIDENCE_CLAIM_MAX_ITEMS = 50;
 const REPOSITORY_TASK_SYNC_WINDOW_MS = 15 * 60 * 1000;
 const REPOSITORY_TASK_SYNC_MAX_ITEMS = 50;
 const REPOSITORY_TASK_SYNC_MAX_BYTES = 5 * 1024 * 1024;
+const PORTAL_ISSUE_REPORT_CLAIM_WINDOW_MS = 10 * 60 * 1000;
+const PORTAL_ISSUE_REPORT_CLAIM_HOLD_MS = 60 * 60 * 1000;
+const PORTAL_ISSUE_REPORT_CLAIM_MAX_ITEMS = 20;
+const PORTAL_ISSUE_REPORT_RATE_HOUR = 5;
+const PORTAL_ISSUE_REPORT_RATE_DAY = 20;
 const GLOBAL_ADMIN_ROLE_TEMPLATE_ID =
   "62e90394-69f5-4237-9190-012177145e10";
 
@@ -217,6 +228,14 @@ export default {
       if (url.pathname === "/api/repository/tasks/sync"
           && request.method === "POST") {
         return await syncRepositoryTasks(request, runtimeEnv);
+      }
+      if (url.pathname === "/api/repository/issue-reports/claim"
+          && request.method === "POST") {
+        return await claimPortalIssueReports(request, runtimeEnv);
+      }
+      if (url.pathname === "/api/repository/issue-reports/receipts"
+          && request.method === "POST") {
+        return await receivePortalIssueReportReceipt(request, runtimeEnv);
       }
 
       if (url.pathname === "/api/submissions"
@@ -1799,6 +1818,7 @@ async function routeAccountRequest(request, env, url) {
       && path !== "/api/tasks/claim"
       && path !== "/api/tasks/load"
       && path !== "/api/tasks/status"
+      && path !== "/api/issue-reports"
       && path !== "/api/consensus/appeals") {
     return null;
   }
@@ -1917,6 +1937,17 @@ async function routeAccountRequest(request, env, url) {
   }
   if (path === "/api/tasks/status" && request.method === "GET") {
     return getTaskStatus(request, env, url);
+  }
+  if (path === "/api/issue-reports" && request.method === "GET") {
+    return listPortalIssueReports(request, env);
+  }
+  if (path === "/api/issue-reports" && request.method === "POST") {
+    enforceOrigin(request, env);
+    return createPortalIssueReport(
+      request,
+      env,
+      await readJsonBody(request)
+    );
   }
   if (path === "/api/consensus/appeals"
       && request.method === "POST") {
@@ -2829,14 +2860,144 @@ async function getCompletedResults(request, env, url) {
   });
 }
 
+async function createPortalIssueReport(request, env, body) {
+  const account = await requireSession(request, env);
+  let input;
+  try {
+    input = validatePortalIssueReportInput(body);
+  } catch (error) {
+    throw new PublicError(error.message, 400);
+  }
+
+  const existing = await env.DB.prepare(
+    `SELECT id, user_id, category, summary, payload_json, status,
+            github_issue_number, github_issue_url, created_at, published_at
+       FROM portal_issue_reports
+      WHERE id = ?`
+  ).bind(input.reportId).first();
+  if (existing) {
+    if (existing.user_id !== account.user_id
+        || !portalIssueInputMatchesPayload(input, existing.payload_json)) {
+      throw new PublicError("معرف البلاغ مستخدم لطلب مختلف.", 409);
+    }
+    return json({
+      accepted: true,
+      duplicate: true,
+      report: portalIssueReportSummary(existing)
+    });
+  }
+
+  const now = Date.now();
+  const createdAtUtc = new Date(now).toISOString();
+  const payloadJson = JSON.stringify(
+    buildPortalIssuePublicPayload(input, createdAtUtc)
+  );
+  const contentSha256 = await sha256Hex(payloadJson);
+  const insert = await env.DB.prepare(
+    `INSERT INTO portal_issue_reports
+      (id, user_id, category, summary, payload_json, content_sha256,
+       status, attempts, created_at, updated_at)
+     SELECT ?, ?, ?, ?, ?, ?, 'pending', 0, ?, ?
+      WHERE (
+        SELECT COUNT(*)
+          FROM portal_issue_reports
+         WHERE user_id = ? AND created_at >= ?
+      ) < ?
+        AND (
+          SELECT COUNT(*)
+            FROM portal_issue_reports
+           WHERE user_id = ? AND created_at >= ?
+        ) < ?`
+  ).bind(
+    input.reportId,
+    account.user_id,
+    input.category,
+    input.summary,
+    payloadJson,
+    contentSha256,
+    now,
+    now,
+    account.user_id,
+    now - 60 * 60 * 1000,
+    PORTAL_ISSUE_REPORT_RATE_HOUR,
+    account.user_id,
+    now - 24 * 60 * 60 * 1000,
+    PORTAL_ISSUE_REPORT_RATE_DAY
+  ).run();
+  if (Number(insert.meta?.changes || 0) !== 1) {
+    throw new PublicError(
+      "بلغت الحد المؤقت للبلاغات. انتظر قبل إرسال بلاغ آخر.",
+      429
+    );
+  }
+  const stored = await env.DB.prepare(
+    `SELECT id, category, summary, status, github_issue_number,
+            github_issue_url, created_at, published_at
+       FROM portal_issue_reports
+      WHERE id = ? AND user_id = ?`
+  ).bind(input.reportId, account.user_id).first();
+  return json({
+    accepted: true,
+    duplicate: false,
+    report: portalIssueReportSummary(stored)
+  }, 202);
+}
+
+async function listPortalIssueReports(request, env) {
+  const account = await requireSession(request, env);
+  const result = await env.DB.prepare(
+    `SELECT id, category, summary, status, github_issue_number,
+            github_issue_url, created_at, published_at
+       FROM portal_issue_reports
+      WHERE user_id = ?
+      ORDER BY created_at DESC
+      LIMIT 10`
+  ).bind(account.user_id).all();
+  return json({
+    reports: (result.results || []).map(portalIssueReportSummary)
+  });
+}
+
+function portalIssueInputMatchesPayload(input, payloadJson) {
+  let payload;
+  try {
+    payload = JSON.parse(payloadJson);
+  } catch {
+    return false;
+  }
+  return payload.reportId === input.reportId
+    && payload.category === input.category
+    && payload.summary === input.summary
+    && payload.details === input.details
+    && payload.reproductionSteps === input.reproductionSteps
+    && JSON.stringify(payload.context) === JSON.stringify(input.context);
+}
+
+function portalIssueReportSummary(row) {
+  return {
+    reportId: row.id,
+    category: row.category,
+    summary: row.summary,
+    status: row.status,
+    issueNumber: row.github_issue_number === null
+      || row.github_issue_number === undefined
+      ? null
+      : Number(row.github_issue_number),
+    issueUrl: row.github_issue_url || null,
+    createdAtUtc: new Date(Number(row.created_at)).toISOString(),
+    publishedAtUtc: row.published_at
+      ? new Date(Number(row.published_at)).toISOString()
+      : null
+  };
+}
+
 async function listRepositoryTasks(request, env, url) {
   const account = await requireSession(request, env);
   if (!account.verified_email_hash) {
     throw new PublicError("وثّق بريد الحساب لعرض المهام المسندة.", 403);
   }
-  const lane = requestedRepositoryTaskLane(
-    url.searchParams.get("mode")
-  );
+  const operationalOnly =
+    url.searchParams.get("mode") === "operational-test";
   const result = await env.DB.prepare(
     `SELECT rtp.task_version_id, rtp.packet_id, rtp.manifest_json,
             rtp.assignment_mode, rtp.lane, rtp.source_repository,
@@ -2850,12 +3011,18 @@ async function listRepositoryTasks(request, env, url) {
        JOIN consensus_rounds cr
          ON cr.task_version_id = tv.id
         AND cr.round_number = tv.current_round
-      WHERE rtp.status = 'active' AND rtp.lane = ?
-      ORDER BY rtp.first_synced_at DESC
+      WHERE rtp.status = 'active'
+        AND rtp.lane IN ('standard', 'operational-test')
+      ORDER BY CASE
+                 WHEN rtp.lane = 'operational-test' THEN 0
+                 ELSE 1
+               END,
+               rtp.first_synced_at DESC
       LIMIT 100`
-  ).bind(lane).all();
+  ).all();
   const tasks = [];
   for (const row of result.results || []) {
+    if (operationalOnly && row.lane !== "operational-test") continue;
     if (row.lane === "operational-test") {
       const claim = await env.DB.prepare(
         `SELECT role, status, claimed_at, submitted_at
@@ -2877,6 +3044,7 @@ async function listRepositoryTasks(request, env, url) {
         title: manifest.titleAr,
         summary: manifest.summaryAr,
         lane: row.lane,
+        baseline: true,
         assignmentMode: "open",
         source: {
           repository: row.source_repository,
@@ -2957,6 +3125,7 @@ async function listRepositoryTasks(request, env, url) {
       summary: manifest.summaryAr,
       assignmentMode: row.assignment_mode,
       lane: row.lane,
+      baseline: false,
       source: {
         repository: row.source_repository,
         path: row.source_path,
@@ -2978,6 +3147,8 @@ async function listRepositoryTasks(request, env, url) {
         : null
     });
   }
+  tasks.sort((left, right) =>
+    Number(right.baseline) - Number(left.baseline));
   return json({ tasks });
 }
 
@@ -3791,6 +3962,198 @@ async function receiveRepositoryReceipt(request, env) {
   }, 202);
 }
 
+async function claimPortalIssueReports(request, env) {
+  if (!env.DB || !env.REPOSITORY_RECEIPT_HMAC_SECRET_NAME) {
+    throw new PublicError("قناة نشر بلاغات المنصة غير مهيأة.", 503);
+  }
+  const signed = await readJsonBody(request);
+  const { hmacSha256: signature, ...envelope } = signed || {};
+  validatePortalIssueReportClaimEnvelope(envelope, signature, env);
+  const key = await getVaultSecret(
+    env.REPOSITORY_RECEIPT_HMAC_SECRET_NAME,
+    env
+  );
+  if (!await verifyHmacSha256(
+    key,
+    JSON.stringify(envelope),
+    signature
+  )) {
+    throw new PublicError("توقيع طلب سحب البلاغات غير صحيح.", 401);
+  }
+
+  const priorClaim = await env.DB.prepare(
+    `SELECT nonce
+       FROM portal_issue_report_claims
+      WHERE nonce = ?`
+  ).bind(envelope.nonce).first();
+  if (!priorClaim) {
+    const now = Date.now();
+    const claimInsert = await env.DB.prepare(
+      `INSERT INTO portal_issue_report_claims
+        (nonce, requested_at, claimed_at)
+       VALUES (?, ?, ?)
+       ON CONFLICT (nonce) DO NOTHING`
+    ).bind(
+      envelope.nonce,
+      Date.parse(envelope.requestedAtUtc),
+      now
+    ).run();
+    if (Number(claimInsert.meta?.changes || 0) === 1) {
+      const limit = Math.min(
+        PORTAL_ISSUE_REPORT_CLAIM_MAX_ITEMS,
+        Math.max(1, Number(envelope.maxItems))
+      );
+      const candidates = await env.DB.prepare(
+        `SELECT id
+           FROM portal_issue_reports
+          WHERE status = 'pending'
+             OR (status = 'claimed' AND claim_expires_at <= ?)
+          ORDER BY created_at
+          LIMIT ?`
+      ).bind(now, limit).all();
+      const updates = (candidates.results || []).map(row =>
+        env.DB.prepare(
+          `UPDATE portal_issue_reports
+              SET status = 'claimed',
+                  claim_nonce = ?,
+                  claim_expires_at = ?,
+                  attempts = attempts + 1,
+                  updated_at = ?
+            WHERE id = ?
+              AND (
+                status = 'pending'
+                OR (status = 'claimed' AND claim_expires_at <= ?)
+              )`
+        ).bind(
+          envelope.nonce,
+          now + PORTAL_ISSUE_REPORT_CLAIM_HOLD_MS,
+          now,
+          row.id,
+          now
+        )
+      );
+      if (updates.length) await env.DB.batch(updates);
+      await env.DB.prepare(
+        `DELETE FROM portal_issue_report_claims
+          WHERE claimed_at < ? AND nonce <> ?`
+      ).bind(
+        now - 30 * 24 * 60 * 60 * 1000,
+        envelope.nonce
+      ).run();
+    }
+  }
+
+  const rows = await env.DB.prepare(
+    `SELECT id, content_sha256, payload_json
+       FROM portal_issue_reports
+      WHERE status = 'claimed' AND claim_nonce = ?
+      ORDER BY created_at
+      LIMIT ?`
+  ).bind(
+    envelope.nonce,
+    PORTAL_ISSUE_REPORT_CLAIM_MAX_ITEMS
+  ).all();
+  const claimedAt = Date.now();
+  return json({
+    accepted: true,
+    claim: {
+      schema: "adg-portal-issue-report-claim-result-v1",
+      repository: envelope.repository,
+      nonce: envelope.nonce,
+      requestedAtUtc: envelope.requestedAtUtc,
+      claimedAtUtc: new Date(claimedAt).toISOString(),
+      count: rows.results?.length || 0
+    },
+    items: (rows.results || []).map(row => ({
+      reportId: row.id,
+      contentSha256: row.content_sha256,
+      payloadJson: row.payload_json
+    }))
+  });
+}
+
+async function receivePortalIssueReportReceipt(request, env) {
+  if (!env.DB || !env.REPOSITORY_RECEIPT_HMAC_SECRET_NAME) {
+    throw new PublicError("قناة إيصال بلاغات المنصة غير مهيأة.", 503);
+  }
+  const signed = await readJsonBody(request);
+  const { hmacSha256: signature, ...envelope } = signed || {};
+  validatePortalIssueReportReceiptEnvelope(envelope, signature, env);
+  const key = await getVaultSecret(
+    env.REPOSITORY_RECEIPT_HMAC_SECRET_NAME,
+    env
+  );
+  if (!await verifyHmacSha256(
+    key,
+    JSON.stringify(envelope),
+    signature
+  )) {
+    throw new PublicError("توقيع إيصال البلاغ غير صحيح.", 401);
+  }
+
+  const stored = await env.DB.prepare(
+    `SELECT id, content_sha256, status, claim_nonce, github_issue_number,
+            github_issue_url
+       FROM portal_issue_reports
+      WHERE id = ?`
+  ).bind(envelope.reportId).first();
+  if (!stored || stored.content_sha256 !== envelope.contentSha256) {
+    throw new PublicError("البلاغ المرتبط بالإيصال غير موجود.", 404);
+  }
+  if (stored.claim_nonce !== envelope.claimNonce) {
+    throw new PublicError("إيصال البلاغ لا يطابق دورة السحب الحالية.", 409);
+  }
+  if (stored.status === "published") {
+    if (Number(stored.github_issue_number) !== envelope.issueNumber
+        || stored.github_issue_url !== envelope.issueUrl) {
+      throw new PublicError("سبق ربط البلاغ بمسألة أخرى.", 409);
+    }
+    return json({
+      accepted: true,
+      duplicate: true,
+      reportId: stored.id,
+      issueNumber: Number(stored.github_issue_number),
+      issueUrl: stored.github_issue_url
+    }, 202);
+  }
+  if (stored.status !== "claimed") {
+    throw new PublicError("لم يُسحب البلاغ للنشر بعد.", 409);
+  }
+
+  const publishedAt = Date.parse(envelope.acceptedAtUtc);
+  const update = await env.DB.prepare(
+    `UPDATE portal_issue_reports
+        SET status = 'published',
+            github_issue_number = ?,
+            github_issue_url = ?,
+            published_at = ?,
+            updated_at = ?,
+            claim_expires_at = NULL
+      WHERE id = ?
+        AND content_sha256 = ?
+        AND status = 'claimed'
+        AND claim_nonce = ?`
+  ).bind(
+    envelope.issueNumber,
+    envelope.issueUrl,
+    publishedAt,
+    publishedAt,
+    envelope.reportId,
+    envelope.contentSha256,
+    envelope.claimNonce
+  ).run();
+  if (Number(update.meta?.changes || 0) !== 1) {
+    throw new PublicError("تغيّرت حالة البلاغ أثناء قبول الإيصال.", 409);
+  }
+  return json({
+    accepted: true,
+    duplicate: false,
+    reportId: envelope.reportId,
+    issueNumber: envelope.issueNumber,
+    issueUrl: envelope.issueUrl
+  }, 202);
+}
+
 async function claimRepositoryEvidence(request, env) {
   if (!env.DB || !env.REPOSITORY_RECEIPT_HMAC_SECRET_NAME) {
     throw new PublicError("قناة سحب أدلة المستودع غير مهيأة.", 503);
@@ -4192,6 +4555,76 @@ async function repositoryTaskImmutableManifestSha256(manifest) {
     sourcePath: manifest.sourcePath,
     packetMerkleRoot: manifest.packetMerkleRoot
   }));
+}
+
+function validatePortalIssueReportClaimEnvelope(
+  envelope,
+  signature,
+  env
+) {
+  const requestedAt = Date.parse(envelope?.requestedAtUtc);
+  const now = Date.now();
+  if (!envelope
+      || envelope.schema !== PORTAL_ISSUE_REPORT_CLAIM_SCHEMA
+      || !isUuid(envelope.nonce)
+      || envelope.repository
+        !== (env.GITHUB_REPOSITORY || "sbay-dev/ADG-Lang")
+      || !Number.isSafeInteger(envelope.maxItems)
+      || envelope.maxItems < 1
+      || envelope.maxItems > PORTAL_ISSUE_REPORT_CLAIM_MAX_ITEMS
+      || !/^[a-f0-9]{64}$/.test(signature || "")
+      || !Number.isFinite(requestedAt)
+      || Math.abs(now - requestedAt)
+        > PORTAL_ISSUE_REPORT_CLAIM_WINDOW_MS) {
+    throw new PublicError("صيغة طلب سحب البلاغات غير صالحة.", 400);
+  }
+}
+
+function validatePortalIssueReportReceiptEnvelope(
+  envelope,
+  signature,
+  env
+) {
+  const acceptedAt = Date.parse(envelope?.acceptedAtUtc);
+  const now = Date.now();
+  const repository =
+    env.GITHUB_REPOSITORY || "sbay-dev/ADG-Lang";
+  if (!envelope
+      || envelope.schema !== PORTAL_ISSUE_REPORT_RECEIPT_SCHEMA
+      || envelope.repository !== repository
+      || !isUuid(envelope.nonce)
+      || !isUuid(envelope.claimNonce)
+      || !isUuid(envelope.reportId)
+      || !/^[a-f0-9]{64}$/.test(envelope.contentSha256 || "")
+      || !Number.isSafeInteger(envelope.issueNumber)
+      || envelope.issueNumber < 1
+      || !validPortalIssueUrl(
+        envelope.issueUrl,
+        repository,
+        envelope.issueNumber
+      )
+      || !Number.isFinite(acceptedAt)
+      || Math.abs(now - acceptedAt)
+        > PORTAL_ISSUE_REPORT_CLAIM_WINDOW_MS
+      || !/^[a-f0-9]{64}$/.test(signature || "")) {
+    throw new PublicError("صيغة إيصال بلاغ المنصة غير صالحة.", 400);
+  }
+}
+
+function validPortalIssueUrl(value, repository, issueNumber) {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "https:"
+      && parsed.hostname === "github.com"
+      && parsed.port === ""
+      && parsed.username === ""
+      && parsed.password === ""
+      && parsed.search === ""
+      && parsed.hash === ""
+      && parsed.pathname === `/${repository}/issues/${issueNumber}`;
+  } catch {
+    return false;
+  }
 }
 
 function validateRepositoryEvidenceClaimEnvelope(envelope, signature, env) {
@@ -7384,6 +7817,11 @@ async function processIdentityErasureRequests(env) {
         env.DB.prepare(
           "DELETE FROM operational_task_claims WHERE user_id = ?"
         ).bind(request.user_id),
+        env.DB.prepare(
+          `UPDATE portal_issue_reports
+              SET user_id = NULL, updated_at = ?
+            WHERE user_id = ?`
+        ).bind(completedAt, request.user_id),
         env.DB.prepare(
           `UPDATE task_assignments
               SET user_id = NULL,

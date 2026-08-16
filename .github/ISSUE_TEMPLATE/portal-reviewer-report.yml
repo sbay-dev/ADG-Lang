@@ -1,0 +1,62 @@
+name: بلاغ عن خلل في منصّة التحكيم
+description: مسار احتياطي عند تعذر إرسال البلاغ من داخل المنصّة
+title: "[بوابة التحكيم] "
+labels:
+  - bug
+  - portal
+  - reviewer-report
+body:
+  - type: markdown
+    attributes:
+      value: |
+        شكرًا لتنبيهنا. هذه المسألة **عامة**.
+
+        لا تكتب اسمك أو بريدك أو رقم هاتفك أو رموز الدخول، ولا ترفق مسودة التحكيم أو قراراتك اللغوية. أبلغ عن الثغرات الأمنية سرًا وفق [سياسة الأمان](https://github.com/sbay-dev/ADG-Lang/security/policy).
+  - type: dropdown
+    id: category
+    attributes:
+      label: موضع الخلل
+      options:
+        - الدخول أو مفتاح المرور
+        - قائمة المهام أو فتح المهمة
+        - الحفظ التلقائي أو استعادة المسودة
+        - واجهة التحليل أو الحقول اللغوية
+        - مراجعة النتيجة أو الإرسال
+        - العرض أو التوافق مع الجهاز
+        - خلل آخر
+    validations:
+      required: true
+  - type: input
+    id: summary
+    attributes:
+      label: ملخص موجز
+      placeholder: لا تظهر العيّنة الأساسية بعد تسجيل الدخول
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: وصف الخلل
+      description: اشرح المتوقع وما ظهر بدلًا منه دون بيانات شخصية أو قرارات لغوية.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: خطوات إعادة الخلل
+      placeholder: |
+        1. سجلت الدخول
+        2. فتحت قائمة المهام
+        3. ...
+  - type: input
+    id: portal_version
+    attributes:
+      label: إصدار المنصّة إن ظهر لك
+      placeholder: 15.2.0
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: مراجعة الخصوصية
+      options:
+        - label: راجعت البلاغ، ولا يحتوي بيانات هوية أو تواصل أو أسرارًا أو مسودة أو قرارات لغوية.
+          required: true

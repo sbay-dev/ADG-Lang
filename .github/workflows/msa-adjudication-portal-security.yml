@@ -7,8 +7,10 @@ on:
       - "scripts/arabic-text/import-msa-portal-submission.mjs"
       - "scripts/arabic-text/render-msa-github-evidence.mjs"
       - "human-evidence/tasks/**"
+      - ".github/ISSUE_TEMPLATE/**"
       - ".github/workflows/import-msa-adjudication.yml"
       - ".github/workflows/msa-adjudication-portal-security.yml"
+      - ".github/workflows/publish-portal-issue-reports.yml"
       - ".github/workflows/sync-msa-adjudication-tasks.yml"
   workflow_dispatch:
 

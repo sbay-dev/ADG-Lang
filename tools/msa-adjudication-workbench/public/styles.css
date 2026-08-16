@@ -1388,6 +1388,18 @@ label small {
   background: var(--canvas-subtle);
 }
 
+.task-card.baseline {
+  border-color: var(--done-fg);
+  background: var(--done-subtle);
+  box-shadow: inset 4px 0 0 var(--done-fg);
+}
+
+.task-card.baseline .task-card-baseline-note {
+  margin-top: 0.55rem;
+  color: var(--fg-default);
+  font-weight: 600;
+}
+
 .task-card-main {
   min-width: 0;
 }
@@ -1462,6 +1474,127 @@ label small {
 
 .recovery-panel p {
   color: var(--fg-muted);
+}
+
+/* =====================================================================
+   قناة بلاغات المستودع
+   ===================================================================== */
+
+.issue-report-launcher {
+  position: fixed;
+  z-index: 30;
+  inset-inline-start: max(1rem, env(safe-area-inset-left));
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  padding: 0.65rem 1rem;
+  border: 1px solid var(--danger-emphasis);
+  border-radius: var(--radius-pill);
+  color: var(--fg-on-emphasis);
+  background: var(--danger-emphasis);
+  box-shadow: var(--shadow-large);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.issue-report-launcher:hover {
+  filter: brightness(0.95);
+}
+
+.issue-report-launcher:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.issue-report-dialog {
+  width: min(720px, calc(100% - 2rem));
+  max-height: calc(100dvh - 2rem);
+  padding: 0;
+  overflow: auto;
+  color: var(--fg-default);
+  background: var(--canvas-overlay);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--overlay-shadow);
+}
+
+.issue-report-dialog::backdrop {
+  background: rgba(1, 4, 9, 0.68);
+}
+
+.issue-report-dialog form {
+  display: grid;
+  gap: 1rem;
+  padding: 1.25rem;
+}
+
+.issue-report-heading,
+.issue-report-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.issue-report-heading h2 {
+  margin: 0.2rem 0 0;
+  font-size: 1.3rem;
+}
+
+.issue-report-dialog label:not(.check-row) {
+  display: grid;
+  gap: 0.4rem;
+  font-weight: 600;
+}
+
+.issue-report-dialog input,
+.issue-report-dialog select,
+.issue-report-dialog textarea {
+  width: 100%;
+}
+
+.issue-report-dialog textarea {
+  resize: vertical;
+}
+
+.issue-report-boundary {
+  margin: 0;
+}
+
+.recent-issue-reports {
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-muted);
+}
+
+.recent-issue-reports h3 {
+  margin-bottom: 0.65rem;
+  font-size: 1rem;
+}
+
+.recent-issue-report {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.25rem 1rem;
+  align-items: center;
+  padding: 0.65rem 0;
+  border-top: 1px solid var(--border-muted);
+}
+
+.recent-issue-report:first-child {
+  border-top: 0;
+}
+
+.recent-issue-report strong,
+.recent-issue-report small {
+  min-width: 0;
+}
+
+.recent-issue-report small {
+  color: var(--fg-muted);
+}
+
+.recent-issue-report a {
+  grid-row: 1 / span 2;
+  grid-column: 2;
 }
 
 .draft-list {
@@ -2295,6 +2428,31 @@ footer {
   .footer-grid {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .issue-report-heading,
+  .issue-report-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .issue-report-heading .button,
+  .issue-report-actions .button {
+    width: 100%;
+  }
+
+  .recent-issue-report {
+    grid-template-columns: 1fr;
+  }
+
+  .recent-issue-report a {
+    grid-row: auto;
+    grid-column: auto;
+  }
+
+  .issue-report-launcher {
+    padding: 0.55rem 0.8rem;
+    font-size: 0.85rem;
   }
 
   .footer-grid > div:last-child {

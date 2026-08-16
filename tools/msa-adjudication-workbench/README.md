@@ -23,7 +23,9 @@ X/Twitter invitation actions.
    before continuing.
 4. Register a discoverable Passkey; no organization account or password is
    required for an external adjudicator.
-5. Read the worked example, then open the authenticated task inbox.
+5. Read the worked example, then start with the pinned PILOT baseline in the
+   authenticated task inbox. It exercises save and submission without entering
+   scientific consensus.
 6. Claim an open task or an email-bound assignment. The portal fixes the role
    and loads the repository packet automatically; J1 receives stored A/B
    evidence and J2 receives the stored J1 package without exchanging files.
@@ -37,11 +39,15 @@ X/Twitter invitation actions.
 9. After submitting, inspect pseudonymous prior results, discuss bound
    evidence, follow the consensus state, and appeal a provisional result
    within its 14-day window.
+10. Report a portal defect from the persistent Arabic report button. The
+    authenticated channel queues only bounded technical text and safe context;
+    GitHub Actions creates the public issue with a short-lived repository token.
 
 ### Assisted operational test
 
-Operators can exercise the complete browser-to-repository publication path
-without claiming independent adjudication by opening:
+The authenticated task inbox now pins the operational PILOT as the primary
+baseline for every reviewer. Operators can still filter the inbox to that lane
+alone by opening:
 
 ```text
 https://adg.sbay.sa/?mode=operational-test
@@ -49,7 +55,8 @@ https://adg.sbay.sa/?mode=operational-test
 
 The blind pilot packet is published under
 `human-evidence/tasks/*.task.json` with `lane: operational-test`. The ordinary
-task query excludes it; the URL above requests that lane explicitly. A
+task query includes it first with an explicit baseline marker; the URL above
+remains a compatibility/filtering route. A
 CODEOWNERS-protected GitHub workflow validates the packet schema, prohibited
 fields, path, and Merkle root before sending a timestamped HMAC-signed catalog
 to the portal. The completed local annotation export is never committed.
@@ -59,6 +66,26 @@ the normal signed GitHub evidence queue, and renders a clearly labelled result.
 Its claims are stored separately from consensus participation, so it does not
 occupy A/B/J1/J2 or change consensus state. Each account may run it once per
 pilot packet.
+
+### Direct GitHub issue reporting
+
+- Authenticated reviewers can submit a bounded Arabic defect report without a
+  GitHub account. The browser sends only category, summary, description,
+  optional reproduction steps, portal version, wizard step, and public task
+  identity/lane.
+- The Worker rejects identity/contact data, URLs, active markup, credential-like
+  strings, unknown fields, and over-limit reports. It applies per-account hourly
+  and daily limits and stores the account link only in the private database.
+- `.github/workflows/publish-portal-issue-reports.yml` claims reports through a
+  timestamped HMAC envelope, creates or reuses a GitHub Issue carrying a hidden
+  report marker, and returns a signed receipt. A failed receipt therefore does
+  not create a duplicate Issue on retry.
+- The public Issue never receives the user ID, profile, email, draft, or
+  linguistic decisions. Identity erasure removes the private account link while
+  preserving the already-public technical Issue.
+- `.github/ISSUE_TEMPLATE/portal-reviewer-report.yml` is the fallback when a
+  login failure prevents use of the in-portal channel. Security vulnerabilities
+  remain private reports to `team@sbay.sa`.
 
 ### Repository task delivery
 
@@ -122,6 +149,9 @@ organization member has authoritative Global Administrator proof.
 - A scheduled GitHub Action imports accepted queue items using Azure OIDC and
   the repository's short-lived `GITHUB_TOKEN`; no persistent GitHub token is
   exposed to the public Worker.
+- A separate least-privilege Action publishes sanitized portal defect reports
+  as Issues with `issues: write`; the browser and Worker never hold a GitHub
+  token.
 - A participant can schedule identity-linkage erasure. Execution waits for
   task closure and the configured retention boundary, deletes active-store
   identity material, removes login/contact material, and preserves only
@@ -356,7 +386,7 @@ provider image plus any chosen Hyperdrive rollback binding.
 
 ## Release integrity
 
-`release\portal-15.1.1.json` binds the sanitized portal, importer, workflows,
+`release\portal-15.2.0.json` binds the sanitized portal, importer, workflows,
 tests, and documentation with canonical LF-normalized SHA-256 records. Regenerate
 it deterministically from a clean clone with:
 

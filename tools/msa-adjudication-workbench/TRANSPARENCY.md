@@ -63,12 +63,16 @@
 3. **التحقّق من البريد الإلكتروني** برمزٍ يُرسَل إلى صندوق المحكّم قبل المضيّ.
 4. تسجيل مفتاح مرور (Passkey) قابلٍ للاكتشاف؛ دون حاجةٍ إلى حساب مؤسسةٍ أو كلمة
    مرور.
-5. قراءة المثال المحلول، ثمّ العمل ضمن الدور المستقلّ المُسنَد.
+5. قراءة المثال المحلول، ثمّ البدء بعيّنة PILOT الأساسية المثبّتة أول القائمة؛
+   وهي تختبر الحفظ والإرسال ولا تدخل الإجماع العلمي، ثمّ الانتقال إلى الدور
+   المستقلّ المُسنَد.
 6. إكمال القرارات اللغوية الموجّهة، مع حفظ المسودّات المشفّرة يدويًّا وبعد كلّ
    تعديلٍ للعودة لاحقًا.
 7. حفظ نسخةٍ محلّيةٍ مجهّلة أو الإرسال عبر واجهة API المحميّة.
 8. بعد الإرسال: تصفّح النتائج السابقة باسمٍ مستعار، ومناقشة الأدلّة المرتبطة،
    ومتابعة حالة الإجماع، وتقديم استئنافٍ خلال نافذته.
+9. عند وقوع خللٍ تشغيلي: فتح زر البلاغ الدائم وإرسال وصفٍ تقنيٍّ منقّى إلى
+   قناة المستودع، دون اشتراط حساب GitHub.
 
 ## 5. البيانات التي نجمعها وسببها
 
@@ -133,8 +137,13 @@
   خارجية، مع `x-content-type-options: nosniff` و`frame-ancestors 'none'`.
 - **أظرفٌ موقّعةٌ بـ HMAC** ومنعُ تكرارٍ عبر الطابع الزمني والرقم العشوائي على
   المسارات الداخلية.
+- البلاغات التشغيلية العادية تُرسل من داخل الحساب إلى جدولٍ خاص، ثم تسحبها
+  GitHub Actions بغلاف HMAC وتُنشئ مسألةً عامةً بصلاحية `issues: write`.
+  لا تحمل الحمولة العامة معرّف الحساب أو الاسم أو البريد أو الملف أو المسودة
+  أو القرارات اللغوية، ويمنع الخادم بيانات التواصل والروابط والاعتمادات
+  والمحتوى النشط ويطبق حدودًا زمنيةً لكل حساب.
 - الإبلاغ عن الثغرات يكون على انفرادٍ إلى `team@sbay.sa` دون تضمين أيّ بياناتٍ
-  شخصيةٍ أو اعتماداتٍ حيّة. التفصيل في `SECURITY.md`.
+  شخصيةٍ أو اعتماداتٍ حيّة في مسألة عامة. التفصيل في `SECURITY.md`.
 
 ## 10. حدود الادعاء (بصراحة)
 
@@ -149,9 +158,10 @@
   ويُنشر بتعهّدات صريحة: الاستقلال «لا»، والتعمية «لا»، والأصالة «نعم».
   ولا يشغل هذا المسار أدوار A أو B أو J1 أو J2، ولا يدخل آلة الإجماع.
 - الحزمة العمياء الخاصة بهذا الاختبار منشورة في
-  `human-evidence/tasks/` بوسم `lane: operational-test`، ولا يعرضها طلب
-  المهام العادي. لا يُنشر ملف الإجابات المحلي ولا المعرّف الشخصي الموجود في
-  غلاف التصدير.
+  `human-evidence/tasks/` بوسم `lane: operational-test`، ويعرضها طلب المهام
+  العادي أولًا بوصفها «العيّنة الأساسية» مع بقاء العزل نفسه. ويظل
+  `?mode=operational-test` مرشحًا متوافقًا لعرض هذه الحارة وحدها. لا يُنشر ملف
+  الإجابات المحلي ولا المعرّف الشخصي الموجود في غلاف التصدير.
 - هذه المنصّة حالةُ استخدامٍ بحثيةٌ للتحكيم، وليست خدمة تصحيحٍ لغويٍّ نهائية.
 
 ## 11. تسليم المهام وحماية المسودات
@@ -173,6 +183,10 @@
 - بعد اكتمال A وB يُحال انخفاض الاتفاق أو التعارض مباشرةً إلى J1 في الجولة
   نفسها، مع بقاء القياسات والأدلة محفوظة؛ ولا تعاد جولة A/B لمجرد انخفاض
   الاتفاق.
+- ترتبط قناة البلاغات بحساب المحكّم في المخزن الخاص لضبط المعدل وعرض حالة
+  المسألة له فقط. أمّا الحمولة التي تسحبها GitHub Actions فلا تتضمن هذا
+  الارتباط. يعيد وسمٌ خفيٌّ ثابت استخدام المسألة نفسها إذا نجح إنشاؤها وتعثر
+  الإيصال، ويزيل محو الهوية ارتباط الحساب بالبلاغ دون حذف المسألة العامة.
 
 ## 12. التحقّق وإعادة الإنتاج
 
@@ -184,7 +198,7 @@ npm run check
 npm test
 ```
 
-تُثبِّت `release/portal-15.1.1.json` سلامةَ الأصول عبر جذر `SHA-256` قانونيٍّ
+تُثبِّت `release/portal-15.2.0.json` سلامةَ الأصول عبر جذر `SHA-256` قانونيٍّ
 مُطبَّعٍ بنهايات أسطر `LF`. يُعاد توليده حتميًّا بالأمر:
 
 ```powershell
@@ -247,9 +261,14 @@ adjudication portal at **https://adg.sbay.sa** (source under
   timestamp/nonce replay protection. Report privately to `team@sbay.sa`.
 - **Task delivery and recovery.** CODEOWNERS-protected repository manifests are
   schema/Merkle validated and HMAC-synchronized into an authenticated task
-  inbox. J1/J2 inputs are hydrated from stored evidence. Draft updates preserve
-  the previous encrypted revision and the browser keeps a local recovery copy;
-  file import is an emergency path only.
+  inbox. The isolated PILOT baseline is pinned first without entering consensus.
+  J1/J2 inputs are hydrated from stored evidence. Draft updates preserve the
+  previous encrypted revision and the browser keeps a local recovery copy; file
+  import is an emergency path only.
+- **Issue reporting.** Authenticated reviewers can queue a bounded defect report
+  without a GitHub account. The public payload excludes account/profile/email,
+  drafts, and linguistic decisions; a least-privilege Action creates or reuses
+  the Issue and returns an HMAC receipt. Security reports remain private.
 - **Claim boundaries.** The encrypted journal plus periodic KV backup support
   accepted-write recovery and point-in-time rebuild, but do **not** promise
   zero loss under simultaneous D1 and container failure. The developer-visible
@@ -259,6 +278,6 @@ adjudication portal at **https://adg.sbay.sa** (source under
   case, not a final proofreading service.
 - **Reproduce.** From a clean clone, inside `tools/msa-adjudication-workbench`:
   `npm ci`, `npm run check`, `npm test`. Release integrity is bound by
-  `release/portal-15.1.1.json` (canonical LF SHA-256 root), regenerated with
+  `release/portal-15.2.0.json` (canonical LF SHA-256 root), regenerated with
   `npm run release:manifest` and enforced by the GitHub Actions security
   workflow.

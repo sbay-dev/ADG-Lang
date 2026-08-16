@@ -83,6 +83,12 @@ export function unpackPortalFile(value) {
   return { kind: "unknown", value: unwrapped, packet: null, role: null };
 }
 
+export function inferLoadedPacketLane(packet, operationalTestRequested = false) {
+  return operationalTestRequested || packet?.pilotOnly === true
+    ? "operational-test"
+    : null;
+}
+
 class CanonicalHashBuilder {
   #parts = [];
   #encoder = new TextEncoder();

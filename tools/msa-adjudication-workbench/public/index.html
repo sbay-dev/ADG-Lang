@@ -575,11 +575,11 @@
             <section class="step-panel" data-step="3" hidden>
               <div class="panel-heading">
                 <span>الخطوة الثالثة</span>
-                <h3>اختر مهمة من قائمتك</h3>
+                <h3>ابدأ بالعيّنة الأساسية ثم انتقل إلى مهامك</h3>
                 <p>
-                  تظهر هنا المهام المفتوحة لك أو المسندة إلى بريد حسابك.
-                  سيحمّل النظام الحزمة ويحدد الدور وينقل أدلة المراحل
-                  السابقة تلقائيًا.
+                  تُثبَّت عيّنة PILOT أول القائمة لتتعرف إلى المسار كاملًا
+                  دون أن تدخل نتيجتها في الإجماع العلمي. وتظهر بعدها المهام
+                  المفتوحة لك أو المسندة إلى بريد حسابك.
                 </p>
               </div>
 
@@ -588,7 +588,8 @@
                   <div>
                     <h4>مهامي</h4>
                     <p>
-                      تحمل شارة «جديدة» المهام التي لم تستلمها بعد.
+                      ابدأ بالبطاقة الموسومة «العيّنة الأساسية». ويحمل
+                      ما لم تستلمه بعد شارة «جديدة».
                     </p>
                   </div>
                   <button id="refresh-tasks"
@@ -916,6 +917,91 @@
     </section>
   </main>
 
+  <button id="open-issue-report" class="issue-report-launcher"
+          type="button" aria-haspopup="dialog"
+          aria-controls="issue-report-dialog">
+    الإبلاغ عن خلل
+  </button>
+
+  <dialog id="issue-report-dialog" class="issue-report-dialog"
+          aria-labelledby="issue-report-title">
+    <form id="issue-report-form">
+      <div class="issue-report-heading">
+        <div>
+          <span class="eyebrow">قناة مرتبطة بالمستودع</span>
+          <h2 id="issue-report-title">أبلغ عن خلل في المنصّة</h2>
+        </div>
+        <button id="close-issue-report" class="button ghost compact"
+                type="button">إغلاق</button>
+      </div>
+      <p>
+        يُرسل البلاغ من حسابك إلى قناة آمنة، ثم تنشئ GitHub Actions
+        مسألة عامة في المستودع. لا تُرسل المنصّة اسمك أو بريدك أو حساباتك
+        أو مسودتك أو قراراتك اللغوية.
+      </p>
+      <div class="privacy-note issue-report-boundary">
+        <strong>قبل الإرسال:</strong>
+        <span>
+          صف الخلل التقني فقط. لا تلصق بريدًا أو رقم هاتف أو رمز دخول أو
+          إجابات التحكيم. وللثغرات الأمنية استخدم قناة الإبلاغ الخاصة في
+          سياسة الأمان، لا المسائل العامة.
+        </span>
+      </div>
+      <label>
+        موضع الخلل
+        <select id="issue-report-category" required>
+          <option value="access">الدخول أو مفتاح المرور</option>
+          <option value="task-inbox">قائمة المهام أو فتح المهمة</option>
+          <option value="autosave">الحفظ التلقائي أو استعادة المسودة</option>
+          <option value="adjudication">واجهة التحليل أو الحقول اللغوية</option>
+          <option value="submission">مراجعة النتيجة أو الإرسال</option>
+          <option value="display">العرض أو التوافق مع الجهاز</option>
+          <option value="other">خلل آخر</option>
+        </select>
+      </label>
+      <label>
+        ملخص موجز
+        <input id="issue-report-summary" type="text"
+               minlength="10" maxlength="160" required
+               placeholder="مثال: لا تظهر العيّنة الأساسية بعد تسجيل الدخول">
+      </label>
+      <label>
+        وصف الخلل
+        <textarea id="issue-report-details" rows="6"
+                  minlength="20" maxlength="4000" required
+                  placeholder="ما الذي كنت تتوقعه؟ وما الذي ظهر بدلًا منه؟"></textarea>
+      </label>
+      <label>
+        خطوات إعادة الخلل <span class="optional">اختياري</span>
+        <textarea id="issue-report-steps" rows="4" maxlength="2000"
+                  placeholder="1. سجلت الدخول&#10;2. فتحت قائمة المهام&#10;3. ..."></textarea>
+      </label>
+      <label class="check-row">
+        <input id="issue-report-privacy" type="checkbox" required>
+        <span>
+          راجعت النص، ولا يحتوي بيانات هوية أو تواصل أو أسرارًا أو مسودة
+          أو قرارات لغوية.
+        </span>
+      </label>
+      <div class="issue-report-actions">
+        <a class="button secondary"
+           href="https://github.com/sbay-dev/ADG-Lang/issues/new?template=portal-reviewer-report.yml"
+           target="_blank" rel="noopener noreferrer">
+          نموذج GitHub الاحتياطي
+        </a>
+        <button id="submit-issue-report" class="button primary"
+                type="submit">إرسال البلاغ للمستودع</button>
+      </div>
+      <output id="issue-report-status" class="status"
+              aria-live="polite"></output>
+      <section class="recent-issue-reports"
+               aria-labelledby="recent-issue-reports-title">
+        <h3 id="recent-issue-reports-title">بلاغاتك الأخيرة</h3>
+        <div id="recent-issue-reports"></div>
+      </section>
+    </form>
+  </dialog>
+
   <footer>
     <div class="shell footer-grid">
       <div>
@@ -927,6 +1013,8 @@
            target="_blank" rel="noreferrer">الإعلان السابق للمشروع</a>
         <a href="https://github.com/sbay-dev/ADG-Lang/pull/1"
            target="_blank" rel="noreferrer">نقاش النشر والتقييم</a>
+        <a href="https://github.com/sbay-dev/ADG-Lang/issues/new?template=portal-reviewer-report.yml"
+           target="_blank" rel="noopener noreferrer">الإبلاغ عن خلل</a>
         <a href="https://sbay.sa/privacy"
            target="_blank" rel="noopener noreferrer">سياسة الخصوصية</a>
       </div>
