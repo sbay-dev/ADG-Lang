@@ -22,6 +22,9 @@ import {
   PostgresD1Database,
   createRuntimeEnv
 } from "../src/database.js";
+import {
+  serializeRows
+} from "../infrastructure/cpoly-postgres/cloudflare/bridge/serialization.mjs";
 
 const recoveryMasterKey = "cpoly-container-master-key-test-2026";
 
@@ -254,6 +257,14 @@ test("container recovery carries the cumulative receipt watermark across generat
     "utf8"
   );
   assert.match(bridge, /async function globalReceiptWatermark/u);
+  assert.match(
+    bridge,
+    /await waitForKeepaliveStatus\(KEEPALIVE_SCHEMA\)/u
+  );
+  assert.match(
+    bridge,
+    /while \(!payload\.status\.ready[\s\S]*?!payload\.status\.lastError[\s\S]*?Date\.now\(\) < deadline\)/u
+  );
   assert.doesNotMatch(bridge, /WHERE generation = \$\{generation\}/u);
   assert.doesNotMatch(bridge, /ON receipt\.generation = runtime\.current_generation/u);
 
@@ -280,6 +291,34 @@ test("container recovery carries the cumulative receipt watermark across generat
       /ON receipt\.generation = state\.current_generation/u
     );
   }
+});
+
+test("container bridge preserves text while normalizing safe integer columns", () => {
+  const rows = [{
+    created_at: "1786811084764",
+    numeric_label: "123",
+    unsafe_integer: "9007199254740993",
+    payload: Uint8Array.from([1, 2, 3])
+  }];
+  Object.defineProperty(rows, "columns", {
+    value: [
+      { name: "created_at", type: 20 },
+      { name: "numeric_label", type: 25 },
+      { name: "unsafe_integer", type: 20 },
+      { name: "payload", type: 17 }
+    ]
+  });
+
+  assert.deepEqual(serializeRows(rows), [{
+    created_at: 1786811084764,
+    numeric_label: "123",
+    unsafe_integer: "9007199254740993",
+    payload: "AQID"
+  }]);
+  assert.equal(
+    new Date(serializeRows(rows)[0].created_at).toISOString(),
+    "2026-08-15T16:24:44.764Z"
+  );
 });
 
 test("runtime env prefers container binding before Hyperdrive and keeps fallbacks", async () => {
@@ -382,12 +421,17 @@ test("Cloudflare entrypoint recreates runtime directories and migrates every boo
   assert.match(entrypoint, /\/run\/cpoly\/secrets/u);
   assert.match(entrypoint, /\/run\/secrets\/roles/u);
   assert.match(entrypoint, /exec gosu postgres "\$0" "\$@"/u);
+  assert.match(entrypoint, /startup_failure_file=/u);
+  assert.match(entrypoint, /startup_stage=restore-backup/u);
+  assert.match(entrypoint, /trap record_startup_failure EXIT/u);
+  assert.match(entrypoint, /kill -0 "\$bridge_pid"[\s\S]*?sleep 10/u);
   const mainBody = entrypoint.match(/main\(\) \{(?<body>[\s\S]*?)\n\}/u)
     ?.groups?.body;
   assert.ok(mainBody);
-  assert.match(
-    mainBody,
-    /if \[ "\$new_cluster" = "true" \]; then[\s\S]*?\n  fi\s*\n\s*apply_migrations\s*\n\s*export PGHOST/u
+  assert.match(mainBody, /if \[ "\$new_cluster" = "true" \]; then/u);
+  assert.ok(
+    mainBody.indexOf("\n  apply_migrations\n")
+      < mainBody.indexOf("\n  export PGHOST=")
   );
   assert.equal(mainBody.match(/\bapply_migrations\b/gu)?.length, 1);
 });

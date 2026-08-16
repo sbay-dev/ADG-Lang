@@ -1,7 +1,9 @@
 import { timingSafeEqual } from "node:crypto";
 import { spawn } from "node:child_process";
+import { readFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import postgres from "postgres";
+import { serializeRows } from "./serialization.mjs";
 
 const EXECUTE_SCHEMA = "adg.cpoly-postgres.execute.v1";
 const STATUS_SCHEMA = "adg.cpoly-postgres.status.v1";
@@ -46,6 +48,8 @@ const maxOperations = boundedInteger(
 const instanceId = String(
   process.env.CPOLY_POSTGRES_INSTANCE_ID || "standard-1"
 );
+const startupFailurePath =
+  `${process.env.PGDATA || "/var/lib/postgresql/data/pgdata"}/.cpoly-startup-failure`;
 
 const sql = postgres({
   host: process.env.PGHOST || "/var/run/postgresql",
@@ -68,6 +72,8 @@ let backupStatus = {
   exitCode: null
 };
 let lastError = null;
+const RECOVERY_KEEPALIVE_MAX_WAIT_MS = 90_000;
+const RECOVERY_KEEPALIVE_POLL_MS = 500;
 
 const server = createServer(async (request, response) => {
   try {
@@ -81,7 +87,11 @@ const server = createServer(async (request, response) => {
     if (request.method === "POST" && url.pathname === paths.keepalive) {
       const body = await readJson(request);
       requireSchema(body, KEEPALIVE_SCHEMA);
-      return sendJson(response, 200, await statusPayload(KEEPALIVE_SCHEMA));
+      return sendJson(
+        response,
+        200,
+        await waitForKeepaliveStatus(KEEPALIVE_SCHEMA)
+      );
     }
     if (request.method === "GET" && url.pathname === paths.receipt) {
       return sendJson(response, 200, {
@@ -226,7 +236,7 @@ async function execute(body) {
       results.push(operation.mode === "all"
         ? {
             success: true,
-            results: Array.from(result).map(serializeRow),
+            results: serializeRows(result),
             meta: { changes: 0 }
           }
         : {
@@ -375,6 +385,7 @@ async function statusPayload(schema) {
     };
   }
   const state = recovery.ready ? "ready" : "restoring";
+  const startupFailure = await readStartupFailure();
   return {
     ok: true,
     schema,
@@ -389,9 +400,31 @@ async function statusPayload(schema) {
       restoreSnapshotWatermark: recovery.postgresReceiptWatermark,
       lastBackupId: null,
       backupInProgress: backupProcess?.exitCode == null && backupProcess != null,
-      lastError
+      lastError: startupFailure || lastError
     }
   };
+}
+
+async function waitForKeepaliveStatus(schema) {
+  const deadline = Date.now() + RECOVERY_KEEPALIVE_MAX_WAIT_MS;
+  let payload = await statusPayload(schema);
+  while (!payload.status.ready
+      && !payload.status.lastError
+      && Date.now() < deadline) {
+    await new Promise(resolve => setTimeout(resolve, RECOVERY_KEEPALIVE_POLL_MS));
+    payload = await statusPayload(schema);
+  }
+  return payload;
+}
+
+async function readStartupFailure() {
+  try {
+    const value = (await readFile(startupFailurePath, "utf8")).trim();
+    return value ? `startup-failure:${value.slice(0, 500)}` : null;
+  } catch (error) {
+    if (error?.code === "ENOENT") return null;
+    return "startup-failure:unreadable";
+  }
 }
 
 async function readRecoveryState() {
@@ -495,17 +528,6 @@ function decodeParameter(value) {
     }
   }
   return value;
-}
-
-function serializeRow(row) {
-  return Object.fromEntries(Object.entries(row).map(([key, value]) => [
-    key,
-    typeof value === "bigint"
-      ? value.toString()
-      : value instanceof Uint8Array
-        ? Buffer.from(value).toString("base64")
-        : value
-  ]));
 }
 
 async function readJson(request) {

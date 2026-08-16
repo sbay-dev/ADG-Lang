@@ -58,6 +58,9 @@ try {
     Invoke-Checked "Cloudflare bridge parse" {
         node --check .\cloudflare\bridge\server.mjs
     }
+    Invoke-Checked "Cloudflare bridge serialization parse" {
+        node --check .\cloudflare\bridge\serialization.mjs
+    }
     Invoke-Checked "Cloudflare Worker parse" {
         node --check .\cloudflare\worker\src\index.js
     }

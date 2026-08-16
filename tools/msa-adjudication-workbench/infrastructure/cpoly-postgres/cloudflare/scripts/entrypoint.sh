@@ -18,6 +18,23 @@ if [ "$(id -u)" -eq 0 ]; then
   exec gosu postgres "$0" "$@"
 fi
 
+startup_failure_file="$PGDATA/.cpoly-startup-failure"
+startup_stage=validate-secrets
+record_startup_failure() {
+  status=$?
+  trap - EXIT
+  if [ "$status" -ne 0 ]; then
+    printf 'stage=%s exit=%s\n' "$startup_stage" "$status" \
+      > "$startup_failure_file"
+    chmod 0600 "$startup_failure_file"
+    if [ -n "${bridge_pid:-}" ] && kill -0 "$bridge_pid" 2>/dev/null; then
+      sleep 10
+    fi
+  fi
+  exit "$status"
+}
+trap record_startup_failure EXIT
+
 for name in ADG_MIGRATOR_PASSWORD ADG_RUNTIME_PASSWORD ADG_BACKUP_PASSWORD \
   CPOLY_POSTGRES_INTERNAL_TOKEN CPOLY_BACKUP_HMAC_KEY CPOLY_BACKUP_BASE_URL; do
   eval "value=\${$name:-}"
@@ -40,6 +57,7 @@ chmod 0600 /run/cpoly/secrets/* /run/secrets/roles/*
 
 new_cluster=false
 if [ ! -s "$PGDATA/PG_VERSION" ]; then
+  startup_stage=initialize-cluster
   new_cluster=true
   mkdir -p "$PGDATA"
   chmod 0700 "$PGDATA"
@@ -112,6 +130,7 @@ recover_or_bootstrap() {
   rm -rf "$recovery"
   mkdir -p "$recovery"
   log=$recovery/download.log
+  startup_stage=download-backup
   set +e
   ADG_BACKUP_BASE_URL_FILE=/run/cpoly/secrets/backup-base-url \
   ADG_BACKUP_HMAC_KEY_FILE=/run/cpoly/secrets/backup-hmac-key \
@@ -152,6 +171,7 @@ SQL
     exit 1
   fi
 
+  startup_stage=restore-backup
   CPOLY_DESTRUCTIVE_RESTORE=RESTORE_adg_adjudication_FROM_D1 \
   BINARY_ARCHIVE="$recovery/adg-adjudication.dump" \
   MIGRATIONS_DIR=/opt/cpoly/migrations \
@@ -163,6 +183,7 @@ SQL
   PGSSLROOTCERT=/dev/null \
   /bin/sh /opt/cpoly/scripts/restore-binary-backup.sh
 
+  startup_stage=complete-worker-recovery
   ADG_BACKUP_BASE_URL_FILE=/run/cpoly/secrets/backup-base-url \
   ADG_BACKUP_HMAC_KEY_FILE=/run/cpoly/secrets/backup-hmac-key \
   python3 /opt/cpoly/scripts/d1_backup_client.py recovery-complete \
@@ -171,6 +192,7 @@ SQL
     --timeout-seconds 3600 \
     --poll-seconds 5
 
+  startup_stage=mark-recovery-ready
   RECOVERY_READY_FILE="$recovery/recovery-ready.tsv" \
   PGHOST=/var/run/postgresql \
   PGPORT=5432 \
@@ -181,6 +203,7 @@ SQL
   /bin/sh /opt/cpoly/scripts/mark-recovery-ready.sh
 
   rm -rf "$recovery"
+  startup_stage=verify-local-readiness
   local_ready || {
     echo "Recovery completed but readiness gate remained closed." >&2
     exit 1
@@ -189,12 +212,15 @@ SQL
 
 main() {
   if [ "$new_cluster" = "true" ]; then
+    startup_stage=bootstrap-roles
     POSTGRES_USER=postgres \
     /bin/sh /docker-entrypoint-initdb.d/10-bootstrap-roles.sh
   fi
 
+  startup_stage=apply-migrations
   apply_migrations
 
+  startup_stage=start-provider
   export PGHOST=/var/run/postgresql
   export PGDATABASE=adg_adjudication
   export PGUSER=adg_runtime
@@ -207,11 +233,15 @@ main() {
        [ "${CPOLY_RESUME_RECOVERY:-false}" = "true" ]; then
     recover_or_bootstrap
   else
+    startup_stage=resume-recovery-required
     echo "Existing PGDATA is not ready; CPOLY_RESUME_RECOVERY=true is required." >&2
     shutdown
     exit 1
   fi
 
+  startup_stage=ready
+  rm -f "$startup_failure_file"
+  trap - EXIT
   wait "$bridge_pid"
 }
 
