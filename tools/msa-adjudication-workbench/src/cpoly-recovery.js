@@ -1588,13 +1588,26 @@ async function beginRecovery(rawBody, env) {
       409
     );
   }
+  const now = Date.now();
   if (runtime.state === "recovering") {
     if (runtime.restoreBackupId === backupId
         && runtime.restoreSnapshotGeneration === snapshotCoverage.generation
         && runtime.restoreSnapshotWatermark === snapshotCoverage.watermark) {
+      const leaseExpiresAt = now + recoveryLeaseMs(env);
+      await recoveryDb.prepare(
+        `UPDATE cpoly_recovery_runtime
+            SET restore_lease_expires_at = ?,
+                updated_at = ?,
+                last_error = NULL
+          WHERE slot = 'global'
+            AND state = 'recovering'
+            AND recovery_id = ?`
+      ).bind(leaseExpiresAt, now, runtime.recoveryId).run();
+      await touchBackupRestoreLease(recoveryDb, backupId, leaseExpiresAt);
+      const updatedRuntime = await getCpolyRecoveryRuntime(env);
       return recoveryJson({
         ok: true,
-        recovery: buildRecoveryStatusPayload(runtime)
+        recovery: buildRecoveryStatusPayload(updatedRuntime)
       });
     }
     throw new RecoveryRouteError(
@@ -1602,7 +1615,6 @@ async function beginRecovery(rawBody, env) {
       409
     );
   }
-  const now = Date.now();
   const targetGeneration = runtime.readyGeneration + 1;
   const recoveryId = crypto.randomUUID();
   const leaseExpiresAt = now + recoveryLeaseMs(env);

@@ -68,7 +68,8 @@ class D1TestDatabase {
       "migrations/0007_cpoly_recovery_state.sql",
       "migrations/0008_cpoly_backup_metadata_hash.sql",
       "migrations/0009_cpoly_backup_kv_lane.sql",
-      "migrations/0010_repository_task_catalog.sql"
+      "migrations/0010_repository_task_catalog.sql",
+      "migrations/0011_portal_issue_reports.sql"
     ]) {
       this.database.exec(readFileSync(path, "utf8"));
     }
@@ -294,7 +295,10 @@ test("operational pilot test imports without occupying consensus roles", async (
       "A",
       "/api/tasks"
     );
-    assert.equal(standardTasks.tasks.length, 0);
+    assert.equal(standardTasks.tasks.length, 1);
+    assert.equal(standardTasks.tasks[0].lane, "operational-test");
+    assert.equal(standardTasks.tasks[0].baseline, true);
+    assert.equal(standardTasks.tasks[0].status, "claimed");
     const operationalTasks = await accountJson(
       fixture,
       "A",
@@ -431,6 +435,57 @@ test("operational pilot test imports without occupying consensus roles", async (
       "SELECT role, status FROM task_participations"
     ).all();
     assert.equal(participations.length, 0);
+  } finally {
+    fixture.restoreFetch();
+  }
+});
+
+test("default task inbox pins the operational baseline before standard work", async () => {
+  const fixture = await createFixture("baseline-order");
+  try {
+    const values = await independentArtifacts();
+    const standardPacket = structuredClone(values.packet);
+    standardPacket.taskId = "msa-standard-followup";
+    standardPacket.packetId = "msa-standard-followup-v1";
+    standardPacket.holdoutId = "standard-followup-holdout";
+    standardPacket.dataVersion = "standard-followup-v1";
+    standardPacket.pilotOnly = false;
+    standardPacket.developerVisible = false;
+
+    await registerRepositoryTask(
+      fixture,
+      standardPacket,
+      "standard",
+      "A"
+    );
+    await registerRepositoryTask(
+      fixture,
+      values.packet,
+      "operational-test",
+      "A"
+    );
+
+    const inbox = await accountJson(fixture, "A", "/api/tasks");
+    assert.equal(inbox.tasks.length, 2);
+    assert.deepEqual(
+      inbox.tasks.map(task => ({
+        packetId: task.packetId,
+        lane: task.lane,
+        baseline: task.baseline
+      })),
+      [
+        {
+          packetId: values.packet.packetId,
+          lane: "operational-test",
+          baseline: true
+        },
+        {
+          packetId: standardPacket.packetId,
+          lane: "standard",
+          baseline: false
+        }
+      ]
+    );
   } finally {
     fixture.restoreFetch();
   }
@@ -1071,6 +1126,20 @@ test("identity erasure removes contact linkage after retention", async () => {
       Date.now(),
       Date.now()
     );
+    const reportId = crypto.randomUUID();
+    fixture.db.database.prepare(
+      `INSERT INTO portal_issue_reports
+        (id, user_id, category, summary, payload_json, content_sha256,
+         status, attempts, created_at, updated_at)
+       VALUES (?, ?, 'display', ?, '{}', ?, 'pending', 0, ?, ?)`
+    ).run(
+      reportId,
+      account.userId,
+      "خلل في عرض صفحة التحكيم على الجهاز",
+      "b".repeat(64),
+      Date.now(),
+      Date.now()
+    );
     const response = await worker.fetch(
       new Request(`${origin}/api/account/privacy/erasure`, {
         method: "POST",
@@ -1139,6 +1208,12 @@ test("identity erasure removes contact linkage after retention", async () => {
           WHERE user_id = ?`
       ).get(account.userId).count,
       0
+    );
+    assert.equal(
+      fixture.db.database.prepare(
+        "SELECT user_id FROM portal_issue_reports WHERE id = ?"
+      ).get(reportId).user_id,
+      null
     );
     const erasedAssignment = fixture.db.database.prepare(
       `SELECT email_hash, email_ciphertext, user_id

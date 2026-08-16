@@ -21,8 +21,11 @@ const outputPath = resolve(releaseDirectory, `${releaseId}.json`);
 const repositoryFiles = [
   ".gitignore",
   ".github/CODEOWNERS",
+  ".github/ISSUE_TEMPLATE/config.yml",
+  ".github/ISSUE_TEMPLATE/portal-reviewer-report.yml",
   ".github/workflows/import-msa-adjudication.yml",
   ".github/workflows/msa-adjudication-portal-security.yml",
+  ".github/workflows/publish-portal-issue-reports.yml",
   ".github/workflows/sync-msa-adjudication-tasks.yml",
   "EVALUATION-NOTICE.md",
   "README.md",
@@ -91,6 +94,7 @@ const manifest = {
     "This is an ordinary-software portal release, not a CNS model release.",
     "Human submissions remain untrusted until the repository importer and review pass.",
     "Operational tests are assisted, do not occupy consensus roles, and cannot establish readiness.",
+    "Portal defect Issues contain sanitized technical reports only; account linkage, profiles, drafts, and linguistic decisions are excluded.",
     "Repository task manifests contain blind packets only; reviewer identities and completed local exports are excluded.",
     "Pilot submissions do not establish unrestricted MSA parser readiness."
   ],

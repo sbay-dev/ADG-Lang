@@ -1,4 +1,7 @@
 # Human-evidence task manifests activate reviewer work in production.
 /human-evidence/tasks/ @sultanAalyami
+/.github/ISSUE_TEMPLATE/ @sultanAalyami
+/.github/workflows/publish-portal-issue-reports.yml @sultanAalyami
 /.github/workflows/sync-msa-adjudication-tasks.yml @sultanAalyami
 /tools/msa-adjudication-workbench/scripts/sync-repository-tasks.mjs @sultanAalyami
+/tools/msa-adjudication-workbench/scripts/publish-portal-issue-reports.mjs @sultanAalyami

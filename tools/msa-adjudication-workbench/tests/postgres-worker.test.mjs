@@ -230,6 +230,56 @@ test("recovery begin/status/complete gates dynamic traffic until PostgreSQL repl
       assert.equal(beginPayload.recovery.restoreBackupId, backupId);
       assert.equal(beginPayload.recovery.targetGeneration, 2);
 
+      recoveryDb.database.prepare(
+        `UPDATE cpoly_recovery_runtime
+            SET restore_lease_expires_at = 0,
+                last_error = 'expired lease probe'
+          WHERE slot = 'global'`
+      ).run();
+      recoveryDb.database.prepare(
+        `UPDATE cpoly_backup_sets
+            SET restore_lease_expires_at = 0
+          WHERE id = ?`
+      ).run(backupId);
+      const resumed = await worker.fetch(
+        await signedRecoveryRequest("/api/internal/cpoly-recovery/begin", {
+          method: "POST",
+          body: jsonBytes({
+            schema: "adg-cpoly-recovery-begin-v1",
+            backupId,
+            snapshotGeneration: 1,
+            snapshotWatermark: 1
+          }),
+          secret: env.CPOLY_BACKUP_HMAC_KEY
+        }),
+        env
+      );
+      assert.equal(resumed.status, 200);
+      const resumedPayload = await resumed.json();
+      assert.equal(
+        resumedPayload.recovery.recoveryId,
+        beginPayload.recovery.recoveryId
+      );
+      assert.ok(
+        Date.parse(resumedPayload.recovery.restoreLeaseExpiresAtUtc) > Date.now()
+      );
+      const renewedRuntime = recoveryDb.database.prepare(
+        `SELECT restore_lease_expires_at, last_error
+           FROM cpoly_recovery_runtime
+          WHERE slot = 'global'`
+      ).get();
+      const renewedBackup = recoveryDb.database.prepare(
+        `SELECT restore_lease_expires_at
+           FROM cpoly_backup_sets
+          WHERE id = ?`
+      ).get(backupId);
+      assert.ok(Number(renewedRuntime.restore_lease_expires_at) > Date.now());
+      assert.equal(renewedRuntime.last_error, null);
+      assert.equal(
+        Number(renewedBackup.restore_lease_expires_at),
+        Number(renewedRuntime.restore_lease_expires_at)
+      );
+
       const gatedConfig = await worker.fetch(
         new Request(`${origin}/api/config`, { method: "GET" }),
         env

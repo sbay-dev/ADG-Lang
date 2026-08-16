@@ -59,7 +59,7 @@ mkfifo "$snapshot_fifo"
       'BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY;' \
       'SELECT pg_export_snapshot();' \
       'SELECT current_generation FROM adjudication.cpoly_runtime_state WHERE singleton = TRUE;' \
-      'SELECT COALESCE(MAX(receipt_seq), 0) FROM adjudication.cpoly_write_receipts WHERE generation = (SELECT current_generation FROM adjudication.cpoly_runtime_state WHERE singleton = TRUE);'
+      'SELECT COALESCE(MAX(receipt_seq), 0) FROM adjudication.cpoly_write_receipts;'
     cat "$snapshot_fifo"
   } | psql \
       --set=ON_ERROR_STOP=1 \
