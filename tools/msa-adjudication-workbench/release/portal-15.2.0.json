@@ -14,7 +14,7 @@
   "integrity": {
     "algorithm": "SHA-256 canonical file-list root",
     "fileCount": 194,
-    "releaseRoot": "7772d92699956673ec98ec2f2a67c9cd36ef581c22685f1d96541f029de2f43a"
+    "releaseRoot": "d84a5294206a14b8e8aa6c376040b098effed649d74f6f8e9d83f6e455baef1a"
   },
   "exclusions": [
     "release/ (self-referential generated output)",
@@ -143,8 +143,8 @@
     },
     {
       "path": "tools/msa-adjudication-workbench/DEPLOYMENT.md",
-      "bytes": 18933,
-      "sha256": "de9d13c23d7688ceadbf138ae3ed3c204a40f44920bdbe1149a592b2662f6195"
+      "bytes": 19161,
+      "sha256": "75e33dfb1efdf5999f434b9c5c8f4a763578b3ecd91298ef8fb1c4b81baa9770"
     },
     {
       "path": "tools/msa-adjudication-workbench/PRIVACY.md",
@@ -193,8 +193,8 @@
     },
     {
       "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/cloudflare/bridge/server.mjs",
-      "bytes": 19101,
-      "sha256": "16e6f1eda921d1c6e265deec34e73ba5628ca5be8be9f1c126911ce21beede15"
+      "bytes": 18845,
+      "sha256": "90b54d355de13231a8133ac6a4ef602cc0d628e1d42c6d81880e439b0484de93"
     },
     {
       "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/cloudflare/contract/database-bridge.v1.json",
@@ -243,8 +243,8 @@
     },
     {
       "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/cloudflare/runtime/scripts/create-kv-binary-backup.sh",
-      "bytes": 5286,
-      "sha256": "212410fb66a9f9f6333904b2e0faf3e039a5c2e51ad2166d19df326060b9fc8d"
+      "bytes": 5178,
+      "sha256": "461ef3967efceb2a982d57bfc94fbf04be098cfee0b464bf1f3a73a29ff24074"
     },
     {
       "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/cloudflare/runtime/scripts/d1_backup_client.py",
@@ -253,8 +253,8 @@
     },
     {
       "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/cloudflare/runtime/scripts/mark-recovery-ready.sh",
-      "bytes": 3282,
-      "sha256": "3b7b08db4bd945c700bbd4fe8588a17905f3c60aa3617b322c565e6c37d993e4"
+      "bytes": 3211,
+      "sha256": "5dda9253522e82ac6e005c2564da1431dd793d105c0f32f925ca6b483a7ec346"
     },
     {
       "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/cloudflare/runtime/scripts/restore-binary-backup.sh",
@@ -353,8 +353,8 @@
     },
     {
       "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/integrity.sha256",
-      "bytes": 9981,
-      "sha256": "cf33c624eee85561b6fa5aae2a3320e93ca019fca66c806e07fea2a445ab406c"
+      "bytes": 10225,
+      "sha256": "fa38e4bda253fa03bcc4905cd0d8c567ae002635783d4d6eebb23f4d057ca8b2"
     },
     {
       "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/kubernetes/CPOLY-WORKBENCH-PATH.md",
@@ -528,13 +528,13 @@
     },
     {
       "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/scripts/create-encrypted-backup.sh",
-      "bytes": 11139,
-      "sha256": "c2bc4eb1566c41850755fd9acb284d9b779a82848450c01b41d0e06c92a9f618"
+      "bytes": 11031,
+      "sha256": "6c5a8548e2ad10f1cdf839518fd8e3be024952ddcea3ad77c70749d2305e887c"
     },
     {
       "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/scripts/create-kv-binary-backup.sh",
-      "bytes": 5286,
-      "sha256": "212410fb66a9f9f6333904b2e0faf3e039a5c2e51ad2166d19df326060b9fc8d"
+      "bytes": 5178,
+      "sha256": "461ef3967efceb2a982d57bfc94fbf04be098cfee0b464bf1f3a73a29ff24074"
     },
     {
       "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/scripts/d1_backup_client.py",
@@ -553,8 +553,8 @@
     },
     {
       "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/scripts/mark-recovery-ready.sh",
-      "bytes": 3282,
-      "sha256": "3b7b08db4bd945c700bbd4fe8588a17905f3c60aa3617b322c565e6c37d993e4"
+      "bytes": 3211,
+      "sha256": "5dda9253522e82ac6e005c2564da1431dd793d105c0f32f925ca6b483a7ec346"
     },
     {
       "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/scripts/render-hba.sh",
@@ -908,8 +908,8 @@
     },
     {
       "path": "tools/msa-adjudication-workbench/tests/cpoly-postgres-container.test.mjs",
-      "bytes": 17045,
-      "sha256": "351792b21c9cf1cb166af464bd00de627961002b190f308f73b8313d15398570"
+      "bytes": 18326,
+      "sha256": "4b53a35392a56a631fcdcf49108e79adbc44b91ff5f3f927a18d754ef7893700"
     },
     {
       "path": "tools/msa-adjudication-workbench/tests/cpoly-recovery-python-client.test.mjs",

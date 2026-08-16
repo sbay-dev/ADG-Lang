@@ -49,12 +49,12 @@ postgres_coverage=$(
     --field-separator='|' <<'SQL'
 SET ROLE adg_owner;
 SELECT state.current_generation,
-       COALESCE(MAX(receipt.receipt_seq), 0)
+       (
+         SELECT COALESCE(MAX(receipt_seq), 0)
+           FROM adjudication.cpoly_write_receipts
+       )
 FROM adjudication.cpoly_runtime_state AS state
-LEFT JOIN adjudication.cpoly_write_receipts AS receipt
-  ON receipt.generation = state.current_generation
-WHERE state.singleton = TRUE
-GROUP BY state.current_generation;
+WHERE state.singleton = TRUE;
 SQL
 )
 postgres_generation=${postgres_coverage%%|*}

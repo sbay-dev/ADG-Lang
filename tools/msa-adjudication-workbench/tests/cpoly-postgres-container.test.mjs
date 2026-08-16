@@ -248,6 +248,40 @@ test("container adapter preserves D1 shapes, private auth, and receipt forwardin
   }
 });
 
+test("container recovery carries the cumulative receipt watermark across generations", () => {
+  const bridge = readFileSync(
+    "infrastructure/cpoly-postgres/cloudflare/bridge/server.mjs",
+    "utf8"
+  );
+  assert.match(bridge, /async function globalReceiptWatermark/u);
+  assert.doesNotMatch(bridge, /WHERE generation = \$\{generation\}/u);
+  assert.doesNotMatch(bridge, /ON receipt\.generation = runtime\.current_generation/u);
+
+  for (const path of [
+    "infrastructure/cpoly-postgres/scripts/create-kv-binary-backup.sh",
+    "infrastructure/cpoly-postgres/scripts/create-encrypted-backup.sh",
+    "infrastructure/cpoly-postgres/cloudflare/runtime/scripts/create-kv-binary-backup.sh"
+  ]) {
+    const source = readFileSync(path, "utf8");
+    assert.match(
+      source,
+      /SELECT COALESCE\(MAX\(receipt_seq\), 0\) FROM adjudication\.cpoly_write_receipts;/
+    );
+    assert.doesNotMatch(source, /WHERE generation =/u);
+  }
+
+  for (const path of [
+    "infrastructure/cpoly-postgres/scripts/mark-recovery-ready.sh",
+    "infrastructure/cpoly-postgres/cloudflare/runtime/scripts/mark-recovery-ready.sh"
+  ]) {
+    const source = readFileSync(path, "utf8");
+    assert.doesNotMatch(
+      source,
+      /ON receipt\.generation = state\.current_generation/u
+    );
+  }
+});
+
 test("runtime env prefers container binding before Hyperdrive and keeps fallbacks", async () => {
   const recoveryDb = new D1RecoveryDatabase();
   const containerEnv = createRuntimeEnv({

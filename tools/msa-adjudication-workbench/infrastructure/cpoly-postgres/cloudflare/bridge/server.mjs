@@ -300,7 +300,7 @@ async function promoteGeneration(body) {
   }
   return await sql.begin(async transaction => {
     const current = await currentGeneration(transaction, true);
-    const watermark = await receiptForGeneration(transaction, current);
+    const watermark = await globalReceiptWatermark(transaction);
     if (current !== target) {
       if (current !== Number(coverage.generation)
           || watermark < Number(coverage.watermark)) {
@@ -318,7 +318,7 @@ async function promoteGeneration(body) {
     }
     return {
       generation: target,
-      receiptSeq: await receiptForGeneration(transaction, target)
+      receiptSeq: await globalReceiptWatermark(transaction)
     };
   });
 }
@@ -328,7 +328,7 @@ async function receiptWatermark() {
     const generation = await currentGeneration(transaction, false);
     return {
       generation,
-      receiptSeq: await receiptForGeneration(transaction, generation)
+      receiptSeq: await globalReceiptWatermark(transaction)
     };
   });
 }
@@ -352,11 +352,10 @@ async function currentGeneration(transaction, lock) {
   return generation;
 }
 
-async function receiptForGeneration(transaction, generation) {
+async function globalReceiptWatermark(transaction) {
   const rows = await transaction`
     SELECT COALESCE(MAX(receipt_seq), 0) AS receipt_seq
       FROM adjudication.cpoly_write_receipts
-     WHERE generation = ${generation}
   `;
   return Number(rows[0]?.receipt_seq || 0);
 }
@@ -399,15 +398,14 @@ async function readRecoveryState() {
   const rows = await sql`
     SELECT gate.ready, gate.worker_status, gate.snapshot_generation,
            gate.postgres_receipt_watermark, runtime.current_generation,
-           COALESCE(MAX(receipt.receipt_seq), 0) AS receipt_seq
+           (
+             SELECT COALESCE(MAX(receipt_seq), 0)
+               FROM adjudication.cpoly_write_receipts
+           ) AS receipt_seq
       FROM adjudication.cpoly_recovery_state AS gate
       JOIN adjudication.cpoly_runtime_state AS runtime
         ON runtime.singleton = gate.singleton
-      LEFT JOIN adjudication.cpoly_write_receipts AS receipt
-        ON receipt.generation = runtime.current_generation
      WHERE gate.singleton = TRUE
-     GROUP BY gate.ready, gate.worker_status, gate.snapshot_generation,
-              gate.postgres_receipt_watermark, runtime.current_generation
   `;
   const row = rows[0];
   return {

@@ -125,6 +125,9 @@ container provider and any Hyperdrive rollback lane:
 - mutating PostgreSQL `run()` and `batch()` calls are AES-GCM journaled into
   D1 first with `CPOLY_BACKUP_MASTER_KEY` and replayed under
   `postgres\0001_portal_v15.sql`'s `cpoly_write_receipts` table;
+- `receipt_seq` is one cumulative PostgreSQL watermark across all recovery
+  generations. Backup, promotion, provider status, and readiness checks must
+  preserve that global maximum when a new generation has no new writes yet;
 - scheduled cron maintenance replays pending or ambiguous journal rows, prunes
   expired signed nonces, and removes old encrypted journal rows only after the
   applicable recovery window; and
