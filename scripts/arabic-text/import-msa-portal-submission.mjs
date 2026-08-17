@@ -156,7 +156,7 @@ export function validateTaskStateEnvelope(envelope) {
   assert.match(envelope.eventId, CONSENSUS_ID_PATTERN);
   assert.equal(envelope.eventId, envelope.nonce);
   assert.equal(
-    containsForbiddenPublicKeys(envelope),
+    containsForbiddenTaskStateKeys(envelope),
     false,
     "PII found in task-state envelope."
   );
@@ -489,6 +489,59 @@ function containsForbiddenPublicKeys(value) {
   return Object.entries(value).some(([key, child]) =>
     isForbiddenPublicKey(key) || containsForbiddenPublicKeys(child)
   );
+}
+
+function containsForbiddenTaskStateKeys(envelope) {
+  const legacyTaskIdentity = envelope?.evidence?.identity;
+  if (legacyTaskIdentity === undefined) {
+    return containsForbiddenPublicKeys(envelope);
+  }
+  if (!isSafeLegacyTaskIdentity(
+    legacyTaskIdentity,
+    envelope
+  )) {
+    return true;
+  }
+  const evidence = { ...envelope.evidence };
+  delete evidence.identity;
+  return containsForbiddenPublicKeys({
+    ...envelope,
+    evidence
+  });
+}
+
+function isSafeLegacyTaskIdentity(value, envelope) {
+  if (envelope?.eventType !== "task-opened"
+      || !value
+      || typeof value !== "object"
+      || Array.isArray(value)) {
+    return false;
+  }
+  const expectedKeys = [
+    "dataVersion",
+    "guidelineVersion",
+    "holdoutId",
+    "id",
+    "packetId",
+    "packetMerkleRoot",
+    "protocolVersion",
+    "taskId",
+    "taskVersion"
+  ];
+  const actualKeys = Object.keys(value).sort();
+  if (actualKeys.length !== expectedKeys.length
+      || actualKeys.some((key, index) => key !== expectedKeys[index])) {
+    return false;
+  }
+  return value.id === envelope.taskVersionId
+    && value.taskId === envelope.taskId
+    && value.taskVersion === envelope.taskVersion
+    && value.packetId === envelope.packetId
+    && value.holdoutId === envelope.holdoutId
+    && value.packetMerkleRoot === envelope.packetMerkleRoot
+    && value.guidelineVersion === envelope.guidelineVersion
+    && value.dataVersion === envelope.dataVersion
+    && value.protocolVersion === envelope.protocolVersion;
 }
 
 function isForbiddenPublicKey(key) {

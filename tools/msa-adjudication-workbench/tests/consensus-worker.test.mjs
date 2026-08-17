@@ -291,6 +291,30 @@ test("operational pilot test imports without occupying consensus roles", async (
       "A",
       false
     );
+    const openedEvidence = JSON.parse(
+      fixture.db.database.prepare(
+        `SELECT evidence_json
+           FROM consensus_events
+          WHERE task_version_id = ? AND event_type = 'task-opened'`
+      ).get(
+        `${values.packet.taskId}:v${values.packet.taskVersion}`
+      ).evidence_json
+    );
+    assert.equal(openedEvidence.identity, undefined);
+    assert.deepEqual(
+      openedEvidence.taskBinding,
+      {
+        id: `${values.packet.taskId}:v${values.packet.taskVersion}`,
+        taskId: values.packet.taskId,
+        taskVersion: values.packet.taskVersion,
+        packetId: values.packet.packetId,
+        holdoutId: values.packet.holdoutId,
+        packetMerkleRoot: await computePacketMerkleRoot(values.packet),
+        guidelineVersion: values.packet.guidelineVersion,
+        dataVersion: values.packet.dataVersion,
+        protocolVersion: values.packet.protocolVersion
+      }
+    );
     const standardTasks = await accountJson(
       fixture,
       "A",

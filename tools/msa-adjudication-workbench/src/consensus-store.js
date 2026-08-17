@@ -58,7 +58,7 @@ export async function prepareConsensusTaskRegistration(
   const initialEventId = `task-open:${identity.id}`;
   const evidence = {
     taskVersionId: identity.id,
-    identity,
+    taskBinding: identity,
     metricPolicy: packet.metricPolicy
   };
   const eventHash = await consensusEventHash({

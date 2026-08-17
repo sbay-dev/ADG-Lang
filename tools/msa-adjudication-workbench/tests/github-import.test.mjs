@@ -354,6 +354,68 @@ test("task-state records use Windows-safe deterministic paths", async () => {
   assert.match(markdown, /secondary-ratification-approved/);
 });
 
+test("legacy task identity binding is accepted only in its public shape", async () => {
+  const envelope = {
+    schema: "adg-msa-task-state-v1",
+    nonce: "77777777-7777-4777-8777-777777777778",
+    eventId: "77777777-7777-4777-8777-777777777778",
+    taskVersionId: "msa-adjudication-pilot:v1",
+    taskId: "msa-adjudication-pilot",
+    taskVersion: 1,
+    packetId: "msa-adjudication-pilot-v1",
+    holdoutId: "pilot-authored-msa-not-final",
+    packetMerkleRoot: "a".repeat(64),
+    guidelineVersion: "msa-human-guidelines-v1",
+    dataVersion: "pilot-authored-msa-v1",
+    protocolVersion: "adg-consensus-policy-v1",
+    state: "open",
+    stateVersion: 0,
+    round: 1,
+    roundId: "msa-adjudication-pilot:v1:r1",
+    eventType: "task-opened",
+    fromState: "draft",
+    toState: "open",
+    reasonCode: "task-version-registered",
+    evidence: {
+      taskVersionId: "msa-adjudication-pilot:v1",
+      identity: {
+        id: "msa-adjudication-pilot:v1",
+        taskId: "msa-adjudication-pilot",
+        taskVersion: 1,
+        packetId: "msa-adjudication-pilot-v1",
+        holdoutId: "pilot-authored-msa-not-final",
+        packetMerkleRoot: "a".repeat(64),
+        guidelineVersion: "msa-human-guidelines-v1",
+        dataVersion: "pilot-authored-msa-v1",
+        protocolVersion: "adg-consensus-policy-v1"
+      },
+      metricPolicy: {
+        schema: "adg-iaa-policy-v1"
+      }
+    },
+    priorStateHash: null,
+    eventHash: "d".repeat(64),
+    activeFinalReceiptId: null,
+    repositoryStatus: "not-sent",
+    createdAtUtc: "2026-08-14T12:00:00.000Z",
+    transitionedAtUtc: "2026-08-14T12:00:00.000Z",
+    claimBoundaries: [
+      "This is a signed workflow-state event, not linguistic gold.",
+      "Participant identity and contact data are excluded."
+    ]
+  };
+  await assert.doesNotReject(
+    validateSignedEnvelope(signEnvelope(envelope, hmacKey), hmacKey)
+  );
+
+  const unsafe = structuredClone(envelope);
+  unsafe.evidence.identity.email = "reviewer@example.test";
+  await assert.rejects(
+    validateSignedEnvelope(signEnvelope(unsafe, hmacKey), hmacKey),
+    /PII found in task-state envelope/
+  );
+});
+
 test("merged-receipt workflow requires trusted main-branch provenance", async () => {
   const workflow = await readFile(new URL(
     ".github/workflows/import-msa-adjudication.yml",

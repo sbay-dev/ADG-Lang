@@ -82,7 +82,7 @@ const IRAB = [
 ];
 
 const PUBLIC_PORTAL_URL = "https://adg.sbay.sa/";
-const PORTAL_VERSION = "15.2.1";
+const PORTAL_VERSION = "15.2.2";
 const BASELINE_PILOT_PACKET_ID = "msa-adjudication-pilot-v1";
 const OPERATIONAL_TEST_REQUESTED =
   new URL(location.href).searchParams.get("mode") === "operational-test";
