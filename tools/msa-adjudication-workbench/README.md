@@ -124,6 +124,10 @@ organization member has authoritative Global Administrator proof.
 - `approved` is provisional. `published` requires both expiry of the
   14-day appeal window and an HMAC-authenticated receipt proving that the
   bound task-state evidence was merged into the repository.
+- Public task-state records contain versioned task bindings only. The importer
+  accepts the historical `evidence.identity` name solely when its exact field
+  set and values match that public binding; any extra identity/contact field
+  remains rejected. New records use `taskBinding`.
 - Repository imports return separate signed receipts for submissions and
   comments so the portal can display their actual GitHub acceptance state.
 - Free-text notes, rationales, and comments are rejected before queueing when
@@ -386,7 +390,7 @@ provider image plus any chosen Hyperdrive rollback binding.
 
 ## Release integrity
 
-`release\portal-15.2.1.json` binds the sanitized portal, importer, workflows,
+`release\portal-15.2.2.json` binds the sanitized portal, importer, workflows,
 tests, and documentation with canonical LF-normalized SHA-256 records. Regenerate
 it deterministically from a clean clone with:
 
