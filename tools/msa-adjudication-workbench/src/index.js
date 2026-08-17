@@ -3846,6 +3846,12 @@ async function receiveRepositoryReceipt(request, env) {
       signature,
       env
     );
+  } else if (envelope.schema === "adg-msa-task-state-receipt-v1") {
+    validateTaskStateRepositoryReceiptEnvelope(
+      envelope,
+      signature,
+      env
+    );
   } else {
     throw new PublicError("نوع إيصال المستودع غير مدعوم.", 400);
   }
@@ -3862,6 +3868,13 @@ async function receiveRepositoryReceipt(request, env) {
   }
   if (envelope.schema === "adg-msa-evidence-receipt-v1") {
     return acceptEvidenceRepositoryReceipt(
+      env,
+      envelope,
+      signature
+    );
+  }
+  if (envelope.schema === "adg-msa-task-state-receipt-v1") {
+    return acceptTaskStateRepositoryReceipt(
       env,
       envelope,
       signature
@@ -4663,11 +4676,15 @@ async function selectClaimableRepositoryEvidenceRows(db, now, limit) {
          ON eo.kind = err.kind
         AND err.related_id = eo.related_id
         AND eo.kind IN ('submission', 'comment')
+       LEFT JOIN task_state_repository_receipts tsrr
+         ON eo.kind = 'task-state'
+        AND tsrr.event_id = eo.related_id
        LEFT JOIN repository_receipts rr
          ON eo.kind = 'task-state' AND rr.nonce = eo.related_id
       WHERE eo.kind IN ('submission', 'comment', 'task-state')
         AND err.id IS NULL
-        AND rr.id IS NULL
+        AND (eo.kind <> 'task-state'
+          OR (tsrr.id IS NULL AND rr.id IS NULL))
         AND (
           eo.status IN ('pending', 'sent')
           OR (eo.status = 'sending' AND eo.next_attempt_at <= ?)
@@ -4698,13 +4715,17 @@ async function selectClaimedRepositoryEvidenceRows(db, claimMarker, limit) {
          ON eo.kind = err.kind
         AND err.related_id = eo.related_id
         AND eo.kind IN ('submission', 'comment')
+       LEFT JOIN task_state_repository_receipts tsrr
+         ON eo.kind = 'task-state'
+        AND tsrr.event_id = eo.related_id
        LEFT JOIN repository_receipts rr
          ON eo.kind = 'task-state' AND rr.nonce = eo.related_id
       WHERE eo.kind IN ('submission', 'comment', 'task-state')
         AND eo.status = 'sending'
         AND eo.last_error = ?
         AND err.id IS NULL
-        AND rr.id IS NULL
+        AND (eo.kind <> 'task-state'
+          OR (tsrr.id IS NULL AND rr.id IS NULL))
         AND (eo.kind <> 'submission' OR s.receipt_id IS NOT NULL)
         AND (eo.kind <> 'submission' OR s.repository_status <> 'imported')
         AND (eo.kind <> 'comment' OR dc.comment_id IS NOT NULL)
@@ -4794,6 +4815,173 @@ async function acceptEvidenceRepositoryReceipt(env, envelope, signature) {
     receiptId: envelope.receiptId,
     evidenceKind: envelope.evidenceKind,
     relatedId: envelope.relatedId
+  }, 202);
+}
+
+function validateTaskStateRepositoryReceiptEnvelope(
+  envelope,
+  signature,
+  env
+) {
+  const acceptedAt = Date.parse(envelope.acceptedAtUtc);
+  const now = Date.now();
+  if (!isUuid(envelope.receiptId)
+      || typeof envelope.taskVersionId !== "string"
+      || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/
+        .test(envelope.taskVersionId)
+      || typeof envelope.eventId !== "string"
+      || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/.test(envelope.eventId)
+      || typeof envelope.toState !== "string"
+      || !/^[a-z][a-z-]{1,31}$/.test(envelope.toState)
+      || envelope.toState === "approved"
+      || !Number.isSafeInteger(envelope.stateVersion)
+      || envelope.stateVersion < 0
+      || envelope.repository
+        !== (env.GITHUB_REPOSITORY || "sbay-dev/ADG-Lang")
+      || !Number.isSafeInteger(envelope.prNumber)
+      || envelope.prNumber < 1
+      || (envelope.issueNumber !== null
+        && envelope.issueNumber !== undefined
+        && (!Number.isSafeInteger(envelope.issueNumber)
+          || envelope.issueNumber < 1))
+      || !/^[a-f0-9]{40}$/.test(envelope.prMergeSha || "")
+      || !/^[a-f0-9]{40}$/.test(envelope.importerCommitSha || "")
+      || !/^[a-f0-9]{64}$/.test(signature || "")
+      || !Number.isFinite(acceptedAt)
+      || Math.abs(now - acceptedAt) > 24 * 60 * 60 * 1000) {
+    throw new PublicError("صيغة إيصال حالة المهمة غير صالحة.", 400);
+  }
+}
+
+async function acceptTaskStateRepositoryReceipt(
+  env,
+  envelope,
+  signature
+) {
+  const binding = await env.DB.prepare(
+    `SELECT eo.id AS outbox_id, eo.public_payload_json,
+            ce.to_state
+       FROM evidence_outbox eo
+       JOIN consensus_events ce
+         ON ce.id = eo.related_id
+        AND ce.task_version_id = eo.task_version_id
+      WHERE eo.kind = 'task-state'
+        AND eo.task_version_id = ?
+        AND eo.related_id = ?`
+  ).bind(
+    envelope.taskVersionId,
+    envelope.eventId
+  ).first();
+  if (!binding) {
+    throw new PublicError(
+      "حدث حالة المهمة المشار إليه غير موجود في المنصة.",
+      409
+    );
+  }
+  let signedState;
+  try {
+    signedState = JSON.parse(binding.public_payload_json);
+  } catch {
+    throw new PublicError(
+      "سجل حالة المهمة المخزن غير صالح.",
+      409
+    );
+  }
+  if (signedState?.schema !== "adg-msa-task-state-v1"
+      || signedState.eventId !== envelope.eventId
+      || signedState.nonce !== envelope.eventId
+      || signedState.taskVersionId !== envelope.taskVersionId
+      || signedState.toState !== envelope.toState
+      || Number(signedState.stateVersion) !== envelope.stateVersion
+      || binding.to_state !== envelope.toState) {
+    throw new PublicError(
+      "إيصال المستودع لا يطابق حدث حالة المهمة.",
+      409
+    );
+  }
+
+  const existing = await env.DB.prepare(
+    `SELECT id, to_state, state_version, repository, pr_number,
+            pr_merge_sha, importer_commit_sha, issue_number
+       FROM task_state_repository_receipts
+      WHERE task_version_id = ? AND event_id = ?`
+  ).bind(
+    envelope.taskVersionId,
+    envelope.eventId
+  ).first();
+  if (existing
+      && (existing.to_state !== envelope.toState
+        || Number(existing.state_version) !== envelope.stateVersion
+        || existing.repository !== envelope.repository
+        || Number(existing.pr_number) !== envelope.prNumber
+        || existing.pr_merge_sha !== envelope.prMergeSha
+        || existing.importer_commit_sha !== envelope.importerCommitSha
+        || (existing.issue_number === null
+          ? null
+          : Number(existing.issue_number))
+          !== (envelope.issueNumber ?? null))) {
+    throw new PublicError(
+      "إيصال حالة المهمة يتعارض مع إيصال سابق.",
+      409
+    );
+  }
+
+  const acceptedAt = Date.parse(envelope.acceptedAtUtc);
+  if (!existing) {
+    await env.DB.prepare(
+      `INSERT INTO task_state_repository_receipts
+        (id, task_version_id, event_id, to_state, state_version,
+         repository, pr_number, pr_merge_sha, importer_commit_sha,
+         issue_number, envelope_json, signature_sha256, accepted_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(
+      envelope.receiptId,
+      envelope.taskVersionId,
+      envelope.eventId,
+      envelope.toState,
+      envelope.stateVersion,
+      envelope.repository,
+      envelope.prNumber,
+      envelope.prMergeSha,
+      envelope.importerCommitSha,
+      envelope.issueNumber ?? null,
+      JSON.stringify(envelope),
+      signature,
+      acceptedAt
+    ).run();
+  }
+  await env.DB.batch([
+    env.DB.prepare(
+      `UPDATE evidence_outbox
+          SET status = 'sent',
+              sent_at = COALESCE(sent_at, ?),
+              last_error = NULL
+        WHERE kind = 'task-state'
+          AND task_version_id = ?
+          AND related_id = ?`
+    ).bind(
+      acceptedAt,
+      envelope.taskVersionId,
+      envelope.eventId
+    ),
+    env.DB.prepare(
+      `UPDATE task_versions
+          SET github_issue_number = COALESCE(?, github_issue_number),
+              updated_at = ?
+        WHERE id = ?`
+    ).bind(
+      envelope.issueNumber ?? null,
+      Date.now(),
+      envelope.taskVersionId
+    )
+  ]);
+  return json({
+    accepted: true,
+    receiptId: existing?.id ?? envelope.receiptId,
+    taskVersionId: envelope.taskVersionId,
+    eventId: envelope.eventId,
+    state: envelope.toState,
+    stateVersion: envelope.stateVersion
   }, 202);
 }
 

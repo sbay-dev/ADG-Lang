@@ -172,6 +172,12 @@
 - تتحقق GitHub Actions من مخطط كل حزمة ومسارها والحقول المحظورة وجذر Merkle،
   ثم ترسل دليل المهام إلى المنصة بغلاف HMAC مؤقت. لا يقبل الخادم تغيير محتوى
   هوية حزمة سبق تثبيتها.
+- يعيد كل حدث حالة غير نهائي دُمج في المستودع إيصال HMAC مستقلًا يوقف إعادة
+  المطالبة به، من دون أن يدّعي النشر. وتبقى حالة `approved` محكومة بإيصال
+  النتيجة النهائي الأشد تقييدًا قبل `accepted` أو `published`.
+- إذا منعت سياسة المنظمة `GITHUB_TOKEN` من فتح طلب السحب، يحتفظ سير العمل
+  بالفرع الداخلي المتحقق منه وينشئ مسألة تشغيلية واحدة برابط المقارنة. ويعاد
+  التحقق من الغلاف الموقّع وحدود الملفات حتى عندما يفتح المشغّل طلب السحب.
 - يثبّت الخادم كذلك العنوان والملخص ونمط الإسناد والمسار والمستودع عند أول
   مزامنة؛ والتغيير اللاحق الوحيد المسموح هو السحب الأحادي الاتجاه، بلا إعادة
   تنشيطٍ صامتة.
@@ -201,7 +207,7 @@ npm run check
 npm test
 ```
 
-تُثبِّت `release/portal-15.2.2.json` سلامةَ الأصول عبر جذر `SHA-256` قانونيٍّ
+تُثبِّت `release/portal-15.2.3.json` سلامةَ الأصول عبر جذر `SHA-256` قانونيٍّ
 مُطبَّعٍ بنهايات أسطر `LF`. يُعاد توليده حتميًّا بالأمر:
 
 ```powershell
@@ -281,6 +287,6 @@ adjudication portal at **https://adg.sbay.sa** (source under
   case, not a final proofreading service.
 - **Reproduce.** From a clean clone, inside `tools/msa-adjudication-workbench`:
   `npm ci`, `npm run check`, `npm test`. Release integrity is bound by
-  `release/portal-15.2.2.json` (canonical LF SHA-256 root), regenerated with
+  `release/portal-15.2.3.json` (canonical LF SHA-256 root), regenerated with
   `npm run release:manifest` and enforced by the GitHub Actions security
   workflow.

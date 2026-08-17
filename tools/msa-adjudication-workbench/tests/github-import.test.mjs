@@ -416,7 +416,7 @@ test("legacy task identity binding is accepted only in its public shape", async 
   );
 });
 
-test("merged-receipt workflow requires trusted main-branch provenance", async () => {
+test("merged-receipt workflow validates internal evidence provenance", async () => {
   const workflow = await readFile(new URL(
     ".github/workflows/import-msa-adjudication.yml",
     repositoryRoot
@@ -426,15 +426,22 @@ test("merged-receipt workflow requires trusted main-branch provenance", async ()
     workflow,
     /pull_request\.head\.repo\.full_name == github\.repository/
   );
-  assert.match(
+  assert.doesNotMatch(
     workflow,
     /pull_request\.user\.login == 'github-actions\[bot\]'/
+  );
+  assert.match(
+    workflow,
+    /startsWith\(github\.event\.pull_request\.head\.ref, 'automation\/msa-adjudication-'\)/
   );
   assert.match(workflow, /Import PR changed files outside the evidence boundary/);
   assert.match(
     workflow,
     /import-msa-portal-submission\.mjs[\s\S]+render-msa-github-evidence\.mjs/
   );
+  assert.match(workflow, /adg-msa-task-state-receipt-v1/);
+  assert.match(workflow, /adg-evidence-import-manual-pr/);
+  assert.match(workflow, /adjudication:import-ops/);
 });
 
 async function createScratchDir(t, name) {

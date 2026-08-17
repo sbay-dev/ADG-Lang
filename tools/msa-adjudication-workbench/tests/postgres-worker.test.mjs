@@ -469,6 +469,18 @@ test("repository receipts and evidence receipts work through Hyperdrive PostgreS
   const approvedEventId = "approved-event-test";
   const finalMerkleRoot = "a".repeat(64);
   const submissionReceiptId = "11111111-1111-4111-8111-111111111111";
+  const openTaskVersionId = "task-version-open-test";
+  const openRoundId = "task-version-open-test:round:1";
+  const openEventId = "task-open:task-version-open-test";
+  const openStatePayload = JSON.stringify({
+    schema: "adg-msa-task-state-v1",
+    nonce: openEventId,
+    eventId: openEventId,
+    taskVersionId: openTaskVersionId,
+    toState: "open",
+    stateVersion: 0,
+    hmacSha256: "f".repeat(64)
+  });
 
   await fixture.sql.unsafe(`
     INSERT INTO users (id, profile_ciphertext, consent_json, created_at, updated_at)
@@ -486,12 +498,20 @@ test("repository receipts and evidence receipts work through Hyperdrive PostgreS
       'guideline-v1', 'data-v1', 'protocol-v1', '{}',
       'approved', 1, 1, '${approvedEventId}', '${finalReceiptId}',
       'pending', ${now}, ${now}, ${now}, ${now - 1000}
+    ), (
+      '${openTaskVersionId}', 'task-open', 1, 'packet-open', 'holdout-open',
+      '${"d".repeat(64)}', 'guideline-v1', 'data-v1', 'protocol-v1', '{}',
+      'open', 0, 1, '${openEventId}', NULL,
+      'not-sent', ${now}, ${now}, NULL, NULL
     );
 
     INSERT INTO consensus_rounds (
       id, task_version_id, round_number, status, opened_at, deadline_at, closed_at
     ) VALUES (
       '${roundId}', '${taskVersionId}', 1, 'closed', ${now - 2000}, ${now - 1000}, ${now - 500}
+    ), (
+      '${openRoundId}', '${openTaskVersionId}', 1, 'open',
+      ${now}, ${now + 86400000}, NULL
     );
 
     INSERT INTO submissions (
@@ -517,6 +537,10 @@ test("repository receipts and evidence receipts work through Hyperdrive PostgreS
       '${approvedEventId}', '${taskVersionId}', '${roundId}', 'result-approved',
       'final-review', 'approved', 'test', '{}', '${"c".repeat(64)}',
       'approved-event-test', ${now}
+    ), (
+      '${openEventId}', '${openTaskVersionId}', '${openRoundId}', 'task-opened',
+      'draft', 'open', 'test', '{}', '${"e".repeat(64)}',
+      '${openEventId}', ${now}
     );
 
     INSERT INTO final_results (
@@ -539,6 +563,11 @@ test("repository receipts and evidence receipts work through Hyperdrive PostgreS
     (
       'outbox-submission', 'submission', '${taskVersionId}', '${submissionReceiptId}',
       '${submissionReceiptId}.json', '{"schema":"public"}', 'submission-key',
+      'pending', 0, ${now}, ${now}
+    ),
+    (
+      'outbox-task-state-open', 'task-state', '${openTaskVersionId}', '${openEventId}',
+      '${openEventId}.state.json', '${openStatePayload}', 'task-state-open-key',
       'pending', 0, ${now}, ${now}
     );
   `);
@@ -627,6 +656,38 @@ test("repository receipts and evidence receipts work through Hyperdrive PostgreS
       env
     );
     assert.equal(evidenceResponse.status, 202, await evidenceResponse.text());
+    const taskStateReceipt = {
+      schema: "adg-msa-task-state-receipt-v1",
+      receiptId: "44444444-4444-4444-8444-444444444444",
+      taskVersionId: openTaskVersionId,
+      eventId: openEventId,
+      toState: "open",
+      stateVersion: 0,
+      repository,
+      prNumber: 44,
+      prMergeSha: "1".repeat(40),
+      importerCommitSha: "2".repeat(40),
+      issueNumber: 18,
+      acceptedAtUtc
+    };
+    const taskStateResponse = await worker.fetch(
+      new Request(`${origin}/api/repository/receipts`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          ...taskStateReceipt,
+          hmacSha256: createHmac("sha256", repositoryHmacKey)
+            .update(JSON.stringify(taskStateReceipt))
+            .digest("hex")
+        })
+      }),
+      env
+    );
+    assert.equal(
+      taskStateResponse.status,
+      202,
+      await taskStateResponse.text()
+    );
     const submission = (await fixture.sql`
       SELECT repository_status
         FROM submissions
@@ -643,8 +704,24 @@ test("repository receipts and evidence receipts work through Hyperdrive PostgreS
         FROM evidence_outbox
        WHERE id = 'outbox-submission'
     `)[0];
+    const openTaskStateOutbox = (await fixture.sql`
+      SELECT status
+        FROM evidence_outbox
+       WHERE id = 'outbox-task-state-open'
+    `)[0];
+    const openTaskStateReceipt = (await fixture.sql`
+      SELECT to_state, state_version, pr_number, issue_number
+        FROM task_state_repository_receipts
+       WHERE task_version_id = ${openTaskVersionId}
+         AND event_id = ${openEventId}
+    `)[0];
     assert.equal(taskStateOutbox.status, "sent");
     assert.equal(submissionOutbox.status, "sent");
+    assert.equal(openTaskStateOutbox.status, "sent");
+    assert.equal(openTaskStateReceipt.to_state, "open");
+    assert.equal(openTaskStateReceipt.state_version, 0);
+    assert.equal(Number(openTaskStateReceipt.pr_number), 44);
+    assert.equal(Number(openTaskStateReceipt.issue_number), 18);
   } finally {
     recoveryDb.database.close();
     await fixture.close();

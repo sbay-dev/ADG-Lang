@@ -59,7 +59,8 @@ class D1TestDatabase {
       "migrations/0008_cpoly_backup_metadata_hash.sql",
       "migrations/0009_cpoly_backup_kv_lane.sql",
       "migrations/0010_repository_task_catalog.sql",
-      "migrations/0011_portal_issue_reports.sql"
+      "migrations/0011_portal_issue_reports.sql",
+      "migrations/0012_task_state_repository_receipts.sql"
     ]) {
       this.database.exec(readFileSync(path, "utf8"));
     }
@@ -200,6 +201,120 @@ test("accepted evidence receipts stop claim replay", async () => {
   const value = await secondClaim.json();
   assert.equal(value.claim.count, 0);
   assert.deepEqual(value.items, []);
+});
+
+test("accepted task-state receipts stop non-final state replay", async () => {
+  const db = new D1TestDatabase();
+  const taskVersionId = "task-state-receipt:v1";
+  const eventId = "task-open:task-state-receipt:v1";
+  seedTaskStateEvidence(db, {
+    taskVersionId,
+    eventId,
+    toState: "open",
+    stateVersion: 0
+  });
+
+  const firstClaim = await worker.fetch(
+    signedClaimRequest({
+      nonce: "12121212-1212-4212-8212-121212121212"
+    }),
+    baseEnv(db)
+  );
+  assert.equal(firstClaim.status, 200);
+  assert.equal((await firstClaim.json()).claim.count, 1);
+
+  const receiptResponse = await worker.fetch(
+    signedTaskStateReceiptRequest({
+      receiptId: "13131313-1313-4313-8313-131313131313",
+      taskVersionId,
+      eventId,
+      toState: "open",
+      stateVersion: 0,
+      issueNumber: 18
+    }),
+    baseEnv(db)
+  );
+  assert.equal(receiptResponse.status, 202, await receiptResponse.text());
+  const storedReceipt = db.database.prepare(
+    `SELECT to_state, state_version, pr_number, issue_number
+       FROM task_state_repository_receipts
+      WHERE task_version_id = ? AND event_id = ?`
+  ).get(taskVersionId, eventId);
+  assert.equal(storedReceipt.to_state, "open");
+  assert.equal(storedReceipt.state_version, 0);
+  assert.equal(storedReceipt.pr_number, 17);
+  assert.equal(storedReceipt.issue_number, 18);
+  const storedTask = db.database.prepare(
+    `SELECT repository_status, github_issue_number
+       FROM task_versions
+      WHERE id = ?`
+  ).get(taskVersionId);
+  assert.equal(storedTask.repository_status, "not-sent");
+  assert.equal(storedTask.github_issue_number, 18);
+  assert.equal(
+    db.database.prepare(
+      `SELECT status FROM evidence_outbox
+        WHERE kind = 'task-state' AND related_id = ?`
+    ).get(eventId).status,
+    "sent"
+  );
+
+  const duplicateResponse = await worker.fetch(
+    signedTaskStateReceiptRequest({
+      receiptId: "14141414-1414-4414-8414-141414141414",
+      taskVersionId,
+      eventId,
+      toState: "open",
+      stateVersion: 0,
+      issueNumber: 18
+    }),
+    baseEnv(db)
+  );
+  const duplicateText = await duplicateResponse.text();
+  assert.equal(duplicateResponse.status, 202, duplicateText);
+  assert.equal(
+    JSON.parse(duplicateText).receiptId,
+    "13131313-1313-4313-8313-131313131313"
+  );
+
+  const conflictingResponse = await worker.fetch(
+    signedTaskStateReceiptRequest({
+      receiptId: "15151515-1515-4515-8515-151515151515",
+      taskVersionId,
+      eventId,
+      toState: "open",
+      stateVersion: 0,
+      issueNumber: 19,
+      prMergeSha: "c".repeat(40)
+    }),
+    baseEnv(db)
+  );
+  assert.equal(conflictingResponse.status, 409);
+
+  const secondClaim = await worker.fetch(
+    signedClaimRequest({
+      nonce: "16161616-1616-4616-8616-161616161616"
+    }),
+    baseEnv(db)
+  );
+  assert.equal(secondClaim.status, 200);
+  assert.equal((await secondClaim.json()).claim.count, 0);
+});
+
+test("approved task states require the final-result repository receipt", async () => {
+  const db = new D1TestDatabase();
+  const response = await worker.fetch(
+    signedTaskStateReceiptRequest({
+      receiptId: "17171717-1717-4717-8717-171717171717",
+      taskVersionId: "task-approved:v1",
+      eventId: "task-approved:task-approved:v1",
+      toState: "approved",
+      stateVersion: 4,
+      issueNumber: 18
+    }),
+    baseEnv(db)
+  );
+  assert.equal(response.status, 400);
 });
 
 test("D1 archive mode keeps only encrypted identity envelopes in the outbox archive", async () => {
@@ -688,6 +803,38 @@ function signedEvidenceReceiptRequest({ receiptId, relatedId }) {
   });
 }
 
+function signedTaskStateReceiptRequest({
+  receiptId,
+  taskVersionId,
+  eventId,
+  toState,
+  stateVersion,
+  issueNumber,
+  prMergeSha = "a".repeat(40)
+}) {
+  const envelope = {
+    schema: "adg-msa-task-state-receipt-v1",
+    receiptId,
+    taskVersionId,
+    eventId,
+    toState,
+    stateVersion,
+    repository,
+    prNumber: 17,
+    prMergeSha,
+    importerCommitSha: "b".repeat(40),
+    issueNumber,
+    acceptedAtUtc: new Date().toISOString()
+  };
+  return new Request(`${origin}/api/repository/receipts`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json"
+    },
+    body: JSON.stringify(signEnvelope(envelope, repositoryReceiptKey))
+  });
+}
+
 function signEnvelope(envelope, key) {
   return {
     ...envelope,
@@ -752,5 +899,78 @@ function seedSubmissionEvidence(db, {
     `submission:${receiptId}`,
     Date.now(),
     Date.now()
+  );
+}
+
+function seedTaskStateEvidence(db, {
+  taskVersionId,
+  eventId,
+  toState,
+  stateVersion
+}) {
+  const now = Date.now();
+  const roundId = `${taskVersionId}:r1`;
+  db.database.prepare(
+    `INSERT INTO task_versions
+      (id, task_id, task_version, packet_id, holdout_id,
+       packet_merkle_root, guideline_version, data_version,
+       protocol_version, metric_policy_json, state, state_version,
+       current_round, last_event_id, repository_status,
+       created_at, updated_at)
+     VALUES (?, 'task-state-receipt', 1, 'packet-task-state',
+             'holdout-task-state', ?, 'guideline-v1', 'data-v1',
+             'protocol-v1', '{}', ?, ?, 1, ?, 'not-sent', ?, ?)`
+  ).run(
+    taskVersionId,
+    "a".repeat(64),
+    toState,
+    stateVersion,
+    eventId,
+    now,
+    now
+  );
+  db.database.prepare(
+    `INSERT INTO consensus_rounds
+      (id, task_version_id, round_number, status, opened_at, deadline_at)
+     VALUES (?, ?, 1, 'open', ?, ?)`
+  ).run(roundId, taskVersionId, now, now + 86400000);
+  db.database.prepare(
+    `INSERT INTO consensus_events
+      (id, task_version_id, round_id, event_type, from_state, to_state,
+       reason_code, evidence_json, event_hash, idempotency_key, created_at)
+     VALUES (?, ?, ?, 'task-opened', 'draft', ?, 'test', '{}', ?, ?, ?)`
+  ).run(
+    eventId,
+    taskVersionId,
+    roundId,
+    toState,
+    "b".repeat(64),
+    eventId,
+    now
+  );
+  const publicPayload = JSON.stringify({
+    schema: "adg-msa-task-state-v1",
+    nonce: eventId,
+    eventId,
+    taskVersionId,
+    toState,
+    stateVersion,
+    hmacSha256: "c".repeat(64)
+  });
+  db.database.prepare(
+    `INSERT INTO evidence_outbox
+      (id, kind, task_version_id, related_id, public_blob_name,
+       public_payload_json, dedupe_key, status, attempts,
+       next_attempt_at, created_at)
+     VALUES (?, 'task-state', ?, ?, ?, ?, ?, 'pending', 0, ?, ?)`
+  ).run(
+    `delivery-${eventId}`,
+    taskVersionId,
+    eventId,
+    `${eventId}.json`,
+    publicPayload,
+    `task-state:${eventId}`,
+    now,
+    now
   );
 }
