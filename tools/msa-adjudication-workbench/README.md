@@ -128,6 +128,15 @@ organization member has authoritative Global Administrator proof.
   accepts the historical `evidence.identity` name solely when its exact field
   set and values match that public binding; any extra identity/contact field
   remains rejected. New records use `taskBinding`.
+- Every merged non-final task-state event returns a distinct HMAC receipt that
+  stops queue replay without claiming publication. `approved` still requires
+  the stricter final-result receipt before repository status can become
+  `accepted` or the task can become `published`.
+- If organization policy prevents `GITHUB_TOKEN` from opening a pull request,
+  the Action leaves the validated internal branch intact and opens one bounded
+  operations Issue with the compare link. A manually opened internal PR is
+  still revalidated from its signed envelopes and file boundary before any
+  receipt is accepted.
 - Repository imports return separate signed receipts for submissions and
   comments so the portal can display their actual GitHub acceptance state.
 - Free-text notes, rationales, and comments are rejected before queueing when
@@ -390,7 +399,7 @@ provider image plus any chosen Hyperdrive rollback binding.
 
 ## Release integrity
 
-`release\portal-15.2.2.json` binds the sanitized portal, importer, workflows,
+`release\portal-15.2.3.json` binds the sanitized portal, importer, workflows,
 tests, and documentation with canonical LF-normalized SHA-256 records. Regenerate
 it deterministically from a clean clone with:
 

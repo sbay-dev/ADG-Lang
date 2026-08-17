@@ -62,7 +62,8 @@ class D1TestDatabase {
       "migrations/0008_cpoly_backup_metadata_hash.sql",
       "migrations/0009_cpoly_backup_kv_lane.sql",
       "migrations/0010_repository_task_catalog.sql",
-      "migrations/0011_portal_issue_reports.sql"
+      "migrations/0011_portal_issue_reports.sql",
+      "migrations/0012_task_state_repository_receipts.sql"
     ]) {
       this.database.exec(readFileSync(path, "utf8"));
     }
@@ -350,7 +351,7 @@ function validReport(reportId, overrides = {}) {
       "سجلت الدخول ثم انتقلت إلى الخطوة الثالثة وضغطت تحديث القائمة.",
     privacyConfirmed: true,
     context: {
-      portalVersion: "15.2.2",
+      portalVersion: "15.2.3",
       step: 3,
       taskVersionId: "msa-adjudication-pilot:v1",
       taskLane: "operational-test",

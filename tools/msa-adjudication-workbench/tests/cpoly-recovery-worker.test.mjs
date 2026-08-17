@@ -99,7 +99,8 @@ class D1TestDatabase {
       "migrations/0008_cpoly_backup_metadata_hash.sql",
       "migrations/0009_cpoly_backup_kv_lane.sql",
       "migrations/0010_repository_task_catalog.sql",
-      "migrations/0011_portal_issue_reports.sql"
+      "migrations/0011_portal_issue_reports.sql",
+      "migrations/0012_task_state_repository_receipts.sql"
     ]) {
       this.database.exec(readFileSync(migrationPath, "utf8"));
     }

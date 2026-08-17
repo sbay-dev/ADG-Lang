@@ -21,6 +21,7 @@ jobs:
     permissions:
       contents: write
       id-token: write
+      issues: write
       pull-requests: write
 
     steps:
@@ -33,20 +34,57 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
+          IMPORT_SOURCE: ${{ vars.ADG_PORTAL_IMPORT_SOURCE || 'portal-api' }}
           REPOSITORY: ${{ github.repository }}
         run: |
           $ErrorActionPreference = "Stop"
-          $openPrNumber = @(
+          $openPrNumber = $null
+          $candidatePulls = @(
             gh api `
-              "repos/$env:REPOSITORY/pulls?state=open&per_page=100" `
-              --jq '.[] | select(.user.login == "github-actions[bot]" and (.head.ref | startswith("automation/msa-adjudication-"))) | .number'
-          ) | Select-Object -First 1
+              "repos/$env:REPOSITORY/pulls?state=open&per_page=100" |
+              ConvertFrom-Json |
+              Where-Object {
+                $_.head.repo.full_name -eq $env:REPOSITORY -and
+                $_.head.ref.StartsWith("automation/msa-adjudication-")
+              }
+          )
+          foreach ($candidate in $candidatePulls) {
+            $commit = gh api `
+              "repos/$env:REPOSITORY/commits/$($candidate.head.sha)" |
+              ConvertFrom-Json
+            if ($commit.author.login -eq "github-actions[bot]" -or
+                $commit.committer.login -eq "github-actions[bot]") {
+              $openPrNumber = $candidate.number
+              break
+            }
+          }
           if ($openPrNumber) {
             "skip=true" | Out-File $env:GITHUB_OUTPUT -Append
             "number=$openPrNumber" | Out-File $env:GITHUB_OUTPUT -Append
-          } else {
-            "skip=false" | Out-File $env:GITHUB_OUTPUT -Append
+            exit 0
           }
+          $manualMarker = "<!-- adg-evidence-import-manual-pr -->"
+          $openIssue = @(
+            gh issue list `
+              --repo $env:REPOSITORY `
+              --state open `
+              --limit 100 `
+              --json number,body,author,labels |
+              ConvertFrom-Json |
+              Where-Object {
+                [string]$_.body -like "*$manualMarker*" -and
+                $_.author.login -eq "github-actions[bot]" -and
+                $_.labels.name -contains "adjudication:import-ops"
+              } |
+              Select-Object -First 1
+          )
+          if ($openIssue) {
+            "skip=true" | Out-File $env:GITHUB_OUTPUT -Append
+            "issue=$($openIssue.number)" |
+              Out-File $env:GITHUB_OUTPUT -Append
+            exit 0
+          }
+          "skip=false" | Out-File $env:GITHUB_OUTPUT -Append
 
       - name: Sign in to Azure with OIDC
         if: ${{ (vars.ADG_PORTAL_IMPORT_SOURCE || 'portal-api') != 'portal-api' }}
@@ -287,6 +325,8 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
+          IMPORT_SOURCE: ${{ vars.ADG_PORTAL_IMPORT_SOURCE || 'portal-api' }}
+          REPOSITORY: ${{ github.repository }}
         run: |
           $ErrorActionPreference = "Stop"
           $records = @(
@@ -348,15 +388,77 @@ jobs:
           git add human-evidence/inbox human-evidence/comments human-evidence/task-state
           git commit -m "evidence: import anonymized MSA adjudication and discussion"
           git push --set-upstream origin $branch
-          $url = gh pr create `
-            --base main `
-            --head $branch `
-            --title "evidence: import anonymized MSA adjudication and discussion" `
-            --body-file $prBodyPath
+          $prOutput = @(
+            gh pr create `
+              --base main `
+              --head $branch `
+              --title "evidence: import anonymized MSA adjudication and discussion" `
+              --body-file $prBodyPath 2>&1
+          )
+          if ($LASTEXITCODE -eq 0) {
+            $url = [string]($prOutput | Select-Object -Last 1)
+          } else {
+            if ([string]$env:IMPORT_SOURCE -ne "portal-api") {
+              throw "GitHub could not create the evidence pull request."
+            }
+            $encodedBranch = [uri]::EscapeDataString($branch)
+            $url = "https://github.com/$env:REPOSITORY/compare/main...$encodedBranch?expand=1"
+            $manualMarker = "<!-- adg-evidence-import-manual-pr -->"
+            $branchMarker = "<!-- adg-evidence-import-branch:$branch -->"
+            $issueBody = ".portal-import/manual-pr-issue.md"
+            @"
+          $manualMarker
+          $branchMarker
+          # Repository evidence PR requires an operator
+
+          GitHub Actions validated and pushed a bounded evidence branch, but
+          the organization policy did not permit `GITHUB_TOKEN` to create the
+          pull request.
+
+          - branch: ``$branch``
+          - compare: [Open the evidence pull request]($url)
+          - workflow: https://github.com/$env:REPOSITORY/actions/runs/$env:GITHUB_RUN_ID
+
+          Do not copy evidence files outside this repository. Open and review
+          the generated PR, then merge only if its signed-envelope and file
+          boundary checks pass.
+          "@ | Set-Content $issueBody -Encoding UTF8
+            gh label create "adjudication:import-ops" `
+              --repo $env:REPOSITORY `
+              --color "B60205" `
+              --description "Repository evidence import requires operator action" `
+              --force | Out-Null
+            $existingIssue = @(
+              gh issue list `
+                --repo $env:REPOSITORY `
+                --state open `
+                --limit 100 `
+                --json number,body,author,labels |
+                ConvertFrom-Json |
+                Where-Object {
+                  [string]$_.body -like "*$manualMarker*" -and
+                  $_.author.login -eq "github-actions[bot]" -and
+                  $_.labels.name -contains "adjudication:import-ops"
+                } |
+                Select-Object -First 1
+            )
+            if (-not $existingIssue) {
+              gh issue create `
+                --repo $env:REPOSITORY `
+                --title "[ADG ops] Open validated evidence import PR" `
+                --body-file $issueBody `
+                --label "adjudication:import-ops" | Out-Null
+            }
+            Write-Output "::warning::Evidence branch requires a manually opened PR: $url"
+            "manual=true" | Out-File $env:GITHUB_OUTPUT -Append
+          }
           "url=$url" | Out-File $env:GITHUB_OUTPUT -Append
 
       - name: Archive accepted queue items
-        if: steps.inbox.outputs.count != '0' && steps.pull_request.outputs.url != ''
+        if: >
+          steps.inbox.outputs.count != '0'
+          && steps.pull_request.outputs.url != ''
+          && steps.pull_request.outputs.manual != 'true'
         shell: pwsh
         env:
           IMPORT_SOURCE: ${{ vars.ADG_PORTAL_IMPORT_SOURCE || 'portal-api' }}
@@ -393,7 +495,6 @@ jobs:
       && github.event.pull_request.merged == true
       && github.event.pull_request.base.ref == 'main'
       && github.event.pull_request.head.repo.full_name == github.repository
-      && github.event.pull_request.user.login == 'github-actions[bot]'
       && startsWith(github.event.pull_request.head.ref, 'automation/msa-adjudication-')
     runs-on: ubuntu-latest
     environment: msa-adjudication-production
@@ -429,6 +530,7 @@ jobs:
           MERGE_SHA: ${{ github.event.pull_request.merge_commit_sha }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           REPOSITORY: ${{ github.repository }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
         run: |
           $ErrorActionPreference = "Stop"
           $importSource = [string]$env:IMPORT_SOURCE
@@ -627,6 +729,24 @@ jobs:
                 --add-label $stateLabel | Out-Null
             }
             if ($signedState.toState -ne "approved") {
+              $taskStateAcceptedAt = [DateTime]::UtcNow.ToString(
+                "yyyy-MM-ddTHH:mm:ss.fffZ"
+              )
+              $taskStateEnvelope = [ordered]@{
+                schema = "adg-msa-task-state-receipt-v1"
+                receiptId = [guid]::NewGuid().ToString()
+                taskVersionId = $signedState.taskVersionId
+                eventId = $signedState.eventId
+                toState = $signedState.toState
+                stateVersion = [int]$signedState.stateVersion
+                repository = $env:REPOSITORY
+                prNumber = [int]$env:PR_NUMBER
+                prMergeSha = $env:MERGE_SHA
+                importerCommitSha = $importerCommit
+                issueNumber = $issueNumber
+                acceptedAtUtc = $taskStateAcceptedAt
+              }
+              Send-PortalReceipt $taskStateEnvelope
               continue
             }
             $finalRoot = [string]$signedState.evidence.finalMerkleRoot
@@ -687,4 +807,26 @@ jobs:
               acceptedAtUtc = $acceptedAt
             }
             Send-PortalReceipt $envelope
+          }
+
+          $branchMarker = "<!-- adg-evidence-import-branch:$env:HEAD_BRANCH -->"
+          $manualIssue = @(
+            gh issue list `
+              --repo $env:REPOSITORY `
+              --state open `
+              --limit 100 `
+              --json number,body,author,labels |
+              ConvertFrom-Json |
+              Where-Object {
+                [string]$_.body -like "*$branchMarker*" -and
+                $_.author.login -eq "github-actions[bot]" -and
+                $_.labels.name -contains "adjudication:import-ops"
+              } |
+              Select-Object -First 1
+          )
+          if ($manualIssue) {
+            gh issue close $manualIssue.number `
+              --repo $env:REPOSITORY `
+              --comment "Merged evidence was revalidated and acknowledged by the portal." |
+              Out-Null
           }
