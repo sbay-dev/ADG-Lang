@@ -82,7 +82,7 @@ const IRAB = [
 ];
 
 const PUBLIC_PORTAL_URL = "https://adg.sbay.sa/";
-const PORTAL_VERSION = "15.2.3";
+const PORTAL_VERSION = "15.3.0";
 const BASELINE_PILOT_PACKET_ID = "msa-adjudication-pilot-v1";
 const OPERATIONAL_TEST_REQUESTED =
   new URL(location.href).searchParams.get("mode") === "operational-test";
@@ -137,6 +137,7 @@ const state = {
     userId: null,
     email: null,
     emailVerified: false,
+    passkeyCount: 0,
     erasureRequested: false
   },
   emailVerification: {
@@ -184,6 +185,7 @@ const wizardStatus = document.querySelector("#wizard-status");
 const quickLoginButton = document.querySelector("#quick-login");
 const registerPasskeyButton = document.querySelector("#register-passkey");
 const loginPasskeyButton = document.querySelector("#login-passkey");
+const addPasskeyButton = document.querySelector("#add-passkey");
 const logoutAccountButton = document.querySelector("#logout-account");
 const requestErasureButton = document.querySelector("#request-erasure");
 const accountTitle = document.querySelector("#account-title");
@@ -277,6 +279,7 @@ downloadButton.addEventListener("click", downloadEvaluation);
 quickLoginButton.addEventListener("click", loginWithPasskey);
 registerPasskeyButton.addEventListener("click", registerPasskey);
 loginPasskeyButton.addEventListener("click", loginWithPasskey);
+addPasskeyButton.addEventListener("click", addPasskey);
 logoutAccountButton.addEventListener("click", logoutAccount);
 requestErasureButton.addEventListener("click", requestIdentityErasure);
 sendEmailCodeButton.addEventListener("click", sendEmailVerificationCode);
@@ -854,6 +857,7 @@ async function restoreAccount() {
       .trim()
       .toLowerCase();
     state.account.emailVerified = account.emailVerified === true;
+    state.account.passkeyCount = Number(account.passkeyCount || 0);
     state.account.erasureRequested =
       account.identityErasure?.requested === true;
     resetEmailVerification();
@@ -874,6 +878,7 @@ async function restoreAccount() {
     state.account.userId = null;
     state.account.email = null;
     state.account.emailVerified = false;
+    state.account.passkeyCount = 0;
     state.account.erasureRequested = false;
     resetEmailVerification();
     setEmailVerificationStatus("", false);
@@ -915,19 +920,22 @@ function renderAccountState() {
 
   registerPasskeyButton.hidden = authenticated;
   loginPasskeyButton.hidden = authenticated;
+  addPasskeyButton.hidden = !authenticated;
   logoutAccountButton.hidden = !authenticated;
   requestErasureButton.hidden =
     !authenticated || state.account.erasureRequested;
   quickLoginButton.hidden = authenticated;
   registerPasskeyButton.disabled = !available;
   loginPasskeyButton.disabled = !available;
+  addPasskeyButton.disabled = !available;
   quickLoginButton.disabled = !available;
 
   if (authenticated) {
     accountTitle.textContent = "حسابك متصل ومحمي";
     accountDescription.textContent =
-      "يمكنك الآن اختيار المهمة وحفظ أي تقدم مشفّرًا للمتابعة لاحقًا.";
-    setAccountStatus("تم الدخول بمفتاح المرور.", false);
+      `البريد الموثّق هو مالك الحساب، ويرتبط به `
+      + `${state.account.passkeyCount} من مفاتيح المرور. `
+      + "يمكنك إضافة مفتاح لجهاز آخر الآن.";
     return;
   }
   accountTitle.textContent = "أنشئ حسابك الآمن";
@@ -977,6 +985,7 @@ async function registerPasskey() {
     state.account.userId = result.userId;
     state.account.email = normalizedCurrentEmail();
     state.account.emailVerified = true;
+    state.account.passkeyCount = Number(result.passkeyCount || 1);
     state.account.erasureRequested = false;
     resetEmailVerification();
     setEmailVerificationStatus("البريد موثّق لهذا الحساب.", false);
@@ -993,6 +1002,44 @@ async function registerPasskey() {
       );
       renderEmailVerificationState();
     }
+    setAccountStatus(passkeyErrorMessage(error), true);
+  } finally {
+    setAccountBusy(false);
+  }
+}
+
+async function addPasskey() {
+  clearStatus();
+  setAccountStatus("", false);
+  try {
+    ensureWebAuthn();
+    setAccountBusy(true);
+    const start = await apiJson(
+      "/api/account/passkeys/register/options",
+      { method: "POST", body: {} }
+    );
+    const credential = await navigator.credentials.create({
+      publicKey: registrationOptions(start.options)
+    });
+    if (!credential) {
+      throw new Error("لم يُنشأ مفتاح المرور.");
+    }
+    const result = await apiJson(
+      "/api/account/passkeys/register/verify",
+      {
+        method: "POST",
+        body: {
+          challengeId: start.challengeId,
+          response: registrationResponse(credential)
+        }
+      }
+    );
+    state.account.passkeyCount = Number(
+      result.passkeyCount || state.account.passkeyCount + 1
+    );
+    renderAccountState();
+    setAccountStatus(result.message, false);
+  } catch (error) {
     setAccountStatus(passkeyErrorMessage(error), true);
   } finally {
     setAccountBusy(false);
@@ -1086,6 +1133,7 @@ async function logoutAccount() {
     state.account.userId = null;
     state.account.email = null;
     state.account.emailVerified = false;
+    state.account.passkeyCount = 0;
     state.account.erasureRequested = false;
     state.packet = null;
     state.annotationA = null;
@@ -1112,6 +1160,7 @@ async function logoutAccount() {
 function setAccountBusy(busy) {
   registerPasskeyButton.disabled = busy;
   loginPasskeyButton.disabled = busy;
+  addPasskeyButton.disabled = busy;
   quickLoginButton.disabled = busy;
   logoutAccountButton.disabled = busy;
   requestErasureButton.disabled = busy;

@@ -58,6 +58,7 @@ class D1Statement {
 class D1TestDatabase {
   constructor() {
     this.database = new DatabaseSync(":memory:");
+    this.prepareCount = 0;
     for (const path of [
       "migrations/0001_passkeys.sql",
       "migrations/0002_admin_progress.sql",
@@ -77,7 +78,12 @@ class D1TestDatabase {
   }
 
   prepare(sql) {
+    this.prepareCount += 1;
     return new D1Statement(this.database, sql);
+  }
+
+  resetPrepareCount() {
+    this.prepareCount = 0;
   }
 
   async batch(statements) {
@@ -523,6 +529,270 @@ test("default task inbox pins the operational baseline before standard work", as
           baseline: false
         }
       ]
+    );
+  } finally {
+    fixture.restoreFetch();
+  }
+});
+
+test("published natural Arabic sample is immediately claimable by A and B", async () => {
+  const fixture = await createFixture("natural-sample-ready");
+  try {
+    const manifest = JSON.parse(readFileSync(
+      new URL(
+        "../../../human-evidence/tasks/"
+          + "natural-arabic-rule-consumption-v1.task.json",
+        import.meta.url
+      ),
+      "utf8"
+    ));
+    await sendRepositoryTaskSync(
+      fixture,
+      [manifest],
+      "1212121212121212121212121212121212121212"
+    );
+
+    const inbox = await accountJson(fixture, "A", "/api/tasks");
+    assert.equal(inbox.tasks.length, 1);
+    assert.equal(
+      inbox.tasks[0].packetId,
+      "natural-arabic-rule-consumption-v1"
+    );
+    assert.equal(inbox.tasks[0].role, "A");
+    assert.equal(inbox.tasks[0].ready, true);
+
+    const taskVersionId = "natural-arabic-rule-consumption:v1";
+    const claimA = await claimRepositoryTask(
+      fixture,
+      "A",
+      taskVersionId
+    );
+    const claimB = await claimRepositoryTask(
+      fixture,
+      "B",
+      taskVersionId
+    );
+    assert.equal(claimA.role, "A");
+    assert.equal(claimB.role, "B");
+    assert.equal(claimA.packet.sentences.length, 7);
+    assert.equal(
+      claimA.packet.sentences.reduce(
+        (count, sentence) => count + sentence.tokens.length,
+        0
+      ),
+      76
+    );
+  } finally {
+    fixture.restoreFetch();
+  }
+});
+
+test("natural Arabic sample completes A, B, J1, and J2 consensus", async () => {
+  const fixture = await createFixture("natural-sample-consensus");
+  try {
+    const manifest = JSON.parse(readFileSync(
+      new URL(
+        "../../../human-evidence/tasks/"
+          + "natural-arabic-rule-consumption-v1.task.json",
+        import.meta.url
+      ),
+      "utf8"
+    ));
+    await sendRepositoryTaskSync(
+      fixture,
+      [manifest],
+      "5656565656565656565656565656565656565656"
+    );
+    const taskVersionId = "natural-arabic-rule-consumption:v1";
+    await claimRepositoryTask(fixture, "A", taskVersionId);
+    await claimRepositoryTask(fixture, "B", taskVersionId);
+
+    const participantIds = {
+      A: "11111111-1111-4111-8111-111111111111",
+      B: "22222222-2222-4222-8222-222222222222",
+      J1: "33333333-3333-4333-8333-333333333333",
+      J2: "44444444-4444-4444-8444-444444444444"
+    };
+    const packet = manifest.packet;
+    const annotationA = await naturalSampleAnnotation(
+      packet,
+      "A",
+      participantIds.A,
+      false
+    );
+    const annotationB = await naturalSampleAnnotation(
+      packet,
+      "B",
+      participantIds.B,
+      true
+    );
+    await submitArtifact(
+      fixture,
+      "A",
+      participantIds.A,
+      {
+        schema: "adg-msa-portal-artifact-v1",
+        kind: "independent-annotation",
+        packet,
+        annotation: annotationA
+      }
+    );
+    await submitArtifact(
+      fixture,
+      "B",
+      participantIds.B,
+      {
+        schema: "adg-msa-portal-artifact-v1",
+        kind: "independent-annotation",
+        packet,
+        annotation: annotationB
+      }
+    );
+    assert.equal(
+      fixture.db.database.prepare(
+        "SELECT state FROM task_versions WHERE id = ?"
+      ).get(taskVersionId).state,
+      "discussion"
+    );
+
+    const j1Task = await claimRepositoryTask(
+      fixture,
+      "J1",
+      taskVersionId
+    );
+    assert.equal(j1Task.clientRole, "adjudication");
+    const adjudication = await naturalSampleAdjudication(
+      packet,
+      annotationA,
+      annotationB,
+      participantIds.J1
+    );
+    const primaryArtifact = {
+      schema: "adg-msa-portal-artifact-v1",
+      kind: "adjudication-package",
+      packet,
+      annotationA,
+      annotationB,
+      adjudication
+    };
+    const primary = await submitArtifact(
+      fixture,
+      "J1",
+      participantIds.J1,
+      primaryArtifact
+    );
+
+    const j2Task = await claimRepositoryTask(
+      fixture,
+      "J2",
+      taskVersionId
+    );
+    assert.equal(j2Task.clientRole, "ratification");
+    const ratification = {
+      schema: RATIFICATION_SCHEMA,
+      taskId: packet.taskId,
+      taskVersion: packet.taskVersion,
+      packetId: packet.packetId,
+      holdoutId: packet.holdoutId,
+      protocolVersion: packet.protocolVersion,
+      packetMerkleRoot: await computePacketMerkleRoot(packet),
+      primaryReceiptId: primary.receiptId,
+      primaryAdjudicationMerkleRoot:
+        await computeAdjudicationMerkleRoot(
+          packet,
+          annotationA,
+          annotationB,
+          adjudication
+        ),
+      reviewerSlot: "J2",
+      reviewerPseudonym:
+        `human-${participantIds.J2.slice(0, 12)}-J2`,
+      reviewerIsHuman: true,
+      reviewerIsSynthetic: false,
+      independentFromImplementationTeam: true,
+      decision: "agree",
+      rationale:
+        "راجعت قراري المحكمين وحسم J1 والجذر النهائي ووافقت على النتيجة."
+    };
+    await submitArtifact(
+      fixture,
+      "J2",
+      participantIds.J2,
+      {
+        schema: "adg-msa-portal-artifact-v1",
+        kind: "ratification-package",
+        primaryArtifact,
+        ratification
+      }
+    );
+    const task = fixture.db.database.prepare(
+      "SELECT state, current_round FROM task_versions WHERE id = ?"
+    ).get(taskVersionId);
+    assert.deepEqual(
+      { ...task },
+      { state: "approved", current_round: 1 }
+    );
+    assert.equal(
+      fixture.db.database.prepare(
+        `SELECT COUNT(*) AS count
+           FROM task_participations
+          WHERE task_version_id = ? AND status = 'submitted'`
+      ).get(taskVersionId).count,
+      4
+    );
+  } finally {
+    fixture.restoreFetch();
+  }
+});
+
+test("task inbox uses a bounded query count for fifty ready tasks", async t => {
+  const fixture = await createFixture("inbox-efficiency");
+  try {
+    const values = await independentArtifacts();
+    const manifests = [];
+    for (let index = 1; index <= 50; index += 1) {
+      const packet = structuredClone(values.packet);
+      packet.taskId = `inbox-efficiency-${index}`;
+      packet.packetId = `inbox-efficiency-${index}-v1`;
+      packet.holdoutId = `inbox-efficiency-holdout-${index}`;
+      packet.dataVersion = `inbox-efficiency-data-${index}`;
+      packet.pilotOnly = false;
+      packet.developerVisible = false;
+      manifests.push({
+        schema: "adg-msa-repository-task-v1",
+        titleAr: `مهمة قياس صندوق المهام ${index}`,
+        summaryAr:
+          "حزمة قياس موثقة للتحقق من ثبات عدد استعلامات صندوق المهام.",
+        assignmentMode: "open",
+        lane: "standard",
+        status: "active",
+        sourcePath:
+          `human-evidence/tasks/${packet.packetId}.task.json`,
+        packetMerkleRoot: await computePacketMerkleRoot(packet),
+        packet
+      });
+    }
+    await sendRepositoryTaskSync(
+      fixture,
+      manifests,
+      "3434343434343434343434343434343434343434"
+    );
+    fixture.db.resetPrepareCount();
+    const startedAt = performance.now();
+    const inbox = await accountJson(fixture, "A", "/api/tasks");
+    const elapsedMs = performance.now() - startedAt;
+    assert.equal(inbox.tasks.length, 50);
+    assert.ok(
+      fixture.db.prepareCount <= 7,
+      `Expected at most 7 statements, received ${fixture.db.prepareCount}.`
+    );
+    assert.ok(
+      elapsedMs < 1000,
+      `Expected the local inbox request below 1000 ms, received ${elapsedMs}.`
+    );
+    t.diagnostic(
+      `50-task inbox: ${elapsedMs.toFixed(3)} ms, `
+        + `${fixture.db.prepareCount} SQL statements`
     );
   } finally {
     fixture.restoreFetch();
@@ -1884,6 +2154,112 @@ async function independentArtifacts() {
       annotation: annotationB
     }
   };
+}
+
+async function naturalSampleAnnotation(
+  packet,
+  slot,
+  participantId,
+  disagree
+) {
+  return {
+    schema: "adg-msa-annotation-submission-v3",
+    taskId: packet.taskId,
+    taskVersion: packet.taskVersion,
+    packetId: packet.packetId,
+    holdoutId: packet.holdoutId,
+    protocolId: packet.protocolId,
+    guidelineVersion: packet.guidelineVersion,
+    dataVersion: packet.dataVersion,
+    protocolVersion: packet.protocolVersion,
+    packetMerkleRoot: await computePacketMerkleRoot(packet),
+    annotatorSlot: slot,
+    annotatorPseudonym:
+      `human-${participantId.slice(0, 12)}-${slot}`,
+    isHuman: true,
+    isSynthetic: false,
+    independentFromImplementationTeam: true,
+    blindToParserInternals: true,
+    parserPredictionsViewed: false,
+    sentences: packet.sentences.map((sentence, sentenceIndex) => ({
+      sentenceId: sentence.sentenceId,
+      structurallyAcceptable: disagree && sentenceIndex === 0
+        ? false
+        : true,
+      completePredicate: true,
+      tokens: sentence.tokens.map(token => ({
+        tokenId: token.id,
+        universalPartOfSpeech: punctuationToken(token.form)
+          ? "PUNCT"
+          : token.id === 1 ? "VERB" : "NOUN",
+        headTokenId: token.id === 1 ? 0 : 1,
+        dependencyRelation: token.id === 1
+          ? "root"
+          : punctuationToken(token.form) ? "punct" : "dep",
+        irabHeadTokenId: null,
+        irabCategory: null,
+        irabNotApplicable: true,
+        note: null
+      })),
+      note: null
+    }))
+  };
+}
+
+async function naturalSampleAdjudication(
+  packet,
+  annotationA,
+  annotationB,
+  participantId
+) {
+  return {
+    schema: "adg-msa-adjudication-decision-v3",
+    taskId: packet.taskId,
+    taskVersion: packet.taskVersion,
+    packetId: packet.packetId,
+    holdoutId: packet.holdoutId,
+    protocolId: packet.protocolId,
+    guidelineVersion: packet.guidelineVersion,
+    dataVersion: packet.dataVersion,
+    protocolVersion: packet.protocolVersion,
+    packetMerkleRoot: await computePacketMerkleRoot(packet),
+    annotationAMerkleRoot:
+      await computeAnnotationMerkleRoot(packet, annotationA),
+    annotationBMerkleRoot:
+      await computeAnnotationMerkleRoot(packet, annotationB),
+    annotationASlot: "A",
+    annotationBSlot: "B",
+    adjudicatorSlot: "J1",
+    adjudicatorPseudonym:
+      `human-${participantId.slice(0, 12)}-J1`,
+    adjudicatorIsHuman: true,
+    adjudicatorIsSynthetic: false,
+    independentFromImplementationTeam: true,
+    blindToParserInternals: true,
+    parserPredictionsViewed: false,
+    sentences: annotationA.sentences.map((sentence, sentenceIndex) => ({
+      sentenceId: sentence.sentenceId,
+      structurallyAcceptable: sentence.structurallyAcceptable,
+      completePredicate: sentence.completePredicate,
+      tokens: sentence.tokens.map(token => ({
+        tokenId: token.tokenId,
+        universalPartOfSpeech: token.universalPartOfSpeech,
+        headTokenId: token.headTokenId,
+        dependencyRelation: token.dependencyRelation,
+        irabHeadTokenId: token.irabHeadTokenId,
+        irabCategory: token.irabCategory,
+        irabNotApplicable: token.irabNotApplicable,
+        resolutionNote: null
+      })),
+      resolutionNote: sentenceIndex === 0
+        ? "اختير قرار A بعد مراجعة مستقلة لاختلاف سلامة التركيب."
+        : null
+    }))
+  };
+}
+
+function punctuationToken(value) {
+  return /^[.:،؛؟!?]$/u.test(value);
 }
 
 function readJson(name) {

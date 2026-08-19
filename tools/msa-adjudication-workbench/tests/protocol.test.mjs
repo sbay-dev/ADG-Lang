@@ -28,6 +28,44 @@ test("browser packet root matches the .NET contract", async () => {
   );
 });
 
+test("natural Arabic task is ready for the full repository consensus lane", async () => {
+  const task = await readJson(new URL(
+    "human-evidence/tasks/natural-arabic-rule-consumption-v1.task.json",
+    repositoryRoot
+  ));
+  assert.equal(task.schema, "adg-msa-repository-task-v1");
+  assert.equal(task.status, "active");
+  assert.equal(task.assignmentMode, "open");
+  assert.equal(task.lane, "standard");
+  assert.equal(task.packet.sentences.length, 7);
+  assert.equal(
+    task.packet.sentences.reduce(
+      (count, sentence) => count + sentence.tokens.length,
+      0
+    ),
+    76
+  );
+  assert.equal(
+    await computePacketMerkleRoot(task.packet),
+    task.packetMerkleRoot
+  );
+  const fixture = await readJson(new URL(
+    "tools/msa-adjudication-workbench/human-evidence/tasks/"
+      + "natural-arabic-rule-consumption-v1.task.json",
+    repositoryRoot
+  ));
+  assert.deepEqual(fixture, task);
+  const sourcePacket = await readJson(new URL(
+    "tools/msa-adjudication-workbench/human-evidence/packets/"
+      + "natural-arabic-rule-consumption-v1.packet.json",
+    repositoryRoot
+  ));
+  assert.deepEqual(sourcePacket, task.packet);
+  const publicText = JSON.stringify(task);
+  assert.doesNotMatch(publicText, /coverage-key\.sealed/);
+  assert.doesNotMatch(publicText, /sourceVerse/);
+});
+
 test("browser annotation root matches the .NET contract", async () => {
   const packet = await readJson(new URL(
     "examples/arabic-text/msa-adjudication-pilot-v1/packet.json",

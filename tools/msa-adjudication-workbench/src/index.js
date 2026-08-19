@@ -1853,6 +1853,20 @@ async function routeAccountRequest(request, env, url) {
     enforceOrigin(request, env);
     return finishRegistration(await readJsonBody(request), env);
   }
+  if (path === "/api/account/passkeys/register/options"
+      && request.method === "POST") {
+    enforceOrigin(request, env);
+    return beginAdditionalPasskeyRegistration(request, env);
+  }
+  if (path === "/api/account/passkeys/register/verify"
+      && request.method === "POST") {
+    enforceOrigin(request, env);
+    return finishAdditionalPasskeyRegistration(
+      request,
+      await readJsonBody(request),
+      env
+    );
+  }
   if (path === "/api/account/login/options"
       && request.method === "POST") {
     enforceOrigin(request, env);
@@ -2292,7 +2306,10 @@ async function beginRegistration(body, env) {
     body?.emailVerificationToken,
     env
   );
-  const userId = crypto.randomUUID();
+  const existingAccount = await env.DB.prepare(
+    "SELECT id FROM users WHERE verified_email_hash = ?"
+  ).bind(emailVerification.emailHash).first();
+  const userId = existingAccount?.id || crypto.randomUUID();
   const { origin, rpId } = relyingParty(env);
   const secret = await getVaultSecret(
     env.ENTITYCRYPT_MASTER_KEY_SECRET_NAME,
@@ -2302,20 +2319,12 @@ async function beginRegistration(body, env) {
     JSON.stringify(profile),
     secret
   );
-  const options = await generateRegistrationOptions({
-    rpName: "منصة تحكيم ADG للغة العربية",
-    rpID: rpId,
-    userID: new TextEncoder().encode(userId),
-    userName: `ads-${userId.slice(0, 12)}`,
-    userDisplayName: "محكّم اللغة العربية",
-    timeout: 120000,
-    attestationType: "none",
-    authenticatorSelection: {
-      residentKey: "required",
-      requireResidentKey: true,
-      userVerification: "required"
-    }
-  });
+  const options = await registrationOptionsForAccount(
+    env.DB,
+    userId,
+    profile,
+    rpId
+  );
   const challengeId = crypto.randomUUID();
   const now = Date.now();
 
@@ -2366,7 +2375,12 @@ async function beginRegistration(body, env) {
     );
   }
 
-  return json({ challengeId, options, origin });
+  return json({
+    challengeId,
+    options,
+    origin,
+    accountMode: existingAccount ? "existing" : "new"
+  });
 }
 
 async function finishRegistration(body, env) {
@@ -2400,11 +2414,224 @@ async function finishRegistration(body, env) {
       400
     );
   }
+  const credential = await verifyRegistrationCredential(
+    body.response,
+    challenge,
+    env
+  );
+  const now = Date.now();
+  const session = await createSessionRecord(challenge.user_id, now);
+  const existingAccount = await env.DB.prepare(
+    "SELECT id FROM users WHERE verified_email_hash = ?"
+  ).bind(challenge.verified_email_hash).first();
+  if (existingAccount && existingAccount.id !== challenge.user_id) {
+    throw new PublicError(
+      "تغيّرت حالة حساب البريد أثناء التسجيل. أعد طلب رمز البريد.",
+      409
+    );
+  }
+  const statements = [];
+  if (existingAccount) {
+    statements.push(
+      env.DB.prepare(
+        `UPDATE users
+            SET profile_ciphertext = ?, consent_json = ?, updated_at = ?
+          WHERE id = ? AND verified_email_hash = ?`
+      ).bind(
+        challenge.profile_ciphertext,
+        challenge.consent_json,
+        now,
+        challenge.user_id,
+        challenge.verified_email_hash
+      )
+    );
+  } else {
+    statements.push(
+      env.DB.prepare(
+        `INSERT INTO users
+          (id, profile_ciphertext, consent_json, verified_email_hash,
+           created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?)`
+      ).bind(
+        challenge.user_id,
+        challenge.profile_ciphertext,
+        challenge.consent_json,
+        challenge.verified_email_hash,
+        now,
+        now
+      )
+    );
+  }
+  statements.push(
+    passkeyInsertStatement(
+      env.DB,
+      credential,
+      challenge.user_id,
+      now
+    ),
+    env.DB.prepare(
+      `INSERT INTO sessions
+        (token_hash, user_id, expires_at, created_at)
+       VALUES (?, ?, ?, ?)`
+    ).bind(
+      session.tokenHash,
+      challenge.user_id,
+      session.expiresAt,
+      now
+    ),
+    env.DB.prepare(
+      `DELETE FROM email_verifications
+        WHERE id = ?
+          AND reservation_id = ?
+          AND consumed_at IS NULL`
+    ).bind(
+      challenge.email_verification_id,
+      challenge.id
+    )
+  );
+  try {
+    await env.DB.batch(statements);
+  } catch (error) {
+    if (isUniqueConstraintError(error)) {
+      throw new PublicError(
+        "مفتاح المرور مرتبط بحساب قائم، أو تغيّرت ملكية البريد.",
+        409
+      );
+    }
+    throw error;
+  }
+
+  return json(
+    {
+      authenticated: true,
+      userId: challenge.user_id,
+      passkeyCount: await accountPasskeyCount(
+        env.DB,
+        challenge.user_id
+      ),
+      message: existingAccount
+        ? "تمت استعادة حساب البريد وإضافة مفتاح المرور الجديد."
+        : "تم إنشاء الحساب وحفظ مفتاح المرور."
+    },
+    201,
+    { "set-cookie": sessionCookie(env, session.token) }
+  );
+}
+
+async function beginAdditionalPasskeyRegistration(request, env) {
+  const account = await requireSession(request, env);
+  const secret = await getVaultSecret(
+    env.ENTITYCRYPT_MASTER_KEY_SECRET_NAME,
+    env
+  );
+  const profile = JSON.parse(await decryptEntityCrypt(
+    account.profile_ciphertext,
+    secret
+  ));
+  const { origin, rpId } = relyingParty(env);
+  const options = await registrationOptionsForAccount(
+    env.DB,
+    account.user_id,
+    profile,
+    rpId
+  );
+  const challengeId = crypto.randomUUID();
+  const now = Date.now();
+  await pruneAuthRecords(env.DB, now);
+  await env.DB.prepare(
+    `INSERT INTO webauthn_challenges
+      (id, challenge, kind, user_id, expires_at)
+     VALUES (?, ?, 'registration', ?, ?)`
+  ).bind(
+    challengeId,
+    options.challenge,
+    account.user_id,
+    now + CHALLENGE_TTL_MS
+  ).run();
+  return json({ challengeId, options, origin });
+}
+
+async function finishAdditionalPasskeyRegistration(request, body, env) {
+  const account = await requireSession(request, env);
+  const challengeId = requiredId(body?.challengeId, "معرف التسجيل");
+  if (!body?.response || typeof body.response !== "object") {
+    throw new PublicError("استجابة مفتاح المرور غير صالحة.", 400);
+  }
+  const challenge = await takeChallenge(
+    env.DB,
+    challengeId,
+    "registration"
+  );
+  if (challenge.user_id !== account.user_id
+      || challenge.email_verification_id
+      || challenge.verified_email_hash) {
+    throw new PublicError(
+      "محاولة إضافة مفتاح المرور غير مرتبطة بالحساب.",
+      403
+    );
+  }
+  const credential = await verifyRegistrationCredential(
+    body.response,
+    challenge,
+    env
+  );
+  const now = Date.now();
+  try {
+    await passkeyInsertStatement(
+      env.DB,
+      credential,
+      account.user_id,
+      now
+    ).run();
+  } catch (error) {
+    if (isUniqueConstraintError(error)) {
+      throw new PublicError("مفتاح المرور مسجل سابقًا.", 409);
+    }
+    throw error;
+  }
+  return json({
+    authenticated: true,
+    passkeyCount: await accountPasskeyCount(
+      env.DB,
+      account.user_id
+    ),
+    message: "تمت إضافة مفتاح المرور إلى حساب البريد."
+  });
+}
+
+async function registrationOptionsForAccount(db, userId, profile, rpId) {
+  const passkeys = await db.prepare(
+    `SELECT credential_id, transports_json
+       FROM passkeys
+      WHERE user_id = ?
+      ORDER BY created_at ASC, credential_id ASC`
+  ).bind(userId).all();
+  return generateRegistrationOptions({
+    rpName: "منصة تحكيم ADG للغة العربية",
+    rpID: rpId,
+    userID: new TextEncoder().encode(userId),
+    userName: profile.email,
+    userDisplayName: profile.email,
+    timeout: 120000,
+    attestationType: "none",
+    excludeCredentials: (passkeys.results || []).map(passkey => ({
+      id: passkey.credential_id,
+      transports: JSON.parse(passkey.transports_json)
+    })),
+    authenticatorSelection: {
+      residentKey: "required",
+      requireResidentKey: true,
+      userVerification: "required"
+    }
+  });
+}
+
+async function verifyRegistrationCredential(response, challenge, env) {
   const { origin, rpId } = relyingParty(env);
   let verification;
   try {
     verification = await verifyRegistrationResponse({
-      response: body.response,
+      response,
       expectedChallenge: challenge.challenge,
       expectedOrigin: origin,
       expectedRPID: rpId,
@@ -2419,77 +2646,53 @@ async function finishRegistration(body, env) {
   if (!verification.verified || !verification.registrationInfo) {
     throw new PublicError("لم ينجح التحقق من مفتاح المرور.", 400);
   }
-
   const info = verification.registrationInfo;
-  const credential = info.credential;
-  const now = Date.now();
-  const session = await createSessionRecord(challenge.user_id, now);
-  try {
-    await env.DB.batch([
-      env.DB.prepare(
-        `INSERT INTO users
-          (id, profile_ciphertext, consent_json, verified_email_hash,
-           created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?)`
-      ).bind(
-        challenge.user_id,
-        challenge.profile_ciphertext,
-        challenge.consent_json,
-        challenge.verified_email_hash,
-        now,
-        now
-      ),
-      env.DB.prepare(
-        `INSERT INTO passkeys
-          (credential_id, user_id, public_key, counter,
-           transports_json, device_type, backed_up, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-      ).bind(
-        credential.id,
-        challenge.user_id,
-        base64UrlFromBytes(credential.publicKey),
-        credential.counter,
-        JSON.stringify(credential.transports || []),
-        info.credentialDeviceType,
-        info.credentialBackedUp ? 1 : 0,
-        now
-      ),
-      env.DB.prepare(
-        `INSERT INTO sessions
-          (token_hash, user_id, expires_at, created_at)
-         VALUES (?, ?, ?, ?)`
-      ).bind(
-        session.tokenHash,
-        challenge.user_id,
-        session.expiresAt,
-        now
-      ),
-      env.DB.prepare(
-        `DELETE FROM email_verifications
-          WHERE id = ?
-            AND reservation_id = ?
-            AND consumed_at IS NULL`
-      ).bind(
-        challenge.email_verification_id,
-        challenge.id
-      )
-    ]);
-  } catch {
-    throw new PublicError(
-      "البريد أو مفتاح المرور مرتبط بحساب قائم، أو تعذر إنشاء الحساب.",
-      409
-    );
+  if (!info.credential?.id
+      || !info.credential.publicKey
+      || !info.credentialDeviceType
+      || typeof info.credentialBackedUp !== "boolean") {
+    throw new PublicError("بيانات مفتاح المرور ناقصة.", 400);
   }
+  return {
+    ...info.credential,
+    deviceType: info.credentialDeviceType,
+    backedUp: Boolean(info.credentialBackedUp)
+  };
+}
 
-  return json(
-    {
-      authenticated: true,
-      userId: challenge.user_id,
-      message: "تم إنشاء الحساب وحفظ مفتاح المرور."
-    },
-    201,
-    { "set-cookie": sessionCookie(env, session.token) }
+function passkeyInsertStatement(db, credential, userId, now) {
+  return db.prepare(
+    `INSERT INTO passkeys
+      (credential_id, user_id, public_key, counter,
+       transports_json, device_type, backed_up, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+  ).bind(
+    credential.id,
+    userId,
+    base64UrlFromBytes(credential.publicKey),
+    credential.counter,
+    JSON.stringify(credential.transports || []),
+    credential.deviceType,
+    credential.backedUp ? 1 : 0,
+    now
   );
+}
+
+async function accountPasskeyCount(db, userId) {
+  const row = await db.prepare(
+    "SELECT COUNT(*) AS passkey_count FROM passkeys WHERE user_id = ?"
+  ).bind(userId).first();
+  return Number(row?.passkey_count || 0);
+}
+
+function isUniqueConstraintError(error) {
+  const message = [
+    error?.message,
+    error?.cause?.message
+  ].filter(Boolean).join(" ").toLowerCase();
+  return message.includes("unique constraint")
+    || message.includes("duplicate key")
+    || message.includes("constraint failed");
 }
 
 async function beginAuthentication(env) {
@@ -2628,6 +2831,7 @@ async function getAccount(request, env) {
     profile: JSON.parse(profileText),
     consent: JSON.parse(account.consent_json),
     emailVerified: Boolean(account.verified_email_hash),
+    passkeyCount: await accountPasskeyCount(env.DB, account.user_id),
     identityErasure: erasure
       ? {
         requested: true,
@@ -3020,21 +3224,99 @@ async function listRepositoryTasks(request, env, url) {
                rtp.first_synced_at DESC
       LIMIT 100`
   ).all();
+  const rows = (result.results || []).filter(
+    row => !operationalOnly || row.lane === "operational-test"
+  );
+  if (rows.length === 0) {
+    return json({ tasks: [] });
+  }
+  const taskVersionIds = rows.map(row => row.task_version_id);
+  const packetIds = rows.map(row => row.packet_id);
+  const taskPlaceholders = taskVersionIds.map(() => "?").join(", ");
+  const packetPlaceholders = packetIds.map(() => "?").join(", ");
+  const [
+    operationalClaimsResult,
+    assignmentsResult,
+    participationsResult,
+    draftsResult
+  ] = await Promise.all([
+    env.DB.prepare(
+      `SELECT otc.task_version_id, otc.role, otc.status,
+              otc.claimed_at, otc.submitted_at
+         FROM operational_task_claims otc
+         JOIN repository_task_packets rtp
+           ON rtp.task_version_id = otc.task_version_id
+        WHERE otc.user_id = ? AND rtp.status = 'active'
+          AND otc.task_version_id IN (${taskPlaceholders})`
+    ).bind(account.user_id, ...taskVersionIds).all(),
+    env.DB.prepare(
+      `SELECT ta.task_version_id, ta.round_id, ta.id, ta.role, ta.status,
+              ta.user_id, ta.email_hash, ta.invited_at, ta.claimed_at,
+              ta.submitted_at
+         FROM task_assignments ta
+         JOIN task_versions tv ON tv.id = ta.task_version_id
+         JOIN repository_task_packets rtp
+           ON rtp.task_version_id = ta.task_version_id
+         JOIN consensus_rounds cr
+           ON cr.id = ta.round_id
+          AND cr.round_number = tv.current_round
+        WHERE rtp.status = 'active' AND ta.status <> 'cancelled'
+          AND ta.task_version_id IN (${taskPlaceholders})`
+    ).bind(...taskVersionIds).all(),
+    env.DB.prepare(
+      `SELECT tp.task_version_id, tp.round_id, tp.role,
+              tp.status, tp.user_id
+         FROM task_participations tp
+         JOIN task_versions tv ON tv.id = tp.task_version_id
+         JOIN repository_task_packets rtp
+           ON rtp.task_version_id = tp.task_version_id
+         JOIN consensus_rounds cr
+           ON cr.id = tp.round_id
+          AND cr.round_number = tv.current_round
+        WHERE rtp.status = 'active'
+          AND tp.task_version_id IN (${taskPlaceholders})`
+    ).bind(...taskVersionIds).all(),
+    env.DB.prepare(
+      `SELECT d.packet_id, d.role, d.completion_percent, d.updated_at
+         FROM drafts d
+         JOIN repository_task_packets rtp ON rtp.packet_id = d.packet_id
+        WHERE d.user_id = ? AND rtp.status = 'active'
+          AND d.packet_id IN (${packetPlaceholders})`
+    ).bind(account.user_id, ...packetIds).all()
+  ]);
+  const operationalClaims = new Map(
+    (operationalClaimsResult.results || []).map(item => [
+      item.task_version_id,
+      item
+    ])
+  );
+  const assignmentsByRound = new Map();
+  for (const item of assignmentsResult.results || []) {
+    const key = `${item.task_version_id}\u0000${item.round_id}`;
+    const values = assignmentsByRound.get(key) || [];
+    values.push(item);
+    assignmentsByRound.set(key, values);
+  }
+  const participationsByRound = new Map();
+  for (const item of participationsResult.results || []) {
+    const key = `${item.task_version_id}\u0000${item.round_id}`;
+    const values = participationsByRound.get(key) || [];
+    values.push(item);
+    participationsByRound.set(key, values);
+  }
+  const drafts = new Map(
+    (draftsResult.results || []).map(item => [
+      `${item.packet_id}\u0000${item.role}`,
+      item
+    ])
+  );
+
   const tasks = [];
-  for (const row of result.results || []) {
-    if (operationalOnly && row.lane !== "operational-test") continue;
+  for (const row of rows) {
     if (row.lane === "operational-test") {
-      const claim = await env.DB.prepare(
-        `SELECT role, status, claimed_at, submitted_at
-           FROM operational_task_claims
-          WHERE task_version_id = ? AND user_id = ?`
-      ).bind(row.task_version_id, account.user_id).first();
+      const claim = operationalClaims.get(row.task_version_id) || null;
       const manifest = parseRepositoryTaskManifest(row.manifest_json);
-      const draft = await env.DB.prepare(
-        `SELECT completion_percent, updated_at
-           FROM drafts
-          WHERE user_id = ? AND packet_id = ? AND role = 'A'`
-      ).bind(account.user_id, row.packet_id).first();
+      const draft = drafts.get(`${row.packet_id}\u0000A`) || null;
       tasks.push({
         taskVersionId: row.task_version_id,
         taskId: row.task_id,
@@ -3068,22 +3350,9 @@ async function listRepositoryTasks(request, env, url) {
       });
       continue;
     }
-    const [assignmentResult, participationResult] = await Promise.all([
-      env.DB.prepare(
-        `SELECT id, role, status, user_id, email_hash, invited_at,
-                claimed_at, submitted_at
-           FROM task_assignments
-          WHERE task_version_id = ? AND round_id = ?
-            AND status <> 'cancelled'`
-      ).bind(row.task_version_id, row.round_id).all(),
-      env.DB.prepare(
-        `SELECT role, status, user_id
-           FROM task_participations
-          WHERE task_version_id = ? AND round_id = ?`
-      ).bind(row.task_version_id, row.round_id).all()
-    ]);
-    const assignments = assignmentResult.results || [];
-    const participations = participationResult.results || [];
+    const roundKey = `${row.task_version_id}\u0000${row.round_id}`;
+    const assignments = assignmentsByRound.get(roundKey) || [];
+    const participations = participationsByRound.get(roundKey) || [];
     const own = assignments.find(item =>
       item.user_id === account.user_id
       || item.email_hash === account.verified_email_hash
@@ -3109,11 +3378,7 @@ async function listRepositoryTasks(request, env, url) {
       : availableRoles.length > 0;
     const draftRole = clientRoleForConsensusRole(role);
     const draft = draftRole
-      ? await env.DB.prepare(
-        `SELECT completion_percent, updated_at
-           FROM drafts
-          WHERE user_id = ? AND packet_id = ? AND role = ?`
-      ).bind(account.user_id, row.packet_id, draftRole).first()
+      ? drafts.get(`${row.packet_id}\u0000${draftRole}`) || null
       : null;
     tasks.push({
       taskVersionId: row.task_version_id,

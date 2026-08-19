@@ -164,6 +164,41 @@ test("email code is sent, verified, and bound to registration", async () => {
     assert.equal(verifyResult.verified, true);
     assert.ok(verifyResult.verificationToken.length >= 32);
 
+    const existingUserId = "f70c06c4-02f3-47ba-a0b7-27ff260c93b4";
+    const now = Date.now();
+    database.database.prepare(
+      `INSERT INTO users
+        (id, profile_ciphertext, consent_json, verified_email_hash,
+         created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    ).run(
+      existingUserId,
+      "will-be-replaced-from-registration-challenge",
+      JSON.stringify({
+        identityStorage: true,
+        futureContact: false,
+        discussionNotifications: false
+      }),
+      stored.email_hash,
+      now,
+      now
+    );
+    database.database.prepare(
+      `INSERT INTO passkeys
+        (credential_id, user_id, public_key, counter, transports_json,
+         device_type, backed_up, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      "existing-passkey",
+      existingUserId,
+      "existing-public-key",
+      0,
+      JSON.stringify(["internal"]),
+      "singleDevice",
+      0,
+      now
+    );
+
     const registrationResponse = await worker.fetch(
       new Request(`${origin}/api/account/register/options`, {
         method: "POST",
@@ -192,6 +227,16 @@ test("email code is sent, verified, and bound to registration", async () => {
     );
     assert.equal(registrationResponse.status, 200);
     const registration = await registrationResponse.json();
+    assert.equal(registration.accountMode, "existing");
+    assert.equal(registration.options.user.name, "judge@example.test");
+    assert.deepEqual(
+      registration.options.excludeCredentials,
+      [{
+        id: "existing-passkey",
+        type: "public-key",
+        transports: ["internal"]
+      }]
+    );
     const reservation = database.database.prepare(
       `SELECT reservation_id, consumed_at
          FROM email_verifications
@@ -199,6 +244,91 @@ test("email code is sent, verified, and bound to registration", async () => {
     ).get(sendResult.verificationId);
     assert.equal(reservation.reservation_id, registration.challengeId);
     assert.equal(reservation.consumed_at, null);
+    const registrationChallenge = database.database.prepare(
+      `SELECT user_id, profile_ciphertext
+         FROM webauthn_challenges
+        WHERE id = ?`
+    ).get(registration.challengeId);
+    assert.equal(registrationChallenge.user_id, existingUserId);
+
+    database.database.prepare(
+      "UPDATE users SET profile_ciphertext = ? WHERE id = ?"
+    ).run(registrationChallenge.profile_ciphertext, existingUserId);
+    const sessionToken = "email-owned-account-session-token";
+    const sessionDigest = await crypto.subtle.digest(
+      "SHA-256",
+      new TextEncoder().encode(sessionToken)
+    );
+    const sessionHash = [...new Uint8Array(sessionDigest)]
+      .map(value => value.toString(16).padStart(2, "0"))
+      .join("");
+    database.database.prepare(
+      `INSERT INTO sessions
+        (token_hash, user_id, expires_at, created_at)
+       VALUES (?, ?, ?, ?)`
+    ).run(
+      sessionHash,
+      existingUserId,
+      now + 60_000,
+      now
+    );
+
+    const additionalResponse = await worker.fetch(
+      new Request(
+        `${origin}/api/account/passkeys/register/options`,
+        {
+          method: "POST",
+          headers: {
+            origin,
+            cookie: `adg_session=${sessionToken}`,
+            "content-type": "application/json"
+          },
+          body: "{}"
+        }
+      ),
+      env
+    );
+    assert.equal(additionalResponse.status, 200);
+    const additional = await additionalResponse.json();
+    assert.equal(additional.options.user.name, "judge@example.test");
+    assert.deepEqual(
+      additional.options.excludeCredentials,
+      registration.options.excludeCredentials
+    );
+    const additionalChallenge = database.database.prepare(
+      `SELECT user_id, email_verification_id, verified_email_hash
+         FROM webauthn_challenges
+        WHERE id = ?`
+    ).get(additional.challengeId);
+    assert.equal(additionalChallenge.user_id, existingUserId);
+    assert.equal(additionalChallenge.email_verification_id, null);
+    assert.equal(additionalChallenge.verified_email_hash, null);
+
+    database.database.prepare(
+      `INSERT INTO passkeys
+        (credential_id, user_id, public_key, counter, transports_json,
+         device_type, backed_up, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      "second-passkey",
+      existingUserId,
+      "second-public-key",
+      0,
+      "[]",
+      "multiDevice",
+      1,
+      now + 1
+    );
+    const accountResponse = await worker.fetch(
+      new Request(`${origin}/api/account`, {
+        headers: { cookie: `adg_session=${sessionToken}` }
+      }),
+      env
+    );
+    assert.equal(accountResponse.status, 200);
+    const account = await accountResponse.json();
+    assert.equal(account.userId, existingUserId);
+    assert.equal(account.passkeyCount, 2);
   } finally {
     globalThis.fetch = originalFetch;
   }

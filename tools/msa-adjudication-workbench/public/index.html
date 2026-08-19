@@ -94,16 +94,16 @@
         </div>
         <aside class="hero-card" aria-label="ملخّص التجربة">
           <div class="metric">
-            <strong>٩</strong>
-            <span>جُمَل في العيّنة الأولى</span>
+            <strong>٢</strong>
+            <span>عيّنتان جاهزتان</span>
           </div>
           <div class="metric">
-            <strong>٣٦</strong>
+            <strong>١٦</strong>
+            <span>جملة عربية</span>
+          </div>
+          <div class="metric">
+            <strong>١١٢</strong>
             <span>وحدة لغوية</span>
-          </div>
-          <div class="metric">
-            <strong>١٠</strong>
-            <span>فئات إعرابية ممثَّلة</span>
           </div>
           <p>
             تستغرق التجربة الأولية نحو ١٥ إلى ٢٥ دقيقة. تهدف إلى قياس
@@ -447,10 +447,9 @@
                 <span>الخطوة الثانية</span>
                 <h3>أنشئ مفتاح المرور وتعرَّف على المهمة</h3>
                 <p>
-                  لا توجد كلمة مرور. يحفظ جهازك مفتاحًا آمنًا، وتؤكّد
-                  الدخول لاحقًا بالوسيلة التي يدعمها جهازك: الوجه أو
-                  البصمة أو رمز الجهاز أو مفتاح أمان خارجي. ولا حاجة إلى
-                  حساب مؤسسي أو حساب Microsoft.
+                  البريد الموثّق هو مالك الحساب، ولا توجد كلمة مرور.
+                  ويمكنك ربط أكثر من مفتاح مرور بالحساب نفسه: بصمة أو
+                  وجه أو رمز جهاز أو مفتاح أمان خارجي.
                 </p>
               </div>
 
@@ -459,8 +458,8 @@
                   <span class="eyebrow">حساب الاستكمال</span>
                   <h4 id="account-title">أنشئ حسابك الآمن</h4>
                   <p id="account-description">
-                    تُشفَّر بيانات التعريف والمسودّات قبل حفظها، ولا يملك
-                    الموقع كلمة مرور قابلة للتسريب.
+                    وثّق بريدك لاستعادة الحساب من أي جهاز، ثم أضف مفتاح
+                    مرور واحدًا أو أكثر. وتظل بيانات التعريف مشفّرة.
                   </p>
                 </div>
                 <div class="account-actions">
@@ -468,6 +467,8 @@
                           type="button" disabled>تسجيل مفتاح المرور</button>
                   <button id="login-passkey" class="button secondary"
                           type="button" disabled>لدي حساب: دخول</button>
+                  <button id="add-passkey" class="button secondary"
+                          type="button" hidden>إضافة مفتاح مرور</button>
                   <button id="logout-account" class="button ghost"
                           type="button" hidden>تسجيل الخروج</button>
                   <button id="request-erasure" class="button ghost"

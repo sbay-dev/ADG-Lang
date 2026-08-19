@@ -21,8 +21,9 @@ X/Twitter invitation actions.
 2. Record private contact details and consent.
 3. Verify the email address with a one-time code sent to the reviewer's inbox
    before continuing.
-4. Register a discoverable Passkey; no organization account or password is
-   required for an external adjudicator.
+4. Register a discoverable Passkey. The verified email owns the account, and
+   the same account may hold multiple Passkeys for different devices,
+   fingerprints, platform authenticators, or security keys.
 5. Read the worked example, then start with the pinned PILOT baseline in the
    authenticated task inbox. It exercises save and submission without entering
    scientific consensus.
@@ -67,6 +68,14 @@ Its claims are stored separately from consensus participation, so it does not
 occupy A/B/J1/J2 or change consensus state. Each account may run it once per
 pilot packet.
 
+The task inbox also publishes
+`human-evidence/tasks/natural-arabic-rule-consumption-v1.task.json` as an open
+standard task. Its sanitized packet contains seven authored sentences and 76
+tokens. It contains neither the sealed coverage key nor parser predictions and
+routes independent A/B submissions to J1 and then J2. Because the material is
+developer-visible, its result is useful for rule-transfer adjudication but is
+not a final unseen holdout claim.
+
 ### Direct GitHub issue reporting
 
 - Authenticated reviewers can submit a bounded Arabic defect report without a
@@ -97,6 +106,9 @@ pilot packet.
 - Administrators may assign A/B/J1/J2 by verified email. The database stores a
   one-way email fingerprint plus EntityCrypt ciphertext; public evidence never
   receives the address.
+- A verified email maps to one account. Re-verifying that address recovers the
+  existing account and adds another Passkey instead of creating a second
+  identity; authenticated reviewers can also add a Passkey directly.
 - Claiming is atomic. A single account cannot occupy two roles in the same
   holdout family.
 - Once both A and B submit, disagreement is routed in the same round to J1
@@ -399,7 +411,7 @@ provider image plus any chosen Hyperdrive rollback binding.
 
 ## Release integrity
 
-`release\portal-15.2.3.json` binds the sanitized portal, importer, workflows,
+`release\portal-15.3.0.json` binds the sanitized portal, importer, workflows,
 tests, and documentation with canonical LF-normalized SHA-256 records. Regenerate
 it deterministically from a clean clone with:
 

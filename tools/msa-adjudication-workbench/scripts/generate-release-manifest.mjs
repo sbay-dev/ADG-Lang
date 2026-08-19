@@ -37,6 +37,7 @@ const repositoryFiles = [
   "examples/arabic-text/msa-adjudication-pilot-v1/human-usability-evaluation.template.json",
   "examples/arabic-text/msa-adjudication-pilot-v1/packet.json",
   "human-evidence/tasks/msa-adjudication-pilot-v1.task.json",
+  "human-evidence/tasks/natural-arabic-rule-consumption-v1.task.json",
   "scripts/arabic-text/import-msa-portal-submission.mjs",
   "scripts/arabic-text/render-msa-github-evidence.mjs"
 ];

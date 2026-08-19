@@ -1,0 +1,389 @@
+{
+  "schema": "adg-msa-adjudication-packet-v3",
+  "taskId": "natural-arabic-rule-consumption",
+  "taskVersion": 1,
+  "packetId": "natural-arabic-rule-consumption-v1",
+  "holdoutId": "authored-natural-arabic-rule-consumption-v1-not-final",
+  "protocolId": "adg-quranic-source-rule-transfer-adjudication-v0",
+  "guidelineVersion": "natural-arabic-rule-consumption-guidelines-v1",
+  "dataVersion": "natural-arabic-rule-consumption-data-v1",
+  "protocolVersion": "adg-quranic-source-rule-transfer-adjudication-v0",
+  "metricPolicy": {
+    "schema": "adg-iaa-policy-v1",
+    "policyVersion": "adg-consensus-policy-v1",
+    "metrics": [
+      "raw-agreement",
+      "cohen-kappa"
+    ],
+    "minimumRawAgreement": 0.9,
+    "minimumDefinedKappa": 0.8,
+    "undefinedKappaFallback": "raw-agreement",
+    "automaticFinalization": false,
+    "claimBoundary": "Task-specific policy; no universal IAA threshold is claimed."
+  },
+  "releaseCandidateId": "adg-lang-dev-contextual-rasm-v0",
+  "pilotOnly": false,
+  "developerVisible": true,
+  "parserPredictionsExcluded": true,
+  "derivedFromExcludedCorpus": false,
+  "holdoutManifestSha256": null,
+  "sentences": [
+    {
+      "sentenceId": "rule-01",
+      "text": "فَلَمَّا دَخَلَ سَلِيمٌ القَاعَةَ أُعْلِنَ: يَا سَلِيمُ، تَقَدَّمْ.",
+      "tokens": [
+        {
+          "id": 1,
+          "form": "فَلَمَّا"
+        },
+        {
+          "id": 2,
+          "form": "دَخَلَ"
+        },
+        {
+          "id": 3,
+          "form": "سَلِيمٌ"
+        },
+        {
+          "id": 4,
+          "form": "القَاعَةَ"
+        },
+        {
+          "id": 5,
+          "form": "أُعْلِنَ"
+        },
+        {
+          "id": 6,
+          "form": ":"
+        },
+        {
+          "id": 7,
+          "form": "يَا"
+        },
+        {
+          "id": 8,
+          "form": "سَلِيمُ"
+        },
+        {
+          "id": 9,
+          "form": "،"
+        },
+        {
+          "id": 10,
+          "form": "تَقَدَّمْ"
+        },
+        {
+          "id": 11,
+          "form": "."
+        }
+      ]
+    },
+    {
+      "sentenceId": "rule-02",
+      "text": "إِنِّي أَنَا مُشْرِفُكَ، فَرَاجِعْ تَقْرِيرَيْكَ؛ إِنَّكَ فِي المَرْكَزِ الجَدِيدِ، مَرْكَزِ التَّدْرِيبِ.",
+      "tokens": [
+        {
+          "id": 1,
+          "form": "إِنِّي"
+        },
+        {
+          "id": 2,
+          "form": "أَنَا"
+        },
+        {
+          "id": 3,
+          "form": "مُشْرِفُكَ"
+        },
+        {
+          "id": 4,
+          "form": "،"
+        },
+        {
+          "id": 5,
+          "form": "فَرَاجِعْ"
+        },
+        {
+          "id": 6,
+          "form": "تَقْرِيرَيْكَ"
+        },
+        {
+          "id": 7,
+          "form": "؛"
+        },
+        {
+          "id": 8,
+          "form": "إِنَّكَ"
+        },
+        {
+          "id": 9,
+          "form": "فِي"
+        },
+        {
+          "id": 10,
+          "form": "المَرْكَزِ"
+        },
+        {
+          "id": 11,
+          "form": "الجَدِيدِ"
+        },
+        {
+          "id": 12,
+          "form": "،"
+        },
+        {
+          "id": 13,
+          "form": "مَرْكَزِ"
+        },
+        {
+          "id": 14,
+          "form": "التَّدْرِيبِ"
+        },
+        {
+          "id": 15,
+          "form": "."
+        }
+      ]
+    },
+    {
+      "sentenceId": "rule-03",
+      "text": "وَأَنَا دَرَّبْتُكَ فَانْتَبِهْ لِمَا يُمْلَى.",
+      "tokens": [
+        {
+          "id": 1,
+          "form": "وَأَنَا"
+        },
+        {
+          "id": 2,
+          "form": "دَرَّبْتُكَ"
+        },
+        {
+          "id": 3,
+          "form": "فَانْتَبِهْ"
+        },
+        {
+          "id": 4,
+          "form": "لِمَا"
+        },
+        {
+          "id": 5,
+          "form": "يُمْلَى"
+        },
+        {
+          "id": 6,
+          "form": "."
+        }
+      ]
+    },
+    {
+      "sentenceId": "rule-04",
+      "text": "إِنَّنِي أَنَا المَسْؤُولُ، لَا قَائِدَ إِلَّا أَنَا، فَاتَّبِعْنِي وَدَوِّنِ الخُطَّةَ لِمُرَاجَعَتِي.",
+      "tokens": [
+        {
+          "id": 1,
+          "form": "إِنَّنِي"
+        },
+        {
+          "id": 2,
+          "form": "أَنَا"
+        },
+        {
+          "id": 3,
+          "form": "المَسْؤُولُ"
+        },
+        {
+          "id": 4,
+          "form": "،"
+        },
+        {
+          "id": 5,
+          "form": "لَا"
+        },
+        {
+          "id": 6,
+          "form": "قَائِدَ"
+        },
+        {
+          "id": 7,
+          "form": "إِلَّا"
+        },
+        {
+          "id": 8,
+          "form": "أَنَا"
+        },
+        {
+          "id": 9,
+          "form": "،"
+        },
+        {
+          "id": 10,
+          "form": "فَاتَّبِعْنِي"
+        },
+        {
+          "id": 11,
+          "form": "وَدَوِّنِ"
+        },
+        {
+          "id": 12,
+          "form": "الخُطَّةَ"
+        },
+        {
+          "id": 13,
+          "form": "لِمُرَاجَعَتِي"
+        },
+        {
+          "id": 14,
+          "form": "."
+        }
+      ]
+    },
+    {
+      "sentenceId": "rule-05",
+      "text": "إِنَّ الإِجَابَةَ حَاضِرَةٌ، أَكَادُ أَحْجُبُهَا لِيُمْتَحَنَ كُلُّ طَالِبٍ بِمَا يُفَكِّرُ.",
+      "tokens": [
+        {
+          "id": 1,
+          "form": "إِنَّ"
+        },
+        {
+          "id": 2,
+          "form": "الإِجَابَةَ"
+        },
+        {
+          "id": 3,
+          "form": "حَاضِرَةٌ"
+        },
+        {
+          "id": 4,
+          "form": "،"
+        },
+        {
+          "id": 5,
+          "form": "أَكَادُ"
+        },
+        {
+          "id": 6,
+          "form": "أَحْجُبُهَا"
+        },
+        {
+          "id": 7,
+          "form": "لِيُمْتَحَنَ"
+        },
+        {
+          "id": 8,
+          "form": "كُلُّ"
+        },
+        {
+          "id": 9,
+          "form": "طَالِبٍ"
+        },
+        {
+          "id": 10,
+          "form": "بِمَا"
+        },
+        {
+          "id": 11,
+          "form": "يُفَكِّرُ"
+        },
+        {
+          "id": 12,
+          "form": "."
+        }
+      ]
+    },
+    {
+      "sentenceId": "rule-06",
+      "text": "فَلَا يَصْرِفَنَّكَ عَنِ الخُطَّةِ مَنْ لَا يَفْهَمُهَا وَاتَّبَعَ وَهْمَهُ فَتَخْسَرَ.",
+      "tokens": [
+        {
+          "id": 1,
+          "form": "فَلَا"
+        },
+        {
+          "id": 2,
+          "form": "يَصْرِفَنَّكَ"
+        },
+        {
+          "id": 3,
+          "form": "عَنِ"
+        },
+        {
+          "id": 4,
+          "form": "الخُطَّةِ"
+        },
+        {
+          "id": 5,
+          "form": "مَنْ"
+        },
+        {
+          "id": 6,
+          "form": "لَا"
+        },
+        {
+          "id": 7,
+          "form": "يَفْهَمُهَا"
+        },
+        {
+          "id": 8,
+          "form": "وَاتَّبَعَ"
+        },
+        {
+          "id": 9,
+          "form": "وَهْمَهُ"
+        },
+        {
+          "id": 10,
+          "form": "فَتَخْسَرَ"
+        },
+        {
+          "id": 11,
+          "form": "."
+        }
+      ]
+    },
+    {
+      "sentenceId": "rule-07",
+      "text": "لَا تُهْمِلِ الدَّلِيلَ فَتَعْمَى عَنِ الصَّوَابِ.",
+      "tokens": [
+        {
+          "id": 1,
+          "form": "لَا"
+        },
+        {
+          "id": 2,
+          "form": "تُهْمِلِ"
+        },
+        {
+          "id": 3,
+          "form": "الدَّلِيلَ"
+        },
+        {
+          "id": 4,
+          "form": "فَتَعْمَى"
+        },
+        {
+          "id": 5,
+          "form": "عَنِ"
+        },
+        {
+          "id": 6,
+          "form": "الصَّوَابِ"
+        },
+        {
+          "id": 7,
+          "form": "."
+        }
+      ]
+    }
+  ],
+  "instructions": [
+    "Annotate independently without viewing parser output, source verses, the sealed coverage key, or the other annotator's work.",
+    "Assign UPOS, dependency head, and dependency relation to every orthographic token.",
+    "Assign a traditional i'rab category or explicitly mark it not applicable.",
+    "Record implicit subjects, deputy-subjects, omitted predicates, interpreted infinitives, and cross-sentence links in the sentence note.",
+    "Treat rule-02, rule-03, and rule-04 as one ordered discourse context with persistent speaker and addressee identities.",
+    "Do not use lexical-root similarity, byte size, or the Quranic source wording to decide structural equivalence.",
+    "This developer-visible authored packet can enter consensus but cannot serve as an independent final holdout.",
+    "Complete the syntax and i'rab decision here; the separate rhetoric sheet remains outside this portal task.",
+    "The repository consensus cycle requires independent A and B annotations, J1 adjudication, and J2 ratification."
+  ]
+}
