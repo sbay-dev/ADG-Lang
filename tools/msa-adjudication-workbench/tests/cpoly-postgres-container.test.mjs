@@ -23,6 +23,12 @@ import {
   createRuntimeEnv
 } from "../src/database.js";
 import {
+  buildJournalPayload,
+  encryptRecoveryString,
+  postgresJournalPurpose,
+  requeueAmbiguousFailedJournalEntries
+} from "../src/cpoly-recovery.js";
+import {
   serializeRows
 } from "../infrastructure/cpoly-postgres/cloudflare/bridge/serialization.mjs";
 
@@ -247,6 +253,155 @@ test("container adapter preserves D1 shapes, private auth, and receipt forwardin
     );
   } finally {
     await runtimeEnv.__runtimeCleanup__?.();
+    recoveryDb.database.close();
+  }
+});
+
+test("container recovery replays legacy disconnect failures under the same request id", async () => {
+  const recoveryDb = new D1RecoveryDatabase();
+  const requestId = "6dbedce1-14ea-4d66-87e5-2f53291f9310";
+  const payload = buildJournalPayload({
+    requestId,
+    operationKind: "run",
+    operations: [{
+      mode: "run",
+      sql: "INSERT INTO probe (id, value) VALUES (?, ?)",
+      params: ["row-a", "alpha"]
+    }]
+  });
+  const ciphertext = await encryptRecoveryString(
+    payload.json,
+    recoveryMasterKey,
+    postgresJournalPurpose()
+  );
+  recoveryDb.database.prepare(
+    `INSERT INTO cpoly_pg_write_journal
+      (request_id, payload_hash, operation_kind, statement_count, status,
+       ciphertext, attempts, last_error, created_at, updated_at)
+     VALUES (?, ?, 'run', 1, 'failed', ?, 1, ?, ?, ?)`
+  ).run(
+    requestId,
+    payload.hash,
+    Buffer.from(ciphertext),
+    "Container suddenly disconnected, try again",
+    1787475617084,
+    1787475617268
+  );
+
+  const stub = new FakeContainerStub(async request => {
+    const url = new URL(request.url);
+    if (url.pathname === CPOLY_POSTGRES_PROMOTE_PATH) {
+      const body = await request.json();
+      assert.deepEqual(body.snapshotCoverage, {
+        generation: 70,
+        watermark: 2407
+      });
+      assert.equal(body.targetGeneration, 71);
+      return jsonResponse({
+        ok: true,
+        schema: "adg.cpoly-postgres.promote-generation.v1",
+        receipt: { generation: 71, receiptSeq: 2407 }
+      });
+    }
+    if (url.pathname === CPOLY_POSTGRES_QUERY_PATH) {
+      const body = await request.json();
+      assert.equal(body.requestId, requestId);
+      assert.equal(body.payloadHash, payload.hash);
+      assert.equal(body.expectedGeneration, 71);
+      return jsonResponse({
+        ok: true,
+        schema: CPOLY_POSTGRES_EXECUTE_SCHEMA,
+        results: [{
+          success: true,
+          meta: { changes: 1, last_row_id: 0 }
+        }],
+        receipt: { generation: 71, receiptSeq: 2408 }
+      });
+    }
+    if (url.pathname === CPOLY_POSTGRES_RECEIPT_PATH) {
+      return jsonResponse({
+        ok: true,
+        schema: "adg.cpoly-postgres.receipt-watermark.v1",
+        receipt: { generation: 71, receiptSeq: 2408 }
+      });
+    }
+    throw new Error(`Unexpected recovery container path: ${url.pathname}`);
+  });
+  const runtimeEnv = createRuntimeEnv({
+    DB: recoveryDb,
+    CPOLY_POSTGRES: {},
+    CPOLY_POSTGRES_INSTANCE_ID: "cpoly-postgres-staging",
+    CPOLY_POSTGRES_INTERNAL_TOKEN: "container-token",
+    CPOLY_BACKUP_MASTER_KEY: recoveryMasterKey,
+    __CPOLY_POSTGRES_GET_CONTAINER__: () => stub
+  });
+
+  try {
+    assert.deepEqual(
+      await runtimeEnv.DB.completeRecoveryReplay({
+        snapshotCoverage: { generation: 70, watermark: 2407 },
+        targetGeneration: 71,
+        limit: 10
+      }),
+      {
+        generation: 71,
+        receiptSeq: 2408,
+        replayed: 1,
+        pending: 0
+      }
+    );
+    assert.deepEqual(
+      { ...recoveryDb.database.prepare(
+        `SELECT status, attempts, last_error,
+                postgres_generation, postgres_receipt_seq
+           FROM cpoly_pg_write_journal
+          WHERE request_id = ?`
+      ).get(requestId) },
+      {
+        status: "applied",
+        attempts: 2,
+        last_error: null,
+        postgres_generation: 71,
+        postgres_receipt_seq: 2408
+      }
+    );
+  } finally {
+    await runtimeEnv.__runtimeCleanup__?.();
+    recoveryDb.database.close();
+  }
+});
+
+test("legacy recovery keeps definitive journal failures blocked", async () => {
+  const recoveryDb = new D1RecoveryDatabase();
+  recoveryDb.database.prepare(
+    `INSERT INTO cpoly_pg_write_journal
+      (request_id, payload_hash, operation_kind, statement_count, status,
+       ciphertext, attempts, last_error, created_at, updated_at)
+     VALUES (?, ?, 'run', 1, 'failed', ?, 1, ?, ?, ?)`
+  ).run(
+    "90fdf667-f96a-446f-a408-d50be7b537f4",
+    "a".repeat(64),
+    Buffer.from([1]),
+    "duplicate key value violates unique constraint",
+    1787475617084,
+    1787475617268
+  );
+
+  try {
+    assert.equal(
+      await requeueAmbiguousFailedJournalEntries(
+        recoveryDb,
+        1788060000000
+      ),
+      0
+    );
+    assert.equal(
+      recoveryDb.database.prepare(
+        "SELECT status FROM cpoly_pg_write_journal"
+      ).get().status,
+      "failed"
+    );
+  } finally {
     recoveryDb.database.close();
   }
 });

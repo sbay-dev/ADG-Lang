@@ -20,6 +20,14 @@
       "image": "./postgres/Dockerfile",
       "max_instances": 1,
       "instance_type": "standard-1"
+      // If the deployed application has SSH diagnostic keys, preserve every
+      // existing key here. Container application updates are declarative.
+      // "authorized_keys": [
+      //   {
+      //     "name": "replace-with-existing-key-name",
+      //     "public_key": "ssh-ed25519 replace-with-existing-public-key"
+      //   }
+      // ]
     }
   ],
   "durable_objects": {

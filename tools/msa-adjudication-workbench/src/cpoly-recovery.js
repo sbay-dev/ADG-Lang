@@ -58,6 +58,17 @@ const DEFAULT_JOURNAL_REPLAY_LIMIT = 24;
 const DEFAULT_JOURNAL_CLEANUP_LIMIT = 64;
 const DEFAULT_JOURNAL_MAX_CIPHERTEXT_BYTES = 1572864;
 const MAX_JSON_BODY_BYTES = MAX_BACKUP_DESCRIPTOR_JSON_BYTES;
+export const AMBIGUOUS_POSTGRES_WRITE_ERROR_MARKERS = Object.freeze([
+  "timeout",
+  "network",
+  "connection",
+  "disconnect",
+  "socket",
+  "econn",
+  "temporarily unavailable",
+  "try again",
+  "provider request failed with status 5"
+]);
 
 export function getRecoveryDatabase(env) {
   if (env?.RECOVERY_DB && typeof env.RECOVERY_DB.prepare === "function") {
@@ -489,6 +500,26 @@ export async function markJournalFailed(
             updated_at = ?
       WHERE request_id = ?`
   ).bind(boundErrorMessage(message), now, requestId).run();
+}
+
+export async function requeueAmbiguousFailedJournalEntries(
+  recoveryDb,
+  now = Date.now()
+) {
+  const predicates = AMBIGUOUS_POSTGRES_WRITE_ERROR_MARKERS.map(
+    () => "lower(COALESCE(last_error, '')) LIKE ?"
+  );
+  const patterns = AMBIGUOUS_POSTGRES_WRITE_ERROR_MARKERS.map(
+    marker => `%${marker}%`
+  );
+  const result = await recoveryDb.prepare(
+    `UPDATE cpoly_pg_write_journal
+        SET status = 'pending',
+            updated_at = ?
+      WHERE status = 'failed'
+        AND (${predicates.join(" OR ")})`
+  ).bind(now, ...patterns).run();
+  return Number(result?.meta?.changes || result?.changes || 0);
 }
 
 export async function loadRecoveryJournalCandidates(

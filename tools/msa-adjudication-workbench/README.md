@@ -238,7 +238,10 @@ The deployed Cloudflare configurations keep
 `CPOLY_ALLOW_FRESH_BOOTSTRAP=false` and `CPOLY_RESUME_RECOVERY=true`.
 An interrupted restore therefore resumes from the signed D1/KV backup and
 journal instead of leaving dynamic traffic permanently closed or approving an
-empty database.
+empty database. Legacy journal rows whose recorded failure is transport-
+ambiguous (for example, a container disconnect or HTTP 5xx) are atomically
+returned to `pending` and replayed under their original request IDs. Definitive
+write failures remain `failed` and keep recovery closed.
 
 Use `EVIDENCE_ARCHIVE_MODE=d1` until Cloudflare dashboard activation allows R2.
 In `d1` mode, the authoritative `evidence_outbox.public_payload_json` and
@@ -418,7 +421,7 @@ provider image plus any chosen Hyperdrive rollback binding.
 
 ## Release integrity
 
-`release\portal-15.3.1.json` binds the sanitized portal, importer, workflows,
+`release\portal-15.3.2.json` binds the sanitized portal, importer, workflows,
 tests, and documentation with canonical LF-normalized SHA-256 records. Regenerate
 it deterministically from a clean clone with:
 

@@ -1,5 +1,6 @@
 import postgres from "postgres";
 import {
+  AMBIGUOUS_POSTGRES_WRITE_ERROR_MARKERS,
   buildJournalPayload,
   cleanupAppliedRecoveryJournal,
   constantTimeHexEqual,
@@ -16,6 +17,7 @@ import {
   markJournalPending,
   parseJournalPayload,
   postgresJournalPurpose,
+  requeueAmbiguousFailedJournalEntries,
   sha256HexUtf8
 } from "./cpoly-recovery.js";
 import {
@@ -194,6 +196,10 @@ class JournaledPostgresD1Database {
     if (!this.recoveryDb || !this.recoveryMasterKey) {
       return 0;
     }
+    await requeueAmbiguousFailedJournalEntries(
+      this.recoveryDb,
+      this.clock()
+    );
     const candidates = await loadRecoveryJournalCandidates(
       this.recoveryDb,
       limit
@@ -279,6 +285,10 @@ class JournaledPostgresD1Database {
     if (!this.recoveryDb || !this.recoveryMasterKey) {
       throw new Error("Recovery journal is unavailable.");
     }
+    await requeueAmbiguousFailedJournalEntries(
+      this.recoveryDb,
+      this.clock()
+    );
     await this.promoteRecoveryGeneration(snapshotCoverage, targetGeneration);
     let replayed = 0;
     while (true) {
@@ -1152,6 +1162,10 @@ function zeroResultsForOperations(operations) {
 function isAmbiguousPostgresWriteError(error) {
   if (error instanceof WriteReceiptConflictError) return false;
   if (Boolean(error?.retryable)) return true;
+  const status = Number(error?.status || 0);
+  if (status === 408 || status === 425 || status === 429 || status >= 500) {
+    return true;
+  }
   const code = String(error?.code || "");
   if (code && /^[0-9A-Z]{5}$/u.test(code)) {
     return code.startsWith("08")
@@ -1160,11 +1174,9 @@ function isAmbiguousPostgresWriteError(error) {
       || code === "57P03";
   }
   const message = String(error?.message || "").toLowerCase();
-  return message.includes("timeout")
-    || message.includes("network")
-    || message.includes("connection")
-    || message.includes("socket")
-    || message.includes("econn");
+  return AMBIGUOUS_POSTGRES_WRITE_ERROR_MARKERS.some(
+    marker => message.includes(marker)
+  );
 }
 
 class WriteReceiptConflictError extends Error {

@@ -75,7 +75,15 @@ explicit rollback paths:
 Production and staging set `CPOLY_ALLOW_FRESH_BOOTSTRAP=false` together with
 `CPOLY_RESUME_RECOVERY=true`. This permits only the signed D1/KV restore and
 journal-replay path to resume after an interrupted container start; it does not
-authorize an empty database bootstrap.
+authorize an empty database bootstrap. The replay lane atomically requeues
+legacy `failed` rows only when their recorded error is transport-ambiguous,
+including container disconnects and HTTP 5xx responses. Constraint, receipt,
+payload-integrity, and other definitive failures remain blocked.
+
+Cloudflare container application updates are declarative. Before deployment,
+copy every existing `configuration.authorized_keys` entry into the selected
+Wrangler container block so a diagnostic key cannot be omitted from the
+desired state.
 
 Set `EVIDENCE_ARCHIVE_MODE=d1` until Cloudflare dashboard activation completes
 and R2 is available. In `d1` mode, the authoritative
