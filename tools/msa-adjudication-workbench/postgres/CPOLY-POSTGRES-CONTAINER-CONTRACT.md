@@ -221,7 +221,10 @@ Request:
 }
 ```
 
-Response reuses the same `status` object as `GET /status`.
+Response immediately reuses the same `status` object as `GET /status`.
+Keepalive must not wait for recovery completion because the signed completion
+callback re-enters the same Durable Object for generation promotion and
+journal replay.
 
 ## Backup trigger
 

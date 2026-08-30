@@ -1,6 +1,6 @@
 {
   "name": "adg-msa-adjudication-workbench",
-  "version": "15.3.3",
+  "version": "15.3.4",
   "private": true,
   "type": "module",
   "scripts": {

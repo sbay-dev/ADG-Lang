@@ -406,7 +406,7 @@ test("legacy recovery keeps definitive journal failures blocked", async () => {
   }
 });
 
-test("container recovery carries the cumulative receipt watermark across generations", () => {
+test("container recovery keeps keepalive non-blocking and carries the cumulative watermark", () => {
   const bridge = readFileSync(
     "infrastructure/cpoly-postgres/cloudflare/bridge/server.mjs",
     "utf8"
@@ -414,12 +414,9 @@ test("container recovery carries the cumulative receipt watermark across generat
   assert.match(bridge, /async function globalReceiptWatermark/u);
   assert.match(
     bridge,
-    /await waitForKeepaliveStatus\(KEEPALIVE_SCHEMA\)/u
+    /url\.pathname === paths\.keepalive[\s\S]*?await statusPayload\(KEEPALIVE_SCHEMA\)/u
   );
-  assert.match(
-    bridge,
-    /while \(!payload\.status\.ready[\s\S]*?!payload\.status\.lastError[\s\S]*?Date\.now\(\) < deadline\)/u
-  );
+  assert.doesNotMatch(bridge, /waitForKeepaliveStatus/u);
   assert.doesNotMatch(bridge, /WHERE generation = \$\{generation\}/u);
   assert.doesNotMatch(bridge, /ON receipt\.generation = runtime\.current_generation/u);
 

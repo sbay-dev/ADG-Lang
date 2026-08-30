@@ -381,7 +381,10 @@ replays the D1 journal to exhaustion under the same request IDs, promotes the
 next recovery generation, and marks the lane `ready`. The scheduled handler
 also pings the private container and only triggers a bounded backup when the
 provider reports `ready`; all other cron side effects remain blocked while the
-container reports `starting` or `restoring`.
+container reports `starting` or `restoring`. Keepalive returns its current
+status immediately: it must not hold the Durable Object request while the
+signed recovery-complete callback re-enters that same provider to promote the
+generation and replay the journal.
 
 For repository imports, `.github\workflows\import-msa-adjudication.yml` now
 supports `ADG_PORTAL_IMPORT_SOURCE=portal-api` with
@@ -423,7 +426,7 @@ provider image plus any chosen Hyperdrive rollback binding.
 
 ## Release integrity
 
-`release\portal-15.3.3.json` binds the sanitized portal, importer, workflows,
+`release\portal-15.3.4.json` binds the sanitized portal, importer, workflows,
 tests, and documentation with canonical LF-normalized SHA-256 records. Regenerate
 it deterministically from a clean clone with:
 

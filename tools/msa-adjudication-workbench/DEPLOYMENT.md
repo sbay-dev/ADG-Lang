@@ -262,7 +262,10 @@ exhaustion under the same request IDs, promotes the next generation, and only
 then returns the lane to `ready`. While recovery is active, or while the
 private container provider reports `starting` or `restoring`, the Worker blocks
 normal dynamic API traffic and cron side effects. The scheduled handler only
-pings the container and, when ready, triggers a bounded backup.
+pings the container and, when ready, triggers a bounded backup. Keepalive is a
+non-blocking status snapshot; waiting inside it would retain the Durable Object
+request needed by the signed recovery-complete callback and can deadlock the
+generation promotion.
 
 Bounded claim: the encrypted D1 journal plus periodic KV-backed backup dump
 protects accepted writes and supports point-in-time rebuild. It does **not**

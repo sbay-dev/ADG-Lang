@@ -72,8 +72,6 @@ let backupStatus = {
   exitCode: null
 };
 let lastError = null;
-const RECOVERY_KEEPALIVE_MAX_WAIT_MS = 90_000;
-const RECOVERY_KEEPALIVE_POLL_MS = 500;
 
 const server = createServer(async (request, response) => {
   try {
@@ -87,11 +85,7 @@ const server = createServer(async (request, response) => {
     if (request.method === "POST" && url.pathname === paths.keepalive) {
       const body = await readJson(request);
       requireSchema(body, KEEPALIVE_SCHEMA);
-      return sendJson(
-        response,
-        200,
-        await waitForKeepaliveStatus(KEEPALIVE_SCHEMA)
-      );
+      return sendJson(response, 200, await statusPayload(KEEPALIVE_SCHEMA));
     }
     if (request.method === "GET" && url.pathname === paths.receipt) {
       return sendJson(response, 200, {
@@ -403,18 +397,6 @@ async function statusPayload(schema) {
       lastError: startupFailure || lastError
     }
   };
-}
-
-async function waitForKeepaliveStatus(schema) {
-  const deadline = Date.now() + RECOVERY_KEEPALIVE_MAX_WAIT_MS;
-  let payload = await statusPayload(schema);
-  while (!payload.status.ready
-      && !payload.status.lastError
-      && Date.now() < deadline) {
-    await new Promise(resolve => setTimeout(resolve, RECOVERY_KEEPALIVE_POLL_MS));
-    payload = await statusPayload(schema);
-  }
-  return payload;
 }
 
 async function readStartupFailure() {
