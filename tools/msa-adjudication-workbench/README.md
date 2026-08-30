@@ -224,6 +224,7 @@ explicit rollback paths:
 - direct Graph mail vars/secrets:
   `MAILER_TENANT_ID`, `MAILER_CLIENT_ID`, `MAILER_CLIENT_SECRET`,
   `MAILER_SENDER_ADDRESS`
+
 - private CPOLY recovery secrets:
   `CPOLY_BACKUP_HMAC_KEY`, `CPOLY_BACKUP_MASTER_KEY`
 - private CPOLY KV propagation delay:
@@ -232,6 +233,12 @@ explicit rollback paths:
   `ENTITYCRYPT_MASTER_KEY`, `SUBMISSION_HMAC_KEY`,
   `REPOSITORY_RECEIPT_HMAC_KEY`, `EMAIL_VERIFICATION_HMAC_KEY`,
   `ENTRA_CLIENT_SECRET`, `TURNSTILE_SECRET`
+
+The deployed Cloudflare configurations keep
+`CPOLY_ALLOW_FRESH_BOOTSTRAP=false` and `CPOLY_RESUME_RECOVERY=true`.
+An interrupted restore therefore resumes from the signed D1/KV backup and
+journal instead of leaving dynamic traffic permanently closed or approving an
+empty database.
 
 Use `EVIDENCE_ARCHIVE_MODE=d1` until Cloudflare dashboard activation allows R2.
 In `d1` mode, the authoritative `evidence_outbox.public_payload_json` and
@@ -411,7 +418,7 @@ provider image plus any chosen Hyperdrive rollback binding.
 
 ## Release integrity
 
-`release\portal-15.3.0.json` binds the sanitized portal, importer, workflows,
+`release\portal-15.3.1.json` binds the sanitized portal, importer, workflows,
 tests, and documentation with canonical LF-normalized SHA-256 records. Regenerate
 it deterministically from a clean clone with:
 

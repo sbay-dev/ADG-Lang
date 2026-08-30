@@ -97,7 +97,7 @@
     "CPOLY_POSTGRES_PROVIDER_PORT": "18444",
     "CPOLY_BACKUP_BASE_URL": "https://adg.sbay.sa",
     "CPOLY_ALLOW_FRESH_BOOTSTRAP": "false",
-    "CPOLY_RESUME_RECOVERY": "false",
+    "CPOLY_RESUME_RECOVERY": "true",
     "MAILER_TENANT_ID": "",
     "MAILER_CLIENT_ID": "",
     "MAILER_SENDER_ADDRESS": "notifications@example.test",

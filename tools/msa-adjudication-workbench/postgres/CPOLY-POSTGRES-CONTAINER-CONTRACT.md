@@ -25,6 +25,11 @@ with the infra-owned provider image before any deployment.
 - var: `CPOLY_ALLOW_FRESH_BOOTSTRAP` (optional, default `false`)
 - var: `CPOLY_RESUME_RECOVERY` (optional, default `false`)
 
+The portal deployment profile sets `CPOLY_ALLOW_FRESH_BOOTSTRAP=false` and
+`CPOLY_RESUME_RECOVERY=true`. This allows a non-ready ephemeral container disk
+to re-enter the signed restore protocol after a restart without permitting a
+blank production bootstrap.
+
 The Worker passes only these container env keys today:
 
 - `CPOLY_POSTGRES_INSTANCE_ID`

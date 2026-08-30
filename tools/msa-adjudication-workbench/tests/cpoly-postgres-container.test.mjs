@@ -405,6 +405,18 @@ test("container helper exposes only expected env keys and path allowlist", () =>
   assert.equal(cpolyPostgresProviderPathAllowed("/api/config"), false);
 });
 
+test("deployed containers resume only signed recovery instead of fresh bootstrap", () => {
+  const exampleConfig = readFileSync("wrangler.example.jsonc", "utf8");
+  assert.match(
+    exampleConfig,
+    /"CPOLY_ALLOW_FRESH_BOOTSTRAP":\s*"false"/u
+  );
+  assert.match(
+    exampleConfig,
+    /"CPOLY_RESUME_RECOVERY":\s*"true"/u
+  );
+});
+
 test("Cloudflare entrypoint recreates runtime directories and migrates every boot", () => {
   const dockerfile = readFileSync(
     "infrastructure/cpoly-postgres/cloudflare/Dockerfile",

@@ -72,6 +72,11 @@ explicit rollback paths:
   `REPOSITORY_RECEIPT_HMAC_KEY`, `EMAIL_VERIFICATION_HMAC_KEY`,
   `ENTRA_CLIENT_SECRET`, `TURNSTILE_SECRET`
 
+Production and staging set `CPOLY_ALLOW_FRESH_BOOTSTRAP=false` together with
+`CPOLY_RESUME_RECOVERY=true`. This permits only the signed D1/KV restore and
+journal-replay path to resume after an interrupted container start; it does not
+authorize an empty database bootstrap.
+
 Set `EVIDENCE_ARCHIVE_MODE=d1` until Cloudflare dashboard activation completes
 and R2 is available. In `d1` mode, the authoritative
 `evidence_outbox.public_payload_json` plus encrypted
