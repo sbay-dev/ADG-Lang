@@ -81,7 +81,8 @@ class D1RecoveryDatabase {
       "migrations/0006_cpoly_backup_contract.sql",
       "migrations/0007_cpoly_recovery_state.sql",
       "migrations/0008_cpoly_backup_metadata_hash.sql",
-      "migrations/0009_cpoly_backup_kv_lane.sql"
+      "migrations/0009_cpoly_backup_kv_lane.sql",
+      "migrations/0013_cpoly_journal_disposition.sql"
     ]) {
       this.database.exec(readFileSync(path, "utf8"));
     }

@@ -77,7 +77,8 @@ class D1RecoveryDatabase {
       "migrations/0006_cpoly_backup_contract.sql",
       "migrations/0007_cpoly_recovery_state.sql",
       "migrations/0008_cpoly_backup_metadata_hash.sql",
-      "migrations/0009_cpoly_backup_kv_lane.sql"
+      "migrations/0009_cpoly_backup_kv_lane.sql",
+      "migrations/0013_cpoly_journal_disposition.sql"
     ]) {
       this.database.exec(readFileSync(path, "utf8"));
     }
@@ -466,11 +467,260 @@ test("legacy recovery keeps definitive journal failures blocked", async () => {
     );
     assert.equal(
       recoveryDb.database.prepare(
-        "SELECT status FROM cpoly_pg_write_journal"
-      ).get().status,
-      "failed"
+        `SELECT status, recovery_disposition
+           FROM cpoly_pg_write_journal`
+      ).get().recovery_disposition,
+      "blocking"
     );
   } finally {
+    recoveryDb.database.close();
+  }
+});
+
+test("recovery retains deterministic rejections without blocking readiness", async () => {
+  const recoveryDb = new D1RecoveryDatabase();
+  const requestId = "0a95c3f5-658a-43e0-b073-9cbc346e4927";
+  const payload = buildJournalPayload({
+    requestId,
+    operationKind: "run",
+    operations: [{
+      mode: "run",
+      sql: "UPDATE users SET verified_email_hash = ? WHERE id = ?",
+      params: ["email-hash", "user-a"]
+    }]
+  });
+  const ciphertext = await encryptRecoveryString(
+    payload.json,
+    recoveryMasterKey,
+    postgresJournalPurpose()
+  );
+  recoveryDb.database.prepare(
+    `INSERT INTO cpoly_pg_write_journal
+      (request_id, payload_hash, operation_kind, statement_count, status,
+       ciphertext, attempts, last_error, created_at, updated_at)
+     VALUES (?, ?, 'run', 1, 'pending', ?, 0, NULL, ?, ?)`
+  ).run(
+    requestId,
+    payload.hash,
+    Buffer.from(ciphertext),
+    1787119914811,
+    1787119914811
+  );
+  const acceptedRequestId = "a6fc2e66-7e0d-4da2-a7e8-1049116f421a";
+  const acceptedPayload = buildJournalPayload({
+    requestId: acceptedRequestId,
+    operationKind: "run",
+    operations: [{
+      mode: "run",
+      sql: "INSERT INTO probe (id, value) VALUES (?, ?)",
+      params: ["row-b", "beta"]
+    }]
+  });
+  const acceptedCiphertext = await encryptRecoveryString(
+    acceptedPayload.json,
+    recoveryMasterKey,
+    postgresJournalPurpose()
+  );
+  recoveryDb.database.prepare(
+    `INSERT INTO cpoly_pg_write_journal
+      (request_id, payload_hash, operation_kind, statement_count, status,
+       ciphertext, attempts, last_error, created_at, updated_at)
+     VALUES (?, ?, 'run', 1, 'pending', ?, 0, NULL, ?, ?)`
+  ).run(
+    acceptedRequestId,
+    acceptedPayload.hash,
+    Buffer.from(acceptedCiphertext),
+    1787119914812,
+    1787119914812
+  );
+
+  const stub = new FakeContainerStub(async request => {
+    const url = new URL(request.url);
+    if (url.pathname === CPOLY_POSTGRES_PROMOTE_PATH) {
+      return jsonResponse({
+        ok: true,
+        schema: "adg.cpoly-postgres.promote-generation.v1",
+        receipt: { generation: 10, receiptSeq: 4427 }
+      });
+    }
+    if (url.pathname === CPOLY_POSTGRES_QUERY_PATH) {
+      const body = await request.json();
+      if (body.requestId === acceptedRequestId) {
+        return jsonResponse({
+          ok: true,
+          schema: CPOLY_POSTGRES_EXECUTE_SCHEMA,
+          results: [{
+            success: true,
+            meta: { changes: 1, last_row_id: 0 }
+          }],
+          receipt: { generation: 10, receiptSeq: 4428 }
+        });
+      }
+      assert.equal(body.requestId, requestId);
+      return jsonResponse({
+        error: {
+          code: "internal_error",
+          message: "Provider request failed.",
+          retryable: true
+        }
+      }, 500);
+    }
+    if (url.pathname === CPOLY_POSTGRES_STATUS_PATH) {
+      return jsonResponse({
+        ok: true,
+        schema: CPOLY_POSTGRES_STATUS_SCHEMA,
+        status: {
+          instanceId: "cpoly-postgres-production",
+          state: "restoring",
+          ready: false,
+          currentGeneration: 10,
+          receiptWatermark: 4427,
+          backupInProgress: false,
+          lastError:
+            "duplicate key value violates unique constraint " +
+            "\"idx_users_verified_email_hash\""
+        }
+      });
+    }
+    if (url.pathname === CPOLY_POSTGRES_RECEIPT_PATH) {
+      return jsonResponse({
+        ok: true,
+        schema: "adg.cpoly-postgres.receipt-watermark.v1",
+        receipt: { generation: 10, receiptSeq: 4428 }
+      });
+    }
+    throw new Error(`Unexpected terminal recovery path: ${url.pathname}`);
+  });
+  const runtimeEnv = createRuntimeEnv({
+    DB: recoveryDb,
+    CPOLY_POSTGRES: {},
+    CPOLY_POSTGRES_INSTANCE_ID: "cpoly-postgres-production",
+    CPOLY_POSTGRES_INTERNAL_TOKEN: "container-token",
+    CPOLY_BACKUP_MASTER_KEY: recoveryMasterKey,
+    __CPOLY_POSTGRES_GET_CONTAINER__: () => stub
+  });
+
+  try {
+    assert.deepEqual(
+      await runtimeEnv.DB.completeRecoveryReplay({
+        snapshotCoverage: { generation: 9, watermark: 4427 },
+        targetGeneration: 10,
+        limit: 10
+      }),
+      {
+        generation: 10,
+        receiptSeq: 4428,
+        replayed: 1,
+        pending: 0
+      }
+    );
+    assert.deepEqual(
+      { ...recoveryDb.database.prepare(
+        `SELECT status, recovery_disposition, last_error
+           FROM cpoly_pg_write_journal
+          WHERE request_id = ?`
+      ).get(requestId) },
+      {
+        status: "failed",
+        recovery_disposition: "terminal_rejected",
+        last_error:
+          "duplicate key value violates unique constraint " +
+          "\"idx_users_verified_email_hash\""
+      }
+    );
+    assert.deepEqual(
+      { ...recoveryDb.database.prepare(
+        `SELECT status, recovery_disposition, postgres_generation,
+                postgres_receipt_seq
+           FROM cpoly_pg_write_journal
+          WHERE request_id = ?`
+      ).get(acceptedRequestId) },
+      {
+        status: "applied",
+        recovery_disposition: "blocking",
+        postgres_generation: 10,
+        postgres_receipt_seq: 4428
+      }
+    );
+  } finally {
+    await runtimeEnv.__runtimeCleanup__?.();
+    recoveryDb.database.close();
+  }
+});
+
+test("recovery keeps encrypted payload-integrity failures blocking", async () => {
+  const recoveryDb = new D1RecoveryDatabase();
+  const requestId = "8f571d7f-b8af-4102-b600-1e47e294eff4";
+  const payload = buildJournalPayload({
+    requestId,
+    operationKind: "run",
+    operations: [{
+      mode: "run",
+      sql: "INSERT INTO probe (id, value) VALUES (?, ?)",
+      params: ["row-integrity", "blocked"]
+    }]
+  });
+  const ciphertext = await encryptRecoveryString(
+    payload.json,
+    recoveryMasterKey,
+    postgresJournalPurpose()
+  );
+  recoveryDb.database.prepare(
+    `INSERT INTO cpoly_pg_write_journal
+      (request_id, payload_hash, operation_kind, statement_count, status,
+       ciphertext, attempts, last_error, created_at, updated_at)
+     VALUES (?, ?, 'run', 1, 'pending', ?, 0, NULL, ?, ?)`
+  ).run(
+    requestId,
+    "f".repeat(64),
+    Buffer.from(ciphertext),
+    1787119914813,
+    1787119914813
+  );
+
+  const stub = new FakeContainerStub(async request => {
+    const url = new URL(request.url);
+    if (url.pathname === CPOLY_POSTGRES_PROMOTE_PATH) {
+      return jsonResponse({
+        ok: true,
+        schema: "adg.cpoly-postgres.promote-generation.v1",
+        receipt: { generation: 10, receiptSeq: 4428 }
+      });
+    }
+    throw new Error(`Unexpected integrity recovery path: ${url.pathname}`);
+  });
+  const runtimeEnv = createRuntimeEnv({
+    DB: recoveryDb,
+    CPOLY_POSTGRES: {},
+    CPOLY_POSTGRES_INSTANCE_ID: "cpoly-postgres-production",
+    CPOLY_POSTGRES_INTERNAL_TOKEN: "container-token",
+    CPOLY_BACKUP_MASTER_KEY: recoveryMasterKey,
+    __CPOLY_POSTGRES_GET_CONTAINER__: () => stub
+  });
+
+  try {
+    await assert.rejects(
+      () => runtimeEnv.DB.completeRecoveryReplay({
+        snapshotCoverage: { generation: 9, watermark: 4428 },
+        targetGeneration: 10,
+        limit: 10
+      }),
+      /payload hash mismatch/u
+    );
+    assert.deepEqual(
+      { ...recoveryDb.database.prepare(
+        `SELECT status, recovery_disposition, last_error
+           FROM cpoly_pg_write_journal
+          WHERE request_id = ?`
+      ).get(requestId) },
+      {
+        status: "failed",
+        recovery_disposition: "blocking",
+        last_error: "Stored PostgreSQL journal payload hash mismatch."
+      }
+    );
+  } finally {
+    await runtimeEnv.__runtimeCleanup__?.();
     recoveryDb.database.close();
   }
 });

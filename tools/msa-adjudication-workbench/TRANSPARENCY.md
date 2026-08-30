@@ -129,7 +129,9 @@
   يكشف أيّ وكيل SQL علنيّ.
 - **سجلّ استردادٍ على D1** مشفَّرٌ `AES-256-GCM`: تُسجَّل الكتابات المتغيّرة
   المقبولة أوّلًا قبل تطبيقها، ثمّ تُحفظ نسخٌ احتياطيةٌ مجزَّأةٌ غير قابلةٍ للتبديل
-  في مساحة `KV` خاصّة، مع بيانات وصفٍ وتحقّقٍ من التجزّؤ في D1.
+  في مساحة `KV` خاصّة، مع بيانات وصفٍ وتحقّقٍ من التجزّؤ في D1. ويبقى رفضُ قيد
+  PostgreSQL الحتمي محفوظًا كصفّ `failed/terminal_rejected` مشفّرٍ للتدقيق؛ لا
+  يُعرض ككتابةٍ مطبّقة ولا يمنع الجاهزية ما دامت معاملته وإيصاله لم يُعتمدا.
 - **Cloudflare Turnstile** وفحوص المصدر نفسه تحمي النقطة العامة.
 - **لوحة الإدارة** على `/admin/` منفصلةٌ تمامًا وتعتمد Microsoft Entra وحده، ولا
   تمنح حسابات مفاتيح المرور العامّة أيّ وصولٍ إليها.
@@ -213,7 +215,7 @@ npm run check
 npm test
 ```
 
-تُثبِّت `release/portal-15.3.5.json` سلامةَ الأصول عبر جذر `SHA-256` قانونيٍّ
+تُثبِّت `release/portal-15.3.6.json` سلامةَ الأصول عبر جذر `SHA-256` قانونيٍّ
 مُطبَّعٍ بنهايات أسطر `LF`. يُعاد توليده حتميًّا بالأمر:
 
 ```powershell
@@ -293,6 +295,6 @@ adjudication portal at **https://adg.sbay.sa** (source under
   case, not a final proofreading service.
 - **Reproduce.** From a clean clone, inside `tools/msa-adjudication-workbench`:
   `npm ci`, `npm run check`, `npm test`. Release integrity is bound by
-  `release/portal-15.3.5.json` (canonical LF SHA-256 root), regenerated with
+  `release/portal-15.3.6.json` (canonical LF SHA-256 root), regenerated with
   `npm run release:manifest` and enforced by the GitHub Actions security
   workflow.

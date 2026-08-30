@@ -281,6 +281,8 @@ The Worker now claims only this bounded recovery scope:
 - accepted writes are journaled in D1 before PostgreSQL mutation;
 - verified PostgreSQL custom-format dumps are chunked into private KV;
 - restore readiness is blocked until the restored snapshot watermark and journal
-  replay generation match; and
+  replay generation match, except that a deterministic integrity-constraint
+  rejection with no committed transaction or matching receipt is retained as
+  a nonblocking `failed/terminal_rejected` audit row; and
 - this does **not** claim zero loss under simultaneous Cloudflare D1 and
   CPOLY container failure.

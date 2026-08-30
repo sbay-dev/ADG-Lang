@@ -77,8 +77,11 @@ Production and staging set `CPOLY_ALLOW_FRESH_BOOTSTRAP=false` together with
 journal-replay path to resume after an interrupted container start; it does not
 authorize an empty database bootstrap. The replay lane atomically requeues
 legacy `failed` rows only when their recorded error is transport-ambiguous,
-including container disconnects and HTTP 5xx responses. Constraint, receipt,
-payload-integrity, and other definitive failures remain blocked. Startup
+including container disconnects and HTTP 5xx responses. Deterministic
+PostgreSQL integrity-constraint rejections are retained as
+`failed/terminal_rejected` audit rows and do not block readiness because the
+transaction and receipt were not committed. Receipt conflicts,
+payload-integrity failures, and unknown failures remain blocked. Startup
 stage/exit failures reported by the container are persisted in
 `cpoly_recovery_runtime.last_error` for bounded diagnosis after the ephemeral
 instance exits. An authenticated provider HTTP 5xx also causes one private
@@ -148,7 +151,10 @@ container provider and any Hyperdrive rollback lane:
   preserve that global maximum when a new generation has no new writes yet;
 - scheduled cron maintenance replays pending or ambiguous journal rows, prunes
   expired signed nonces, and removes old encrypted journal rows only after the
-  applicable recovery window; and
+  applicable recovery window;
+- deterministic PostgreSQL integrity-constraint rejections retain their
+  encrypted journal rows as `failed/terminal_rejected`, while receipt,
+  payload-integrity, and unknown failures remain readiness-blocking; and
 - a separate private dump API accepts the QdrantServer-style backup manifest
   plus chunked immutable backup uploads in the private `CPOLY_BACKUPS` KV
   namespace for the CPOLY container backup/restore path. D1 stores only the

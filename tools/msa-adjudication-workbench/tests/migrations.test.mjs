@@ -17,7 +17,8 @@ function migratedDatabase() {
     "migrations/0009_cpoly_backup_kv_lane.sql",
     "migrations/0010_repository_task_catalog.sql",
     "migrations/0011_portal_issue_reports.sql",
-    "migrations/0012_task_state_repository_receipts.sql"
+    "migrations/0012_task_state_repository_receipts.sql",
+    "migrations/0013_cpoly_journal_disposition.sql"
   ]) {
     database.exec(readFileSync(path, "utf8"));
   }
@@ -283,4 +284,18 @@ test("CPOLY recovery migrations create bounded backup, descriptor, and journal t
       WHERE type = 'table' AND name = 'cpoly_pg_write_journal'`
   ).get().sql;
   assert.match(journalSql, /status IN \('pending', 'applied', 'failed'\)/i);
+  assert.match(
+    journalSql,
+    /recovery_disposition TEXT NOT NULL DEFAULT 'blocking'/i
+  );
+  assert.match(
+    journalSql,
+    /recovery_disposition IN \('blocking', 'terminal_rejected'\)/i
+  );
+  const journalIndexes = new Set(database.prepare(
+    "PRAGMA index_list(cpoly_pg_write_journal)"
+  ).all().map(index => index.name));
+  assert.ok(
+    journalIndexes.has("idx_cpoly_pg_write_journal_recovery_disposition")
+  );
 });

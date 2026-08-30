@@ -98,6 +98,10 @@ class D1ProbeDatabase {
       path.join(projectRoot, "migrations", "0009_cpoly_backup_kv_lane.sql"),
       "utf8"
     ));
+    this.database.exec(readFileSync(
+      path.join(projectRoot, "migrations", "0013_cpoly_journal_disposition.sql"),
+      "utf8"
+    ));
     this.database.exec(`
       CREATE TABLE probe (
         id TEXT PRIMARY KEY,
@@ -243,12 +247,16 @@ test("Postgres adapter matches D1 result shapes and rolls back failed batches", 
     ).bind("row-c").first();
     assert.equal(remaining.count, 0);
     const failedJournal = sqlite.database.prepare(
-      `SELECT status
+      `SELECT status, recovery_disposition
          FROM cpoly_pg_write_journal
         ORDER BY created_at DESC
         LIMIT 1`
     ).get();
     assert.equal(failedJournal.status, "failed");
+    assert.equal(
+      failedJournal.recovery_disposition,
+      "terminal_rejected"
+    );
 
     sqlite.database.prepare(
       `UPDATE cpoly_pg_write_journal
@@ -333,11 +341,12 @@ test("Postgres journal replay fails closed on request-id payload conflicts", {
     );
     await postgresDb.replayRecoveryJournal({ limit: 10 });
     const failed = recoveryDb.database.prepare(
-      `SELECT status
+      `SELECT status, recovery_disposition
          FROM cpoly_pg_write_journal
         WHERE request_id = ?`
     ).get(original.request_id);
     assert.equal(failed.status, "failed");
+    assert.equal(failed.recovery_disposition, "blocking");
     const absent = await postgresDb.prepare(
       `SELECT COUNT(*) AS count FROM probe WHERE id = ?`
     ).bind("row-z").first();

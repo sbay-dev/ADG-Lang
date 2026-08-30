@@ -166,7 +166,9 @@ class JournaledPostgresD1Database {
       }
       return applied.results;
     } catch (error) {
-      const ambiguous = isAmbiguousPostgresWriteError(error);
+      const terminalRejection = isTerminalPostgresWriteRejection(error);
+      const ambiguous = !terminalRejection
+        && isAmbiguousPostgresWriteError(error);
       try {
         if (ambiguous) {
           await markJournalPending(
@@ -180,7 +182,12 @@ class JournaledPostgresD1Database {
             this.recoveryDb,
             requestId,
             journalFailureMessage(error),
-            this.clock()
+            terminalRejection
+              ? {
+                  now: this.clock(),
+                  recoveryDisposition: "terminal_rejected"
+                }
+              : this.clock()
           );
         }
       } catch (journalError) {
@@ -236,8 +243,20 @@ class JournaledPostgresD1Database {
       } catch (error) {
         const definitive = error instanceof WriteReceiptConflictError
           || /Stored PostgreSQL journal/i.test(String(error?.message || ""));
+        const terminalRejection = !definitive
+          && isTerminalPostgresWriteRejection(error);
         try {
-          if (!definitive && isAmbiguousPostgresWriteError(error)) {
+          if (terminalRejection) {
+            await markJournalFailed(
+              this.recoveryDb,
+              entry.requestId,
+              journalFailureMessage(error),
+              {
+                now: this.clock(),
+                recoveryDisposition: "terminal_rejected"
+              }
+            );
+          } else if (!definitive && isAmbiguousPostgresWriteError(error)) {
             await markJournalPending(
               this.recoveryDb,
               entry.requestId,
@@ -331,6 +350,20 @@ class JournaledPostgresD1Database {
         } catch (error) {
           const definitive = error instanceof WriteReceiptConflictError
             || /Stored PostgreSQL journal/i.test(String(error?.message || ""));
+          const terminalRejection = !definitive
+            && isTerminalPostgresWriteRejection(error);
+          if (terminalRejection) {
+            await markJournalFailed(
+              this.recoveryDb,
+              entry.requestId,
+              journalFailureMessage(error),
+              {
+                now: this.clock(),
+                recoveryDisposition: "terminal_rejected"
+              }
+            );
+            continue;
+          }
           if (!definitive && isAmbiguousPostgresWriteError(error)) {
             await markJournalPending(
               this.recoveryDb,
@@ -1206,6 +1239,18 @@ function isAmbiguousPostgresWriteError(error) {
   return AMBIGUOUS_POSTGRES_WRITE_ERROR_MARKERS.some(
     marker => message.includes(marker)
   );
+}
+
+function isTerminalPostgresWriteRejection(error) {
+  if (error instanceof WriteReceiptConflictError) return false;
+  const code = String(error?.code || "").toUpperCase();
+  if (/^23[0-9A-Z]{3}$/u.test(code)) return true;
+  const diagnostic = String(error?.providerLastError || "").toLowerCase();
+  return diagnostic.includes("duplicate key value violates unique constraint")
+    || diagnostic.includes("violates foreign key constraint")
+    || diagnostic.includes("violates not-null constraint")
+    || diagnostic.includes("violates check constraint")
+    || diagnostic.includes("violates exclusion constraint");
 }
 
 class WriteReceiptConflictError extends Error {

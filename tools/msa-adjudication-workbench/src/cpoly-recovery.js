@@ -461,6 +461,7 @@ export async function markJournalApplied(
   await recoveryDb.prepare(
     `UPDATE cpoly_pg_write_journal
         SET status = 'applied',
+            recovery_disposition = 'blocking',
             attempts = attempts + 1,
             last_error = NULL,
             updated_at = ?,
@@ -486,6 +487,7 @@ export async function markJournalPending(
   await recoveryDb.prepare(
     `UPDATE cpoly_pg_write_journal
         SET status = 'pending',
+            recovery_disposition = 'blocking',
             attempts = attempts + 1,
             last_error = ?,
             updated_at = ?
@@ -497,16 +499,29 @@ export async function markJournalFailed(
   recoveryDb,
   requestId,
   message,
-  now = Date.now()
+  options = {}
 ) {
+  const settings = typeof options === "number"
+    ? { now: options }
+    : options;
+  const now = Number(settings.now ?? Date.now());
+  const disposition = settings.recoveryDisposition === "terminal_rejected"
+    ? "terminal_rejected"
+    : "blocking";
   await recoveryDb.prepare(
     `UPDATE cpoly_pg_write_journal
         SET status = 'failed',
+            recovery_disposition = ?,
             attempts = attempts + 1,
             last_error = ?,
             updated_at = ?
       WHERE request_id = ?`
-  ).bind(boundErrorMessage(message), now, requestId).run();
+  ).bind(
+    disposition,
+    boundErrorMessage(message),
+    now,
+    requestId
+  ).run();
 }
 
 export async function requeueAmbiguousFailedJournalEntries(
@@ -522,8 +537,10 @@ export async function requeueAmbiguousFailedJournalEntries(
   const result = await recoveryDb.prepare(
     `UPDATE cpoly_pg_write_journal
         SET status = 'pending',
+            recovery_disposition = 'blocking',
             updated_at = ?
       WHERE status = 'failed'
+        AND recovery_disposition = 'blocking'
         AND (${predicates.join(" OR ")})`
   ).bind(now, ...patterns).run();
   return Number(result?.meta?.changes || result?.changes || 0);
@@ -676,8 +693,11 @@ export async function countRecoveryReplayPending(
     `SELECT COUNT(*) AS count
        FROM cpoly_pg_write_journal
       WHERE status = 'pending'
-         OR status = 'failed'
-         OR (
+          OR (
+            status = 'failed'
+            AND recovery_disposition = 'blocking'
+          )
+          OR (
            status = 'applied'
            AND (
              postgres_generation IS NULL
