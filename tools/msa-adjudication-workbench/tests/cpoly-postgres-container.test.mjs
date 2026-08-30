@@ -371,6 +371,75 @@ test("container recovery replays legacy disconnect failures under the same reque
   }
 });
 
+test("container write failures persist the private provider diagnostic after 5xx", async () => {
+  const recoveryDb = new D1RecoveryDatabase();
+  const calls = [];
+  const stub = new FakeContainerStub(async request => {
+    const url = new URL(request.url);
+    calls.push(url.pathname);
+    if (url.pathname === CPOLY_POSTGRES_QUERY_PATH) {
+      return jsonResponse({
+        error: {
+          code: "internal_error",
+          message: "Provider request failed.",
+          retryable: true
+        }
+      }, 500);
+    }
+    if (url.pathname === CPOLY_POSTGRES_STATUS_PATH) {
+      return jsonResponse({
+        ok: true,
+        schema: CPOLY_POSTGRES_STATUS_SCHEMA,
+        status: {
+          instanceId: "cpoly-postgres-production",
+          state: "restoring",
+          ready: false,
+          currentGeneration: 10,
+          receiptWatermark: 4427,
+          backupInProgress: false,
+          lastError: "relation adjudication.sample does not exist"
+        }
+      });
+    }
+    throw new Error(`Unexpected diagnostic container path: ${url.pathname}`);
+  });
+  const runtimeEnv = createRuntimeEnv({
+    DB: recoveryDb,
+    CPOLY_POSTGRES: {},
+    CPOLY_POSTGRES_INSTANCE_ID: "cpoly-postgres-production",
+    CPOLY_POSTGRES_INTERNAL_TOKEN: "container-token",
+    CPOLY_BACKUP_MASTER_KEY: recoveryMasterKey,
+    __CPOLY_POSTGRES_GET_CONTAINER__: () => stub
+  });
+
+  try {
+    await assert.rejects(
+      () => runtimeEnv.DB.prepare(
+        "INSERT INTO sample (id) VALUES (?)"
+      ).bind("row-a").run(),
+      /Provider request failed/u
+    );
+    assert.deepEqual(calls, [
+      CPOLY_POSTGRES_QUERY_PATH,
+      CPOLY_POSTGRES_STATUS_PATH
+    ]);
+    assert.deepEqual(
+      { ...recoveryDb.database.prepare(
+        `SELECT status, attempts, last_error
+           FROM cpoly_pg_write_journal`
+      ).get() },
+      {
+        status: "pending",
+        attempts: 1,
+        last_error: "relation adjudication.sample does not exist"
+      }
+    );
+  } finally {
+    await runtimeEnv.__runtimeCleanup__?.();
+    recoveryDb.database.close();
+  }
+});
+
 test("legacy recovery keeps definitive journal failures blocked", async () => {
   const recoveryDb = new D1RecoveryDatabase();
   recoveryDb.database.prepare(

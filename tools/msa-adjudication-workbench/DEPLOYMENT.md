@@ -81,7 +81,9 @@ including container disconnects and HTTP 5xx responses. Constraint, receipt,
 payload-integrity, and other definitive failures remain blocked. Startup
 stage/exit failures reported by the container are persisted in
 `cpoly_recovery_runtime.last_error` for bounded diagnosis after the ephemeral
-instance exits.
+instance exits. An authenticated provider HTTP 5xx also causes one private
+status probe; its bounded `lastError` is retained in the affected D1 journal
+row while the public error remains generic.
 
 Cloudflare container application updates are declarative. Before deployment,
 copy every existing `configuration.authorized_keys` entry into the selected

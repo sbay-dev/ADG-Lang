@@ -243,7 +243,10 @@ ambiguous (for example, a container disconnect or HTTP 5xx) are atomically
 returned to `pending` and replayed under their original request IDs. Definitive
 write failures remain `failed` and keep recovery closed. A container startup
 failure is retained in the recovery runtime as a bounded stage/exit diagnostic
-instead of being lost after the ephemeral instance stops.
+instead of being lost after the ephemeral instance stops. If an authenticated
+provider write returns HTTP 5xx, the adapter performs one private status probe
+and retains its bounded `lastError` in the encrypted-write journal metadata;
+the public response remains generic.
 
 Use `EVIDENCE_ARCHIVE_MODE=d1` until Cloudflare dashboard activation allows R2.
 In `d1` mode, the authoritative `evidence_outbox.public_payload_json` and
@@ -426,7 +429,7 @@ provider image plus any chosen Hyperdrive rollback binding.
 
 ## Release integrity
 
-`release\portal-15.3.4.json` binds the sanitized portal, importer, workflows,
+`release\portal-15.3.5.json` binds the sanitized portal, importer, workflows,
 tests, and documentation with canonical LF-normalized SHA-256 records. Regenerate
 it deterministically from a clean clone with:
 

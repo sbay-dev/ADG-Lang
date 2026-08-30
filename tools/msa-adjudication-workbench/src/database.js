@@ -27,7 +27,8 @@ import {
   CPOLY_POSTGRES_QUERY_PATH,
   CPOLY_POSTGRES_RECEIPT_PATH,
   callCpolyPostgresProviderJson,
-  cpolyPostgresBindingPresent
+  cpolyPostgresBindingPresent,
+  fetchCpolyPostgresStatus
 } from "./cpoly-postgres-container.js";
 
 const INTEGER_OIDS = new Set([20, 21, 23, 26]);
@@ -171,14 +172,14 @@ class JournaledPostgresD1Database {
           await markJournalPending(
             this.recoveryDb,
             requestId,
-            error?.message,
+            journalFailureMessage(error),
             this.clock()
           );
         } else {
           await markJournalFailed(
             this.recoveryDb,
             requestId,
-            error?.message,
+            journalFailureMessage(error),
             this.clock()
           );
         }
@@ -240,14 +241,14 @@ class JournaledPostgresD1Database {
             await markJournalPending(
               this.recoveryDb,
               entry.requestId,
-              error?.message,
+              journalFailureMessage(error),
               this.clock()
             );
           } else {
             await markJournalFailed(
               this.recoveryDb,
               entry.requestId,
-              error?.message,
+              journalFailureMessage(error),
               this.clock()
             );
           }
@@ -334,14 +335,14 @@ class JournaledPostgresD1Database {
             await markJournalPending(
               this.recoveryDb,
               entry.requestId,
-              error?.message,
+              journalFailureMessage(error),
               this.clock()
             );
           } else {
             await markJournalFailed(
               this.recoveryDb,
               entry.requestId,
-              error?.message,
+              journalFailureMessage(error),
               this.clock()
             );
           }
@@ -648,7 +649,9 @@ export class ContainerPostgresD1Database extends JournaledPostgresD1Database {
         receipt: normalizeProviderReceipt(payload?.receipt)
       };
     } catch (error) {
-      throw normalizeContainerProviderWriteError(error);
+      const normalized = normalizeContainerProviderWriteError(error);
+      await attachContainerProviderDiagnostic(normalized, this.runtimeEnv);
+      throw normalized;
     }
   }
 
@@ -979,6 +982,32 @@ function normalizeContainerProviderWriteError(error) {
     return new WriteReceiptConflictError(error.message);
   }
   return error;
+}
+
+async function attachContainerProviderDiagnostic(error, env) {
+  if (Number(error?.status || 0) < 500) return;
+  try {
+    const status = await fetchCpolyPostgresStatus(env, {
+      forceRefresh: true
+    });
+    const detail = String(status?.lastError || "").trim();
+    if (detail) {
+      error.providerLastError = detail.slice(0, 1000);
+    }
+  } catch (diagnosticError) {
+    console.error("CPOLY provider diagnostic probe failed", {
+      name: diagnosticError?.name,
+      message: diagnosticError?.message
+    });
+  }
+}
+
+function journalFailureMessage(error) {
+  return String(
+    error?.providerLastError
+    || error?.message
+    || error
+  );
 }
 
 function normalizeAllResult(result) {
