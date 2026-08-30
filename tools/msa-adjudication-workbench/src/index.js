@@ -63,6 +63,7 @@ import {
 import {
   getCpolyRecoveryRuntime,
   processCpolyRecoveryMaintenance,
+  recordCpolyRecoveryRuntimeError,
   routeCpolyBackupRequest
 } from "./cpoly-recovery.js";
 import { createRuntimeEnv } from "./database.js";
@@ -305,8 +306,22 @@ async function runScheduledMaintenance(env) {
         name: error?.name,
         message: error?.message
       });
+      await recordCpolyRecoveryRuntimeError(
+        env,
+        `Container maintenance failed: ${String(error?.message || error)}`
+      );
       await processCpolyRecoveryMaintenance(env);
       return;
+    }
+    if (containerStatus?.lastError) {
+      console.error("CPOLY PostgreSQL container reported startup failure", {
+        state: containerStatus.state,
+        lastError: containerStatus.lastError
+      });
+      await recordCpolyRecoveryRuntimeError(
+        env,
+        `Container startup failed: ${containerStatus.lastError}`
+      );
     }
   }
   if (recoveryRuntime.state === "recovering"

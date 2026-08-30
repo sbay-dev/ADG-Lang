@@ -1,0 +1,1050 @@
+{
+  "schema": "adg-ordinary-software-release-manifest-v1",
+  "releaseId": "portal-15.3.3",
+  "version": "15.3.3",
+  "classification": "ordinary-software",
+  "publicOrigin": "https://adg.sbay.sa",
+  "repository": "sbay-dev/ADG-Lang",
+  "canonicalization": {
+    "pathSeparator": "/",
+    "pathOrder": "ordinal-ascending",
+    "textLineEndings": "LF",
+    "rootRecord": "<sha256> <bytes> <path>\\n"
+  },
+  "integrity": {
+    "algorithm": "SHA-256 canonical file-list root",
+    "fileCount": 203,
+    "releaseRoot": "0b3b5fcfdf6f9b2c86d722ef44da54ff5e57229bc3ae0d53a758a3f672e31256"
+  },
+  "exclusions": [
+    "release/ (self-referential generated output)",
+    "wrangler.jsonc and wrangler.staging.jsonc (private resource bindings)",
+    ".dev.vars, .env, node_modules, .wrangler, caches, logs, and databases",
+    "participant identity, Azure SAS values, Entra secrets, and Turnstile secrets"
+  ],
+  "claimBoundaries": [
+    "This is an ordinary-software portal release, not a CNS model release.",
+    "Human submissions remain untrusted until the repository importer and review pass.",
+    "Operational tests are assisted, do not occupy consensus roles, and cannot establish readiness.",
+    "Portal defect Issues contain sanitized technical reports only; account linkage, profiles, drafts, and linguistic decisions are excluded.",
+    "Repository task manifests contain blind packets only; reviewer identities and completed local exports are excluded.",
+    "Pilot submissions do not establish unrestricted MSA parser readiness."
+  ],
+  "files": [
+    {
+      "path": ".github/CODEOWNERS",
+      "bytes": 454,
+      "sha256": "e38b6c495fd74a6ce307440c6bd4c1a70f64ada5ca6156f581941b35f29a6b0a"
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/config.yml",
+      "bytes": 294,
+      "sha256": "436e7a22c5cc7412811215dc24f3a13f0fb52bef3057df15e082c9530d459062"
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/portal-reviewer-report.yml",
+      "bytes": 2344,
+      "sha256": "f367ba99659f63d856784c473d7837a1c050466489795af501bcda2aecff6cbb"
+    },
+    {
+      "path": ".github/workflows/import-msa-adjudication.yml",
+      "bytes": 34682,
+      "sha256": "bf21932d85e70463763e45ecafc2c7abe27b353289e24f365c6230f9eb3afa06"
+    },
+    {
+      "path": ".github/workflows/msa-adjudication-portal-security.yml",
+      "bytes": 4637,
+      "sha256": "a74f8733709ae52c942cb5535716b64a6587fbd5568a27825186ce742c203856"
+    },
+    {
+      "path": ".github/workflows/publish-portal-issue-reports.yml",
+      "bytes": 1067,
+      "sha256": "e31a58e45c0dd7f283205bcbb76b2cc630afb18ff1e329c5a4e16447abbb3c44"
+    },
+    {
+      "path": ".github/workflows/sync-msa-adjudication-tasks.yml",
+      "bytes": 1606,
+      "sha256": "b2b3652dc1d1384a43a995775c6554208704266853bc7ad62b65118f3283c92d"
+    },
+    {
+      "path": ".gitignore",
+      "bytes": 357,
+      "sha256": "321a1d5ca7be9a28523980043865221c347ecfca86bdc4bf0602e43a9472222a"
+    },
+    {
+      "path": "EVALUATION-NOTICE.md",
+      "bytes": 279,
+      "sha256": "52830dba005f4832cdfd4f4e5145ebb0400a028c2cc83dace549508468a23b96"
+    },
+    {
+      "path": "README.md",
+      "bytes": 11236,
+      "sha256": "669a32762e25b50d41c1e5172da00f94a4ff53fe60131373db244ba208e6aeba"
+    },
+    {
+      "path": "SECURITY.md",
+      "bytes": 4256,
+      "sha256": "1ac8d12fc22e64345ad454d0218eb506dfad0b1a1563455abde040c119834b1f"
+    },
+    {
+      "path": "examples/arabic-text/msa-adjudication-pilot-v1/README.md",
+      "bytes": 1297,
+      "sha256": "f80c3a579fa21d932e47a1bcc6e008f5111462fafbce710588fe0e0fda489f5c"
+    },
+    {
+      "path": "examples/arabic-text/msa-adjudication-pilot-v1/adjudication.synthetic.json",
+      "bytes": 10328,
+      "sha256": "21a70ad580412d00ff2412fdfd31e0ba82b8630107bd508408f98fffbf385e6e"
+    },
+    {
+      "path": "examples/arabic-text/msa-adjudication-pilot-v1/annotation-a.synthetic.json",
+      "bytes": 9293,
+      "sha256": "4b70a80de2c6a3aa297c18f4fe0ca8e1ea290f63722b569f5dd965791d0c0715"
+    },
+    {
+      "path": "examples/arabic-text/msa-adjudication-pilot-v1/annotation-b.synthetic.json",
+      "bytes": 9450,
+      "sha256": "7b891c950519956709c63a232470518c6d13428cb29caa701c559178573b5aa6"
+    },
+    {
+      "path": "examples/arabic-text/msa-adjudication-pilot-v1/human-usability-evaluation.template.json",
+      "bytes": 555,
+      "sha256": "4bcb3c47a43bb5c6c7c4598505cc63c1685d5da31fc64a0636f630547b71fc19"
+    },
+    {
+      "path": "examples/arabic-text/msa-adjudication-pilot-v1/packet.json",
+      "bytes": 4056,
+      "sha256": "0c4204809efcafe437f5c6b6586cb16f49d0f1f4577c836099592c936974cbc0"
+    },
+    {
+      "path": "human-evidence/tasks/msa-adjudication-pilot-v1.task.json",
+      "bytes": 6205,
+      "sha256": "c869fb0cebd3962cf6d479085abbb2b260645c1d2b0b0aefe5da5c42450e497b"
+    },
+    {
+      "path": "human-evidence/tasks/natural-arabic-rule-consumption-v1.task.json",
+      "bytes": 10843,
+      "sha256": "8a2ddb1b5135b30999fd9f1905eec100d26616dd79095bf265604298c0872613"
+    },
+    {
+      "path": "scripts/arabic-text/import-msa-portal-submission.mjs",
+      "bytes": 20478,
+      "sha256": "ba8009c2d4efa077ff43daeccc0fb76e46e3f3d4f3f04ec42b18de68cd2d3466"
+    },
+    {
+      "path": "scripts/arabic-text/render-msa-github-evidence.mjs",
+      "bytes": 16582,
+      "sha256": "43f042f433d809cd5e0046de4cd98863ce7421b832424d999556da087a28eb26"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/.dev.vars.example",
+      "bytes": 1067,
+      "sha256": "2bf7fcfc0997893d29115cafa06d639ea9008bd444d36d6fb2681d045b9632e5"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/CONSENSUS-PROTOCOL.md",
+      "bytes": 7896,
+      "sha256": "aad086dbc8be0ab114b9f3e49be8e36cfa6b8b6d51bab149e6e4951d7e1a2a11"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/DEPLOYMENT.md",
+      "bytes": 20095,
+      "sha256": "3bd6ccc588c4d405f1309aa59026714fdc4ad1a0bf75a3b44ded2a11caef1c77"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/PRIVACY.md",
+      "bytes": 7358,
+      "sha256": "51c025f05f376c259bf9a592f443e8992ad06239baa6452b7652c8908d1d6061"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/README.md",
+      "bytes": 24014,
+      "sha256": "e553dde752c39705a98f2f325ba153b7dad3d7e31120c4a545d8e9baf9c3db8f"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/SECURITY.md",
+      "bytes": 3139,
+      "sha256": "71f7df1b74808a9a8944584e5c1f72f7dfd38efef385dcc730a75c1f5665d553"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/TRANSPARENCY.md",
+      "bytes": 24130,
+      "sha256": "b9b941ff9fe6c6129c91e670797dbb80c59867d57171000eb12f980604990239"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/human-evidence/README.md",
+      "bytes": 414,
+      "sha256": "ba4f2becc1a76e62c0e4569f78fa99ecc45b7858470823318bc58b942f42c438"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/human-evidence/packets/natural-arabic-rule-consumption-v1.packet.json",
+      "bytes": 9506,
+      "sha256": "7770b3eb4a12ae88b0f497fe87583cbc2db04c0e30a599d1d1048bdcfa84276f"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/human-evidence/tasks/natural-arabic-rule-consumption-v1.task.json",
+      "bytes": 10843,
+      "sha256": "8a2ddb1b5135b30999fd9f1905eec100d26616dd79095bf265604298c0872613"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/.gitattributes",
+      "bytes": 179,
+      "sha256": "8a0da057491434263a0782729c6dd3e9e8f79d5cd477cc56ea31c2260f68594c"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/README.md",
+      "bytes": 4029,
+      "sha256": "dd7542ca0b2d854f57c399d64350c1ec20c78d5d3715e2a0894d3436cd723118"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/cloudflare/.dockerignore",
+      "bytes": 55,
+      "sha256": "cfb2218ec752e644af7bcc251922951d5d245171a4d27d04ab65a48e41716317"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/cloudflare/Dockerfile",
+      "bytes": 1978,
+      "sha256": "222ad6692d7a59b45860a88ff2046f8e72ffef958406c7bdbb7cd3a3b95cfb49"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/cloudflare/README.md",
+      "bytes": 3015,
+      "sha256": "7fbd2cd1657e9160229184a087ead3af9d98ac3f6f2e39625d65700a8840fc15"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/cloudflare/bridge/serialization.mjs",
+      "bytes": 1129,
+      "sha256": "f20fc908cac00c76c8cd7e38f2e4717cb162a58839daa21c81370a1e1f5b2caf"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/cloudflare/bridge/server.mjs",
+      "bytes": 19685,
+      "sha256": "8dec29a22d0c02a36ca47615abb2d12f8af87c06d4633fbc74ce01e9d0b648a4"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/cloudflare/contract/database-bridge.v1.json",
+      "bytes": 1744,
+      "sha256": "942269964fb2a5eac5b3c6aaea8fdf5168dccd178a4506cfe34c9f4bd99bc293"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/cloudflare/package-lock.json",
+      "bytes": 799,
+      "sha256": "2c94a9ea1f01b1b12700b273c85380f6b50d9af73b27654541fa6310be6dfe77"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/cloudflare/package.cloudflare.cpoly.json",
+      "bytes": 1312,
+      "sha256": "698bc4c53274f5fd46d1dcbed455a32903c5c6b3d0ae3561a4e0b5ecec32cef8"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/cloudflare/package.json",
+      "bytes": 202,
+      "sha256": "bcefcb40d17c23da2db497c2f7dcf0c69e5a9e19202692f08764b11753ed9bc8"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/cloudflare/runtime/migrations/0001_portal_v15.sql",
+      "bytes": 23141,
+      "sha256": "1fd6c8affececf259247b003cec1ff915973affa5b7347c11f3c57a6e6385d21"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/cloudflare/runtime/migrations/0002_repository_task_catalog.sql",
+      "bytes": 3908,
+      "sha256": "48959b05e96189ab755fe11054496d26d7a7ead83f2a86574e5154edddf059f6"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/cloudflare/runtime/migrations/0003_portal_issue_reports.sql",
+      "bytes": 1825,
+      "sha256": "5b76cfb40f3c1108d6d0c4bd74abcfdcf472b294a260a15fafbc78b110829613"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/cloudflare/runtime/migrations/0004_task_state_repository_receipts.sql",
+      "bytes": 1173,
+      "sha256": "ecb8750877036758bfbd1804759f61922202bbb81f9ea123306ddb5d2918a5f2"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/cloudflare/runtime/scripts/apply-migrations.sh",
+      "bytes": 3628,
+      "sha256": "35b75145603597990a1000e453c025c6ab7910091f802e7a18738140e9984de5"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/cloudflare/runtime/scripts/bootstrap-roles.sh",
+      "bytes": 4174,
+      "sha256": "7572e3fa6ba11b32fab00821c6903ea3fdf4facdc5bbd7152abc0abe56af0167"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/cloudflare/runtime/scripts/create-kv-binary-backup.sh",
+      "bytes": 5178,
+      "sha256": "461ef3967efceb2a982d57bfc94fbf04be098cfee0b464bf1f3a73a29ff24074"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/cloudflare/runtime/scripts/d1_backup_client.py",
+      "bytes": 29392,
+      "sha256": "ec61ef1396c787d3adfeadea21ef875ee4bfc9d8fe777e84b071a7b061b9df5c"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/cloudflare/runtime/scripts/mark-recovery-ready.sh",
+      "bytes": 3211,
+      "sha256": "5dda9253522e82ac6e005c2564da1431dd793d105c0f32f925ca6b483a7ec346"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/cloudflare/runtime/scripts/restore-binary-backup.sh",
+      "bytes": 377,
+      "sha256": "c9e90dab0f0bed2f90aa837225369bc5db1392fe7ebe91d776377004f5f3ae85"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/cloudflare/runtime/scripts/restore-logical.sh",
+      "bytes": 2939,
+      "sha256": "dae309f86901c8ae1003c9955635d1990cb53b61cd1e0493847e9d0e47d8e1ee"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/cloudflare/runtime/scripts/verify-binary-backup-job.sh",
+      "bytes": 1833,
+      "sha256": "58fd27efe7df49963be6bbcb727ac09e088e317ff952705ee0cfaa2650783b5c"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/cloudflare/scripts/backup-now.sh",
+      "bytes": 1122,
+      "sha256": "839cf1ba168242509cdaaaa4db3ec09fba9de127a53b59247fdd6d7aadbe6a32"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/cloudflare/scripts/entrypoint.sh",
+      "bytes": 7421,
+      "sha256": "f304edff117681b80ab81dd81f3de5f1adf0a007967e1ab9f6295c2821df505f"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/cloudflare/worker/package-lock.json",
+      "bytes": 635,
+      "sha256": "140acfb611ab84fa3636612864dc11cdcf09a79c9fa9c969bd1896fedcf527d6"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/cloudflare/worker/package.json",
+      "bytes": 177,
+      "sha256": "4345ee0567d74ed821c2f08289331cdcca315863022092907c5bb632e32f6665"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/cloudflare/worker/src/index.js",
+      "bytes": 2976,
+      "sha256": "e249ae0070561692a6eae3a873e420b076ef83a11ee8aa9b68bb4e0d889e8a72"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/cloudflare/worker/wrangler.toml.example",
+      "bytes": 720,
+      "sha256": "d64948193321339e2e9a050443c009885aa801c91bab9be323e1454d72a73c73"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/contract/cpoly-adg-postgres.json",
+      "bytes": 2050,
+      "sha256": "0ff83efb528fccef7405000e162cd207f2e0c46a42ee8d24c9d212cf0dabf181"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/contract/cpoly-adg-postgres.schema.json",
+      "bytes": 3875,
+      "sha256": "5b8360fb5abaf7fb2b8fef48e6b30f19b941fcce0e3877e97b80005c6f1e64f7"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/contract/d1-backup-api.v1.json",
+      "bytes": 5069,
+      "sha256": "649f66032201e8b8071c880a3bfaa6a267bb79dac6f8e7c09eb19d24ca6cdc6f"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/docs/ARCHITECTURE.md",
+      "bytes": 2141,
+      "sha256": "1805b168dae14861ff1e718c8f8a78585f0c8c0ba91cad9709f0824c60a832ef"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/docs/CPOLY-FIELD-STATUS.md",
+      "bytes": 1208,
+      "sha256": "ec684a67a816503261c4f899e06204bea40efc5ca42c703d9c2f23f00399911e"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/docs/HYPERDRIVE-ORIGIN-SECURITY.md",
+      "bytes": 3792,
+      "sha256": "d4bb2ebe5ac8a8349f133e5629c6fa6c441ef0110bc55a17f558fd0ff5c49313"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/docs/POSTGRES-MIGRATION-CONTRACT.md",
+      "bytes": 1352,
+      "sha256": "90b1bc384daeeb18cb811e2274cf3175e7d25ef73947f1abed9e8b67fc70ceb3"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/docs/QDRANT-BACKUP-PROVENANCE.md",
+      "bytes": 2119,
+      "sha256": "7d0145ddd73c452e80c84a5cf2d27c09f31410cfd2e135e15b0b5940c8c84dc9"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/docs/adr/0001-external-stateful-cpoly-data-plane.md",
+      "bytes": 2075,
+      "sha256": "bde789c8612ce91512d20958ba805d0aa2be76c5be2347a13864774472049273"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/docs/adr/0002-cloudflare-container-primary.md",
+      "bytes": 1261,
+      "sha256": "873d8b86381f35608c1ad1ffc27297296fdc1d0bacf3137b4aeda486226ef5b1"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/integrity.sha256",
+      "bytes": 10591,
+      "sha256": "f8b6ee1ff1803bcb2760596f5c500974187ceebf8e2a6dd17854329ddb952749"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/kubernetes/CPOLY-WORKBENCH-PATH.md",
+      "bytes": 2932,
+      "sha256": "ae6fb5c143d1acdd658841d78cb64ac78791df892b6f6ec18825079b1ce06127"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/kubernetes/README.md",
+      "bytes": 5759,
+      "sha256": "4c87eb21d7986053d44c77950db9c2a86f752782248a399ce033e68ddb617f99"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/kubernetes/cpoly-execution.cpoly.json",
+      "bytes": 2249,
+      "sha256": "85c09c8c5df3e60e38ceb243307118f46987850823c8d0150c20ddd90a980d2e"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/kubernetes/manifests/backup-cronjob.yaml",
+      "bytes": 6928,
+      "sha256": "c8e296ad3a3eb964482d21a0991e2a676fdbd70a0e5afb944fb7b13b819bb7f6"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/kubernetes/manifests/backup-settings.yaml",
+      "bytes": 245,
+      "sha256": "24898854cbe08fd16b009d07be1a933d867ccc9ec703e4e75b5fbc27d388932c"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/kubernetes/manifests/namespace.yaml",
+      "bytes": 275,
+      "sha256": "70cfa8a5d4bb2f27e7a0ae0218baf302440288ea4889103f7525cc9d31901220"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/kubernetes/manifests/networkpolicy.yaml",
+      "bytes": 4292,
+      "sha256": "95557e7c85979986024441f30e6e9f4da52b8f57ca4f8fe29def0236f29c5ebd"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/kubernetes/manifests/services.yaml",
+      "bytes": 1938,
+      "sha256": "394ad6259d573202274dc08f37e1334120be6cf0e229603642f2796ac3c4e1b9"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/kubernetes/manifests/statefulset.yaml",
+      "bytes": 6736,
+      "sha256": "59665cfba85603734424846bf1fa6ec94f3b8132f324af08c1f9c43b017e073e"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/kubernetes/operations/Deploy-CpolyPostgres.ps1",
+      "bytes": 2863,
+      "sha256": "cf9a95d15f5e9ca2c293e4321c55d11cab574033171aa48b1a72ee42234f2e62"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/kubernetes/operations/Test-CpolyWorkbenchTarget.ps1",
+      "bytes": 3046,
+      "sha256": "86fdb38815ee64a99a7748acb3ccb67ceed16cf898d76cef41fb3fa22b5e574f"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/kubernetes/operations/d1-restore-job.yaml",
+      "bytes": 7908,
+      "sha256": "85a80721b9f611ad1093cdc8b87742c150b1fceabd8860a4e4b3f20362371660"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/kubernetes/operations/kustomization.yaml",
+      "bytes": 143,
+      "sha256": "c14c3a65fb7a91817dd3adb0af0661173175e0375b5377a126bc2143552f99b7"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/kubernetes/operations/migrate-job.yaml",
+      "bytes": 2893,
+      "sha256": "4f07651cd808d4a105f6c2587c82aaf62000894ab8c55a02baf1d8ffb8dccc07"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/kubernetes/operations/restore-drill.yaml",
+      "bytes": 4165,
+      "sha256": "1f25aebb5b6f8323e8460a61bd0c83e496097ffb352887310dffa1848a04957d"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/kubernetes/optional/qdrant-gpg/README.md",
+      "bytes": 637,
+      "sha256": "6af2ecd589c0d87d70ad3bf286a0a2764d6c77ae15d21b194bc4a2df7b9769f2"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/kubernetes/optional/qdrant-gpg/backup-job.yaml",
+      "bytes": 5631,
+      "sha256": "6a75f919316a111b18927d70986d862e77eb94102b40a2f1e29a9ce939cd2708"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/kubernetes/optional/qdrant-gpg/kustomization.yaml",
+      "bytes": 96,
+      "sha256": "62a2583f302f4c8f4d924296ccb8a0736ec54699023c766553304927aaa36eac"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/kubernetes/optional/walg/backup-cronjob.yaml",
+      "bytes": 3593,
+      "sha256": "2022f4cd91097c089a174b7e53b88a3f135848ee4744e22dd0f87ba0ecdbb08a"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/kubernetes/optional/walg/backup-settings.yaml",
+      "bytes": 492,
+      "sha256": "9e63d34e218e0767475bb9f6067e2b13670147f59c8eb813d336cfa10396c264"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/kubernetes/optional/walg/kustomization.yaml",
+      "bytes": 175,
+      "sha256": "3c8a72dcc6adc928564470f1a9eddb8f4a7514f6e40601b58e593ce258480a37"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/kubernetes/optional/walg/restore-approval-job.yaml",
+      "bytes": 1617,
+      "sha256": "629750252ae6f54936fb09ba88ada665c932ca077a896c956c8a487dd234cd1e"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/kubernetes/optional/walg/restore-job.yaml",
+      "bytes": 2405,
+      "sha256": "75267db61665566939a4a2b41bcfe35f938e494c549b69786442375b1773d499"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/kubernetes/package.kubernetes.cpoly.json",
+      "bytes": 2669,
+      "sha256": "9f34acacab62ebdd4d8ec90ece6dc02d3af1663ca32b00a9e37ed066b677a8b0"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/kustomization.yaml",
+      "bytes": 2079,
+      "sha256": "ef23f7be4ab3c6be6008bf04c8bd44dd0db4c7da8490048bde5c3c380d19c34a"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/migrations/postgresql/0001_portal_v15.sql",
+      "bytes": 23141,
+      "sha256": "1fd6c8affececf259247b003cec1ff915973affa5b7347c11f3c57a6e6385d21"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/migrations/postgresql/0002_repository_task_catalog.sql",
+      "bytes": 3908,
+      "sha256": "48959b05e96189ab755fe11054496d26d7a7ead83f2a86574e5154edddf059f6"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/migrations/postgresql/0003_portal_issue_reports.sql",
+      "bytes": 1825,
+      "sha256": "5b76cfb40f3c1108d6d0c4bd74abcfdcf472b294a260a15fafbc78b110829613"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/migrations/postgresql/0004_task_state_repository_receipts.sql",
+      "bytes": 1173,
+      "sha256": "ecb8750877036758bfbd1804759f61922202bbb81f9ea123306ddb5d2918a5f2"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/operations/BACKUP-RESTORE.md",
+      "bytes": 6564,
+      "sha256": "17719772c908096c849eea6bfb7dbb088b14e252af21c492e141b548977ef5b4"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/operations/restore-new-volume.sh",
+      "bytes": 1590,
+      "sha256": "974eadca0407c69da801797de1d016eeaab02b9835fe07bbc4dd4372ba078fc9"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/operations/verify-restore.sh",
+      "bytes": 1741,
+      "sha256": "e04135f2bd0c498a34a438b3d9aa7a68a23e0b2689284b2bd876fcbc0946b5b4"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/scripts/apply-migrations.sh",
+      "bytes": 3628,
+      "sha256": "35b75145603597990a1000e453c025c6ab7910091f802e7a18738140e9984de5"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/scripts/bootstrap-roles.sh",
+      "bytes": 4174,
+      "sha256": "7572e3fa6ba11b32fab00821c6903ea3fdf4facdc5bbd7152abc0abe56af0167"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/scripts/cpoly-postgres-entrypoint.sh",
+      "bytes": 1128,
+      "sha256": "27fdf3da8973a1daa28c55933384c7b61468790ea87439151600d87a50855bd0"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/scripts/create-encrypted-backup.sh",
+      "bytes": 11031,
+      "sha256": "6c5a8548e2ad10f1cdf839518fd8e3be024952ddcea3ad77c70749d2305e887c"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/scripts/create-kv-binary-backup.sh",
+      "bytes": 5178,
+      "sha256": "461ef3967efceb2a982d57bfc94fbf04be098cfee0b464bf1f3a73a29ff24074"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/scripts/d1_backup_client.py",
+      "bytes": 29392,
+      "sha256": "ec61ef1396c787d3adfeadea21ef875ee4bfc9d8fe777e84b071a7b061b9df5c"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/scripts/kubernetes-restore.sh",
+      "bytes": 756,
+      "sha256": "05847dd7b000ae29800c9e2e096946fa274b593bcca13dfd8139c2427ed091e6"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/scripts/load-walg-env.sh",
+      "bytes": 1712,
+      "sha256": "55ddcba07d3cf43f7431d8ed92a875f19e15f25236c80de87b43d9261ed1e462"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/scripts/mark-recovery-ready.sh",
+      "bytes": 3211,
+      "sha256": "5dda9253522e82ac6e005c2564da1431dd793d105c0f32f925ca6b483a7ec346"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/scripts/render-hba.sh",
+      "bytes": 2096,
+      "sha256": "6cfe7cb9d1627f8db219ea0028836d85a631ff8ee97da98b9d31ef490022a339"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/scripts/restore-binary-backup.sh",
+      "bytes": 377,
+      "sha256": "c9e90dab0f0bed2f90aa837225369bc5db1392fe7ebe91d776377004f5f3ae85"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/scripts/restore-encrypted-backup.sh",
+      "bytes": 4319,
+      "sha256": "49e76e29768af2a0c280fb0f2d6beaa1f372edbbaeb6c236adf5a2fda43db5af"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/scripts/restore-logical.sh",
+      "bytes": 2939,
+      "sha256": "dae309f86901c8ae1003c9955635d1990cb53b61cd1e0493847e9d0e47d8e1ee"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/scripts/verify-binary-backup-job.sh",
+      "bytes": 1833,
+      "sha256": "58fd27efe7df49963be6bbcb727ac09e088e317ff952705ee0cfaa2650783b5c"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/scripts/verify-encrypted-backup-job.sh",
+      "bytes": 985,
+      "sha256": "f90c786885414d10da3126edd59ab45f40a35e59f072fde473957082c42a5fdb"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/scripts/walg-backup.sh",
+      "bytes": 312,
+      "sha256": "5172f5b841364b3d7a435fdf7cdad207475656cc50ab91c5e08553cdcc3e9212"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/scripts/walg-restore-fetch.sh",
+      "bytes": 554,
+      "sha256": "720ddb9a4fc443cc9baabad9a62b9f54f232df5ef2186e9029ce4513d67ea9d3"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/standard/README.md",
+      "bytes": 3722,
+      "sha256": "eaa07546cdb910bf9f4c343f899b4def6204dcdc5a1f452ba61a464d3beb5757"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/standard/deployment.env.example",
+      "bytes": 872,
+      "sha256": "019626d4c01bc1972128b7d8d330813f2c4f0f8d349db0d02d15f0fe6b126b2f"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/standard/docker-compose.yml",
+      "bytes": 9919,
+      "sha256": "e1d5b921623422f4a795bfca2b0b7f261a2d1a7c3e27820919edb032498791dd"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/standard/package.cpoly.json",
+      "bytes": 1088,
+      "sha256": "bb96522aa72e9d39538f54547a84ca549ba88e74191af255f3b0639e22b6fa92"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/standard/secrets/README.md",
+      "bytes": 1077,
+      "sha256": "4ae73114960576cf45bb50b49464be6f5f47f83844b1c845a02ded8c18050720"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/validation/README.md",
+      "bytes": 2930,
+      "sha256": "ac32bf3cf0f56d25c4a55896e7b057590eb0bbd97d66b2469e219183407db151"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/validation/bridge-smoke-client.mjs",
+      "bytes": 4053,
+      "sha256": "42232c58a22621a2707ff4000854b30fa74320f7205f7fcfa299dedfe3609d83"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/validation/real-worker-backup-harness.mjs",
+      "bytes": 9797,
+      "sha256": "49d0ea9fa6c8cf7f74469b5a45e134ffe34b7e25853b61ffe2ce21fdf8b65f85"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/validation/smoke-cloudflare-container.ps1",
+      "bytes": 6954,
+      "sha256": "bb818fa7cbf5afcc74b8a143a1259d28802e1a1f025cd6dd92086e1c36397df8"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/validation/smoke-compose.ps1",
+      "bytes": 6472,
+      "sha256": "ee407e2f40ee36bcbd29a517663f40183d07ff19a14e88869cee49ce0ac54f1b"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/validation/smoke-d1-recovery.ps1",
+      "bytes": 18784,
+      "sha256": "b5cbd8c218bbb7f820a08682d32f987f2c26814d113768eb97e1c72007a9356b"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/validation/validate-contracts.mjs",
+      "bytes": 9193,
+      "sha256": "1e27471692cc09ff912a5df8ff89baca6233b800b59295e71f796daa94ddefb2"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/validation/validate-integrity.mjs",
+      "bytes": 1862,
+      "sha256": "af928d04370b1807ec0241918d857c1642b10f399e6dd5df4ddb6402f2b4297c"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/validation/validate-security.mjs",
+      "bytes": 16325,
+      "sha256": "b9cc14882eb00251c05d7fcd3a6bf6ca3f07940709f7410cc1ed02361c223510"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/infrastructure/cpoly-postgres/validation/validate.ps1",
+      "bytes": 6196,
+      "sha256": "0c4fb8b5b28c6f264726a45b2b0b1b43ddf4fd83e10c3c060cc0989edf3b45e7"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/migrations/0001_passkeys.sql",
+      "bytes": 1463,
+      "sha256": "4a6874a7208f2a54ad7e53841671a10a67726658ff05882731e7983bfe063373"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/migrations/0002_admin_progress.sql",
+      "bytes": 1385,
+      "sha256": "f6927ad473c5ef861247494364772d3426f0e53fd917f659bdc17a82fff5e143"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/migrations/0003_results_discussion.sql",
+      "bytes": 4067,
+      "sha256": "8676833bcee7ae90c3ea45e8b594acfab45467cdd3be4704bf7b1215aa045b00"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/migrations/0004_consensus_state.sql",
+      "bytes": 13528,
+      "sha256": "bf7f57369e5b06971a0bf3679a2729769f05f410cbcef921fd87a8355c7b891b"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/migrations/0005_cpoly_recovery.sql",
+      "bytes": 3056,
+      "sha256": "7e6ef005aad945fcbe7ee0e8bd71e52f620a2c46d630e303825271a04ec65b3e"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/migrations/0006_cpoly_backup_contract.sql",
+      "bytes": 331,
+      "sha256": "e3228b64430668d24693c079f20258fb3f72d5ac7f15f0c500033996f5d5e685"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/migrations/0007_cpoly_recovery_state.sql",
+      "bytes": 3053,
+      "sha256": "fa0359a4e96c21faa7d0e612f3618edabaa76f002890c4ca1d4244f3573f5284"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/migrations/0008_cpoly_backup_metadata_hash.sql",
+      "bytes": 180,
+      "sha256": "5377e09f64d96edb325e0e08a2f77288906f94cc6ea0a23beb67c91cb3bb38a1"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/migrations/0009_cpoly_backup_kv_lane.sql",
+      "bytes": 1282,
+      "sha256": "550f24cd97aa0d753999f6c07da11e3ea5cb885655b0c82bd48d96b517d7ecc4"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/migrations/0010_repository_task_catalog.sql",
+      "bytes": 3867,
+      "sha256": "7ca76dedcb39ff710257735bd3c803daa72aea12e14ad9b71a8bdbc8c154b0dc"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/migrations/0011_portal_issue_reports.sql",
+      "bytes": 1605,
+      "sha256": "3ae54646b1d1a6ebb29fca1270cc47e819a0a7ead61d915bdfd6848765cb7423"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/migrations/0012_task_state_repository_receipts.sql",
+      "bytes": 990,
+      "sha256": "071b4e36167e29526cb1ad558d6dfe660b0c8be53a7791a4b10328fe321aafbe"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/package-lock.json",
+      "bytes": 60438,
+      "sha256": "fc9f770e1128b1172726604855e3584beb7f15ce93ccd952aed2740f7609e9bb"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/package.json",
+      "bytes": 2061,
+      "sha256": "8edc40159951d813ad2cdd1fc9c6878ca201a2e9fcdf9db20ed19984bc84e3ad"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/postgres/0001_portal_v15.sql",
+      "bytes": 20741,
+      "sha256": "f4d5dc5702fa03ffa2387f36c212876638e6b62b574a4f19b7f848731569be7d"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/postgres/0002_repository_task_catalog.sql",
+      "bytes": 3908,
+      "sha256": "48959b05e96189ab755fe11054496d26d7a7ead83f2a86574e5154edddf059f6"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/postgres/0003_portal_issue_reports.sql",
+      "bytes": 1825,
+      "sha256": "5b76cfb40f3c1108d6d0c4bd74abcfdcf472b294a260a15fafbc78b110829613"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/postgres/0004_task_state_repository_receipts.sql",
+      "bytes": 1173,
+      "sha256": "ecb8750877036758bfbd1804759f61922202bbb81f9ea123306ddb5d2918a5f2"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/postgres/CPOLY-POSTGRES-CONTAINER-CONTRACT.md",
+      "bytes": 6678,
+      "sha256": "6fbf5e8b123584bef4b210885935e89dfe4ce5e7b45471eabf3dcbc7fc89f6b1"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/postgres/Dockerfile",
+      "bytes": 252,
+      "sha256": "96aa1a6563005ccb1c83c562e37d8f36b88a29d45c4dbdf4cdc7cad9a13b2698"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/postgres/provider-contract-placeholder.mjs",
+      "bytes": 1131,
+      "sha256": "962cb8f5a492e0103cb3775e0146fa60baefbd726c72acd9350c950ee35c8818"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/public/404.html",
+      "bytes": 609,
+      "sha256": "1f9584c796b248dbddd272109d1d17921c8c90141b6885f4e1756e59db36ada8"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/public/admin/admin.css",
+      "bytes": 8307,
+      "sha256": "7cf951c86c644e088be3f295193c8fd2949b4bc27b4355a3d6d7aba328ac698e"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/public/admin/admin.js",
+      "bytes": 20802,
+      "sha256": "ef17dd759e38e87dd83cd039545014c6b10bdbcf532c6e13b2577c7b40fd4814"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/public/admin/index.html",
+      "bytes": 9530,
+      "sha256": "d1bc3420718bf161c941abbad2ea3ce9ab278a23f4c727ce5c078247d667a4e0"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/public/app.js",
+      "bytes": 126629,
+      "sha256": "6f7e1be81c1823557bf3817270b4a837c991601b477e18212e2ddbbf32089814"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/public/data/pilot-packet.json",
+      "bytes": 4056,
+      "sha256": "0c4204809efcafe437f5c6b6586cb16f49d0f1f4577c836099592c936974cbc0"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/public/index.html",
+      "bytes": 53608,
+      "sha256": "38e8d17e346b70cbd7992388fc85ec69b9e5bcaaac2df054e887053fb1bf1dab"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/public/protocol.js",
+      "bytes": 21894,
+      "sha256": "2fe3418f2f1703396b849f3945ab15d995f8c6aceb94320817ee7537907ecab2"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/public/styles.css",
+      "bytes": 48739,
+      "sha256": "92485d364941352c0ab7206c47618d950bce20d1c428de580ba63662ef8ab6b1"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/public/theme.js",
+      "bytes": 2153,
+      "sha256": "5e3788cc16fb395510061f03f18e359fb52345fa128fc15258c42499c6e6c9fb"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/scripts/apply-postgres-schema.mjs",
+      "bytes": 2478,
+      "sha256": "b7e210b85e18646cc66e62aa838abbbf397fe9ba220dff253c7632d256f49414"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/scripts/create-repository-task.mjs",
+      "bytes": 1878,
+      "sha256": "1b5ec534c05a1dc72408b5d0cc04752c35058983db1ab7c5e26e5fadd90c3bdf"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/scripts/generate-release-manifest.mjs",
+      "bytes": 6131,
+      "sha256": "96f463093eb10c98467b33d6b82245c5b7943a8771917b4a5c047d8a83480e49"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/scripts/migrate-d1-export-to-postgres.mjs",
+      "bytes": 12945,
+      "sha256": "3767b3c763b5895a1271ded3a688f1a1c62f325580a8d137e62a9122be9263a1"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/scripts/postgres-operator-utils.mjs",
+      "bytes": 1563,
+      "sha256": "708b19b480f7adfcee9532d2678dedaaf7fc19394eb612123cdd801593d279e6"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/scripts/publish-portal-issue-reports.mjs",
+      "bytes": 7554,
+      "sha256": "671509515c98741b789dc2bf00284f4fe2002b987f10f12fae3d4c37a9005ae4"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/scripts/sync-repository-tasks.mjs",
+      "bytes": 4060,
+      "sha256": "dde0e60e69b1a90bdd99af13408cc6f0b3bb3e732c1e3f0a4249d35641bd121b"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/src/consensus-store.js",
+      "bytes": 12894,
+      "sha256": "48f5f16a9d7243de773657c8fc487f9773d6e01d739a848d9cfc1f1b0f1cf97a"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/src/consensus.js",
+      "bytes": 9751,
+      "sha256": "10687d171dd6d343d68e65fe64d08d47e8680cdfc4668246db3af1fa5132d893"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/src/cpoly-postgres-container.js",
+      "bytes": 15170,
+      "sha256": "dd1358b55f435c186b22f85ba746d07a8a1e7dc66db71e053b337754eb2b3807"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/src/cpoly-recovery.js",
+      "bytes": 101513,
+      "sha256": "a63f474fdcace2bd2717f77b9260c034de964eb44ee43847c033291d6bf8ae0a"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/src/database.js",
+      "bytes": 34425,
+      "sha256": "df3ba236279c83ac9d3760529f737606b96509d649965c6b0da7c816037f109b"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/src/discussion.js",
+      "bytes": 7417,
+      "sha256": "7f5aa465cd7a64ffc8c93c9c70cd02febf49f6f47f8622c38636d6aff0d4eb57"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/src/email-verification.js",
+      "bytes": 2397,
+      "sha256": "9c00b428bcebe5a19e119f2d44ee8d0f5933b3dac29c74896559f2bd1375d5b3"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/src/index.js",
+      "bytes": 294249,
+      "sha256": "6445b6c59a5e87cb88876ea8bfbe0a24df7b19a401c9633c34e3ead1523f1236"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/src/issue-reporting.js",
+      "bytes": 9199,
+      "sha256": "c47f4928b09f92ab701d41db567df1b125a851d4600f0f10d0346937b8256a07"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/tests/consensus-worker.test.mjs",
+      "bytes": 68650,
+      "sha256": "c0b26b2080b8773a51cb8104269dd51a5777614094fd54c938ad2604f4f0a6ec"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/tests/consensus.test.mjs",
+      "bytes": 3027,
+      "sha256": "19c6ec9ddf80848b0147b01a9c4a31f0a2d21505c7e82247600c6d115e4217ea"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/tests/cpoly-postgres-container.test.mjs",
+      "bytes": 26311,
+      "sha256": "5638e02e9ed19e9b3d4bca61778fa46c8045342ea0a6cff7e3ab8541336bf59d"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/tests/cpoly-recovery-python-client.test.mjs",
+      "bytes": 22929,
+      "sha256": "6d690b3c724142059e06b37b10ff9a0e8ac70c49d7068569504fe97f41438a75"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/tests/cpoly-recovery-worker.test.mjs",
+      "bytes": 29360,
+      "sha256": "44b41e20318a9a354c44c372230d3a9203bd52e563862170593756b3714eb12d"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/tests/d1-export-migration.test.mjs",
+      "bytes": 10567,
+      "sha256": "b96f4c6a3034173a21313bd32bbe21755597b104be239879f3a2b8cd881435e0"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/tests/discussion.test.mjs",
+      "bytes": 2897,
+      "sha256": "577d44a09db1c9d514ef06b0801f5ec1f8ed14145f31f53ebfa6c7b9173ce0ab"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/tests/email-verification-worker.test.mjs",
+      "bytes": 15447,
+      "sha256": "1d05dd4f2f1fddf351fb901e6d31c386b9894be49ad923e6ac84b9217d83aba6"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/tests/email-verification.test.mjs",
+      "bytes": 1315,
+      "sha256": "39b036daef2720446c640f5f55a90f1dc75d79af6f415b4881ad1e910f10ada6"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/tests/fixtures/cpoly-openpgp-symmetric-aes256.base64",
+      "bytes": 389,
+      "sha256": "3ac604b5d93e80e403d07eabefa8f1efe50710eef534ab0bfde1a95a2374868e"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/tests/github-import.test.mjs",
+      "bytes": 22000,
+      "sha256": "f05d5974f5983a5034454fd183921c338723474afb5e78c5320d9c11b0095f00"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/tests/issue-reporting-worker.test.mjs",
+      "bytes": 13423,
+      "sha256": "3fe67b4758ce7204e171d6bc29cc78e37b19a76fab5f567156e56db0e51a3fb5"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/tests/issue-reporting.test.mjs",
+      "bytes": 7876,
+      "sha256": "c74f64123215f9ea98ea7845c379abfe252ddec15c585963a16bbcd3fcb4bc38"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/tests/migrations.test.mjs",
+      "bytes": 9049,
+      "sha256": "06b33ac7462908745c1c28a6b0fe5a24d7ae0d3c5075e7ced31b9b72dfc69ce0"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/tests/postgres-adapter.test.mjs",
+      "bytes": 14782,
+      "sha256": "baddf33732e3eef51fa1d0eec8352cbbc639f5966c1da089bbd37ec3b486c1b7"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/tests/postgres-test-utils.mjs",
+      "bytes": 4206,
+      "sha256": "6771b72bc87c50887fa31a55a0c88a923d5f17bbb96e443b4665cae5406bc45a"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/tests/postgres-worker.test.mjs",
+      "bytes": 36572,
+      "sha256": "0bbd8a332623272ee2693e00a342c99648db2c4ff82f81e3c4f104e00a12792c"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/tests/protocol.test.mjs",
+      "bytes": 8781,
+      "sha256": "8f876ea40eb39439868f5b02abb84f212e0b51a5acbdd26865e2b5cc8c7d9f1b"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/tests/repository-evidence-worker.test.mjs",
+      "bytes": 28287,
+      "sha256": "1f9959c9212c2a6a65aee7aa2dd581fcd241f5a681cb10aa6194b0949716e286"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/tests/worker.test.mjs",
+      "bytes": 9374,
+      "sha256": "9f49987dd97dc269bbf38b3719836a91d85f1e524aabdc4b13ee2f6d4925e355"
+    },
+    {
+      "path": "tools/msa-adjudication-workbench/wrangler.example.jsonc",
+      "bytes": 5040,
+      "sha256": "d2254bee52a969c9204d74ef7c7fe4cc75580d1beca62f058fdb4d5d1defa3f8"
+    }
+  ]
+}

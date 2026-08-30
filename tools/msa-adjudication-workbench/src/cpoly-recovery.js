@@ -82,6 +82,13 @@ export function getRecoveryDatabase(env) {
   return null;
 }
 
+export async function recordCpolyRecoveryRuntimeError(env, message) {
+  const recoveryDb = getRecoveryDatabase(env);
+  if (!recoveryDb) return false;
+  await setRecoveryRuntimeError(recoveryDb, message);
+  return true;
+}
+
 export function getBackupObjectStore(env) {
   const store = env?.CPOLY_BACKUPS;
   if (!store

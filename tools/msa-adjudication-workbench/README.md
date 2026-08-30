@@ -241,7 +241,9 @@ journal instead of leaving dynamic traffic permanently closed or approving an
 empty database. Legacy journal rows whose recorded failure is transport-
 ambiguous (for example, a container disconnect or HTTP 5xx) are atomically
 returned to `pending` and replayed under their original request IDs. Definitive
-write failures remain `failed` and keep recovery closed.
+write failures remain `failed` and keep recovery closed. A container startup
+failure is retained in the recovery runtime as a bounded stage/exit diagnostic
+instead of being lost after the ephemeral instance stops.
 
 Use `EVIDENCE_ARCHIVE_MODE=d1` until Cloudflare dashboard activation allows R2.
 In `d1` mode, the authoritative `evidence_outbox.public_payload_json` and
@@ -421,7 +423,7 @@ provider image plus any chosen Hyperdrive rollback binding.
 
 ## Release integrity
 
-`release\portal-15.3.2.json` binds the sanitized portal, importer, workflows,
+`release\portal-15.3.3.json` binds the sanitized portal, importer, workflows,
 tests, and documentation with canonical LF-normalized SHA-256 records. Regenerate
 it deterministically from a clean clone with:
 

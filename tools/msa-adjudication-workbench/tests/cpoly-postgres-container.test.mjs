@@ -764,6 +764,61 @@ test("scheduled maintenance skips side effects until the container becomes ready
   recoveryDb.database.close();
 });
 
+test("scheduled maintenance persists bounded container startup failures", async () => {
+  const recoveryDb = new D1RecoveryDatabase();
+  recoveryDb.database.prepare(
+    `UPDATE cpoly_recovery_runtime
+        SET state = 'recovering',
+            target_generation = 2,
+            recovery_id = ?,
+            updated_at = ?
+      WHERE slot = 'global'`
+  ).run(
+    "81bd6d55-03bb-48bd-ad32-571ebe98938e",
+    1788062415728
+  );
+  const stub = new FakeContainerStub(async request => {
+    const url = new URL(request.url);
+    assert.equal(url.pathname, CPOLY_POSTGRES_KEEPALIVE_PATH);
+    return jsonResponse({
+      ok: true,
+      schema: CPOLY_POSTGRES_KEEPALIVE_SCHEMA,
+      status: {
+        instanceId: "cpoly-postgres-production",
+        state: "restoring",
+        ready: false,
+        currentGeneration: 9,
+        receiptWatermark: 4427,
+        backupInProgress: false,
+        lastError: "startup-failure:stage=restore-backup exit=1"
+      }
+    });
+  });
+
+  try {
+    await runScheduled({
+      DB: recoveryDb,
+      CPOLY_POSTGRES: {},
+      CPOLY_POSTGRES_INSTANCE_ID: "cpoly-postgres-production",
+      CPOLY_POSTGRES_INTERNAL_TOKEN: "container-token",
+      CPOLY_BACKUP_MASTER_KEY: recoveryMasterKey,
+      CPOLY_BACKUP_HMAC_KEY: "backup-hmac",
+      ALLOWED_ORIGIN: "https://adg.sbay.sa",
+      __CPOLY_POSTGRES_GET_CONTAINER__: () => stub
+    });
+    assert.equal(
+      recoveryDb.database.prepare(
+        `SELECT last_error
+           FROM cpoly_recovery_runtime
+          WHERE slot = 'global'`
+      ).get().last_error,
+      "Container startup failed: startup-failure:stage=restore-backup exit=1"
+    );
+  } finally {
+    recoveryDb.database.close();
+  }
+});
+
 function jsonResponse(body, status = 200) {
   return Response.json(body, { status });
 }

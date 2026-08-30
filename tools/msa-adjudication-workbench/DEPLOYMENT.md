@@ -78,7 +78,10 @@ journal-replay path to resume after an interrupted container start; it does not
 authorize an empty database bootstrap. The replay lane atomically requeues
 legacy `failed` rows only when their recorded error is transport-ambiguous,
 including container disconnects and HTTP 5xx responses. Constraint, receipt,
-payload-integrity, and other definitive failures remain blocked.
+payload-integrity, and other definitive failures remain blocked. Startup
+stage/exit failures reported by the container are persisted in
+`cpoly_recovery_runtime.last_error` for bounded diagnosis after the ephemeral
+instance exits.
 
 Cloudflare container application updates are declarative. Before deployment,
 copy every existing `configuration.authorized_keys` entry into the selected
