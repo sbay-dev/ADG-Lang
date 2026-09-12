@@ -1,0 +1,715 @@
+{
+  "schema": "adg-msa-github-inbox-v1",
+  "receiptId": "7336acb3-907e-4808-942b-322f4fefb364",
+  "participantPseudonym": "adg-7336acb3-907",
+  "receivedAtUtc": "2026-09-01T19:27:49.339Z",
+  "submissionMode": "operational-test",
+  "artifactType": "independent-annotation",
+  "artifactSha256": "8f49f1d6ebb294c8fec13f61442435ec0dd145a45511ea36080592d5a4f9f2f1",
+  "attestation": {
+    "independent": false,
+    "blind": false,
+    "authentic": true
+  },
+  "artifact": {
+    "schema": "adg-msa-portal-artifact-v1",
+    "kind": "independent-annotation",
+    "packet": {
+      "schema": "adg-msa-adjudication-packet-v3",
+      "taskId": "msa-adjudication-pilot",
+      "taskVersion": 1,
+      "packetId": "msa-adjudication-pilot-v1",
+      "holdoutId": "pilot-authored-msa-not-final",
+      "protocolId": "adg-msa-blind-adjudication-protocol-v1",
+      "guidelineVersion": "msa-human-guidelines-v1",
+      "dataVersion": "pilot-authored-msa-v1",
+      "protocolVersion": "adg-consensus-policy-v1",
+      "metricPolicy": {
+        "schema": "adg-iaa-policy-v1",
+        "policyVersion": "adg-consensus-policy-v1",
+        "metrics": [
+          "raw-agreement",
+          "cohen-kappa"
+        ],
+        "minimumRawAgreement": 0.9,
+        "minimumDefinedKappa": 0.8,
+        "undefinedKappaFallback": "raw-agreement",
+        "automaticFinalization": false,
+        "claimBoundary": "Task-specific policy; no universal IAA threshold is claimed."
+      },
+      "releaseCandidateId": "adg-lang-v14",
+      "pilotOnly": true,
+      "developerVisible": true,
+      "parserPredictionsExcluded": true,
+      "derivedFromExcludedCorpus": false,
+      "holdoutManifestSha256": null,
+      "sentences": [
+        {
+          "sentenceId": "pilot-01",
+          "text": "كتبَ الطالبُ الدرسَ.",
+          "tokens": [
+            {
+              "id": 1,
+              "form": "كتبَ"
+            },
+            {
+              "id": 2,
+              "form": "الطالبُ"
+            },
+            {
+              "id": 3,
+              "form": "الدرسَ"
+            },
+            {
+              "id": 4,
+              "form": "."
+            }
+          ]
+        },
+        {
+          "sentenceId": "pilot-02",
+          "text": "كُتبَ القرارُ.",
+          "tokens": [
+            {
+              "id": 1,
+              "form": "كُتبَ"
+            },
+            {
+              "id": 2,
+              "form": "القرارُ"
+            },
+            {
+              "id": 3,
+              "form": "."
+            }
+          ]
+        },
+        {
+          "sentenceId": "pilot-03",
+          "text": "الطالبُ مجتهدٌ.",
+          "tokens": [
+            {
+              "id": 1,
+              "form": "الطالبُ"
+            },
+            {
+              "id": 2,
+              "form": "مجتهدٌ"
+            },
+            {
+              "id": 3,
+              "form": "."
+            }
+          ]
+        },
+        {
+          "sentenceId": "pilot-04",
+          "text": "قرأتُ كتابَ الطالبِ.",
+          "tokens": [
+            {
+              "id": 1,
+              "form": "قرأتُ"
+            },
+            {
+              "id": 2,
+              "form": "كتابَ"
+            },
+            {
+              "id": 3,
+              "form": "الطالبِ"
+            },
+            {
+              "id": 4,
+              "form": "."
+            }
+          ]
+        },
+        {
+          "sentenceId": "pilot-05",
+          "text": "جاءَ الطالبُ المجتهدُ.",
+          "tokens": [
+            {
+              "id": 1,
+              "form": "جاءَ"
+            },
+            {
+              "id": 2,
+              "form": "الطالبُ"
+            },
+            {
+              "id": 3,
+              "form": "المجتهدُ"
+            },
+            {
+              "id": 4,
+              "form": "."
+            }
+          ]
+        },
+        {
+          "sentenceId": "pilot-06",
+          "text": "عادَ المسافرُ مسرعًا.",
+          "tokens": [
+            {
+              "id": 1,
+              "form": "عادَ"
+            },
+            {
+              "id": 2,
+              "form": "المسافرُ"
+            },
+            {
+              "id": 3,
+              "form": "مسرعًا"
+            },
+            {
+              "id": 4,
+              "form": "."
+            }
+          ]
+        },
+        {
+          "sentenceId": "pilot-07",
+          "text": "دقَّ العاملُ البابَ دقًّا.",
+          "tokens": [
+            {
+              "id": 1,
+              "form": "دقَّ"
+            },
+            {
+              "id": 2,
+              "form": "العاملُ"
+            },
+            {
+              "id": 3,
+              "form": "البابَ"
+            },
+            {
+              "id": 4,
+              "form": "دقًّا"
+            },
+            {
+              "id": 5,
+              "form": "."
+            }
+          ]
+        },
+        {
+          "sentenceId": "pilot-08",
+          "text": "درستُ رغبةً في النجاحِ.",
+          "tokens": [
+            {
+              "id": 1,
+              "form": "درستُ"
+            },
+            {
+              "id": 2,
+              "form": "رغبةً"
+            },
+            {
+              "id": 3,
+              "form": "في"
+            },
+            {
+              "id": 4,
+              "form": "النجاحِ"
+            },
+            {
+              "id": 5,
+              "form": "."
+            }
+          ]
+        },
+        {
+          "sentenceId": "pilot-09",
+          "text": "سارَ القائدُ والجيشَ.",
+          "tokens": [
+            {
+              "id": 1,
+              "form": "سارَ"
+            },
+            {
+              "id": 2,
+              "form": "القائدُ"
+            },
+            {
+              "id": 3,
+              "form": "والجيشَ"
+            },
+            {
+              "id": 4,
+              "form": "."
+            }
+          ]
+        }
+      ],
+      "instructions": [
+        "Annotate without viewing parser output.",
+        "Assign UPOS, dependency head, and dependency relation to every token.",
+        "Assign one supported traditional i'rab category or explicitly mark it not applicable.",
+        "Record structural acceptability and complete-predicate status per sentence.",
+        "This authored, developer-visible packet is pilot-only and cannot become a final holdout."
+      ]
+    },
+    "annotation": {
+      "schema": "adg-msa-annotation-submission-v3",
+      "taskId": "msa-adjudication-pilot",
+      "taskVersion": 1,
+      "packetId": "msa-adjudication-pilot-v1",
+      "holdoutId": "pilot-authored-msa-not-final",
+      "protocolId": "adg-msa-blind-adjudication-protocol-v1",
+      "guidelineVersion": "msa-human-guidelines-v1",
+      "dataVersion": "pilot-authored-msa-v1",
+      "protocolVersion": "adg-consensus-policy-v1",
+      "packetMerkleRoot": "3a06e94d7b53f3f4938c074511836bc4a19c95c724b18d8276530b02bfb7b8e5",
+      "annotatorSlot": "A",
+      "annotatorPseudonym": "human-97f0ece9-8c5-A",
+      "isHuman": true,
+      "isSynthetic": false,
+      "independentFromImplementationTeam": false,
+      "blindToParserInternals": false,
+      "parserPredictionsViewed": false,
+      "sentences": [
+        {
+          "sentenceId": "pilot-01",
+          "structurallyAcceptable": true,
+          "completePredicate": true,
+          "tokens": [
+            {
+              "tokenId": 1,
+              "universalPartOfSpeech": "VERB",
+              "headTokenId": 0,
+              "dependencyRelation": "root",
+              "irabHeadTokenId": null,
+              "irabCategory": null,
+              "irabNotApplicable": true,
+              "note": "فعل ماضٍ متعدٍ (جذر)"
+            },
+            {
+              "tokenId": 2,
+              "universalPartOfSpeech": "NOUN",
+              "headTokenId": 1,
+              "dependencyRelation": "nsubj",
+              "irabHeadTokenId": 1,
+              "irabCategory": "faail",
+              "irabNotApplicable": false,
+              "note": "فاعل ظاهر مرفوع"
+            },
+            {
+              "tokenId": 3,
+              "universalPartOfSpeech": "NOUN",
+              "headTokenId": 1,
+              "dependencyRelation": "obj",
+              "irabHeadTokenId": 1,
+              "irabCategory": "mafool-bih",
+              "irabNotApplicable": false,
+              "note": "مفعول به منصوب"
+            },
+            {
+              "tokenId": 4,
+              "universalPartOfSpeech": "PUNCT",
+              "headTokenId": 1,
+              "dependencyRelation": "punct",
+              "irabHeadTokenId": null,
+              "irabCategory": null,
+              "irabNotApplicable": true,
+              "note": "نقطة نهاية الجملة"
+            }
+          ],
+          "note": null
+        },
+        {
+          "sentenceId": "pilot-02",
+          "structurallyAcceptable": true,
+          "completePredicate": true,
+          "tokens": [
+            {
+              "tokenId": 1,
+              "universalPartOfSpeech": "VERB",
+              "headTokenId": 0,
+              "dependencyRelation": "root",
+              "irabHeadTokenId": null,
+              "irabCategory": null,
+              "irabNotApplicable": true,
+              "note": "فعل ماضٍ مبني للمجهول"
+            },
+            {
+              "tokenId": 2,
+              "universalPartOfSpeech": "NOUN",
+              "headTokenId": 1,
+              "dependencyRelation": "nsubj:pass",
+              "irabHeadTokenId": 1,
+              "irabCategory": "naaib-faail",
+              "irabNotApplicable": false,
+              "note": "نائب فاعل ظاهر مرفوع"
+            },
+            {
+              "tokenId": 3,
+              "universalPartOfSpeech": "PUNCT",
+              "headTokenId": 1,
+              "dependencyRelation": "punct",
+              "irabHeadTokenId": null,
+              "irabCategory": null,
+              "irabNotApplicable": true,
+              "note": "نقطة نهاية الجملة"
+            }
+          ],
+          "note": null
+        },
+        {
+          "sentenceId": "pilot-03",
+          "structurallyAcceptable": true,
+          "completePredicate": true,
+          "tokens": [
+            {
+              "tokenId": 1,
+              "universalPartOfSpeech": "NOUN",
+              "headTokenId": 2,
+              "dependencyRelation": "nsubj",
+              "irabHeadTokenId": null,
+              "irabCategory": null,
+              "irabNotApplicable": true,
+              "note": "مبتدأ/مسند إليه في التمثيل الوظيفي"
+            },
+            {
+              "tokenId": 2,
+              "universalPartOfSpeech": "ADJ",
+              "headTokenId": 0,
+              "dependencyRelation": "root",
+              "irabHeadTokenId": 1,
+              "irabCategory": "khabar",
+              "irabNotApplicable": false,
+              "note": "خبر ظاهر للمبتدأ"
+            },
+            {
+              "tokenId": 3,
+              "universalPartOfSpeech": "PUNCT",
+              "headTokenId": 2,
+              "dependencyRelation": "punct",
+              "irabHeadTokenId": null,
+              "irabCategory": null,
+              "irabNotApplicable": true,
+              "note": "نقطة نهاية الجملة"
+            }
+          ],
+          "note": null
+        },
+        {
+          "sentenceId": "pilot-04",
+          "structurallyAcceptable": true,
+          "completePredicate": true,
+          "tokens": [
+            {
+              "tokenId": 1,
+              "universalPartOfSpeech": "VERB",
+              "headTokenId": 0,
+              "dependencyRelation": "root",
+              "irabHeadTokenId": null,
+              "irabCategory": null,
+              "irabNotApplicable": true,
+              "note": "فعل ماضٍ متعدٍ مع ضمير فاعل متصل"
+            },
+            {
+              "tokenId": 2,
+              "universalPartOfSpeech": "NOUN",
+              "headTokenId": 1,
+              "dependencyRelation": "obj",
+              "irabHeadTokenId": 1,
+              "irabCategory": "mafool-bih",
+              "irabNotApplicable": false,
+              "note": "مفعول به ظاهر منصوب"
+            },
+            {
+              "tokenId": 3,
+              "universalPartOfSpeech": "NOUN",
+              "headTokenId": 2,
+              "dependencyRelation": "nmod",
+              "irabHeadTokenId": 2,
+              "irabCategory": "mudaf-ilayh",
+              "irabNotApplicable": false,
+              "note": "مضاف إليه مجرور تابع لـ«كتابَ»"
+            },
+            {
+              "tokenId": 4,
+              "universalPartOfSpeech": "PUNCT",
+              "headTokenId": 1,
+              "dependencyRelation": "punct",
+              "irabHeadTokenId": null,
+              "irabCategory": null,
+              "irabNotApplicable": true,
+              "note": "نقطة نهاية الجملة"
+            }
+          ],
+          "note": null
+        },
+        {
+          "sentenceId": "pilot-05",
+          "structurallyAcceptable": true,
+          "completePredicate": true,
+          "tokens": [
+            {
+              "tokenId": 1,
+              "universalPartOfSpeech": "VERB",
+              "headTokenId": 0,
+              "dependencyRelation": "root",
+              "irabHeadTokenId": null,
+              "irabCategory": null,
+              "irabNotApplicable": true,
+              "note": "فعل ماضٍ لازم (لا يتعدى لمفعول ظاهر)."
+            },
+            {
+              "tokenId": 2,
+              "universalPartOfSpeech": "NOUN",
+              "headTokenId": 1,
+              "dependencyRelation": "nsubj",
+              "irabHeadTokenId": 1,
+              "irabCategory": "faail",
+              "irabNotApplicable": false,
+              "note": "فاعل ظاهر مرفوع بالضمة."
+            },
+            {
+              "tokenId": 3,
+              "universalPartOfSpeech": "ADJ",
+              "headTokenId": 2,
+              "dependencyRelation": "amod",
+              "irabHeadTokenId": 2,
+              "irabCategory": "nat",
+              "irabNotApplicable": false,
+              "note": "نعت يصف «الطالبُ» ويطابقه في الإعراب."
+            },
+            {
+              "tokenId": 4,
+              "universalPartOfSpeech": "PUNCT",
+              "headTokenId": 1,
+              "dependencyRelation": "punct",
+              "irabHeadTokenId": null,
+              "irabCategory": null,
+              "irabNotApplicable": true,
+              "note": "نقطة نهاية الجملة."
+            }
+          ],
+          "note": null
+        },
+        {
+          "sentenceId": "pilot-06",
+          "structurallyAcceptable": true,
+          "completePredicate": true,
+          "tokens": [
+            {
+              "tokenId": 1,
+              "universalPartOfSpeech": "VERB",
+              "headTokenId": 0,
+              "dependencyRelation": "root",
+              "irabHeadTokenId": null,
+              "irabCategory": null,
+              "irabNotApplicable": true,
+              "note": "فعل ماضٍ لازم (جذر)"
+            },
+            {
+              "tokenId": 2,
+              "universalPartOfSpeech": "NOUN",
+              "headTokenId": 1,
+              "dependencyRelation": "nsubj",
+              "irabHeadTokenId": 1,
+              "irabCategory": "faail",
+              "irabNotApplicable": false,
+              "note": "فاعل ظاهر مرفوع"
+            },
+            {
+              "tokenId": 3,
+              "universalPartOfSpeech": "ADV",
+              "headTokenId": 1,
+              "dependencyRelation": "advmod",
+              "irabHeadTokenId": 1,
+              "irabCategory": "hal",
+              "irabNotApplicable": false,
+              "note": "حال منصوب يصف المسافر"
+            },
+            {
+              "tokenId": 4,
+              "universalPartOfSpeech": "PUNCT",
+              "headTokenId": 1,
+              "dependencyRelation": "punct",
+              "irabHeadTokenId": null,
+              "irabCategory": null,
+              "irabNotApplicable": true,
+              "note": "نقطة نهاية الجملة"
+            }
+          ],
+          "note": null
+        },
+        {
+          "sentenceId": "pilot-07",
+          "structurallyAcceptable": true,
+          "completePredicate": true,
+          "tokens": [
+            {
+              "tokenId": 1,
+              "universalPartOfSpeech": "VERB",
+              "headTokenId": 0,
+              "dependencyRelation": "root",
+              "irabHeadTokenId": null,
+              "irabCategory": null,
+              "irabNotApplicable": true,
+              "note": "فعل ماضٍ متعدٍ (جذر)"
+            },
+            {
+              "tokenId": 2,
+              "universalPartOfSpeech": "NOUN",
+              "headTokenId": 1,
+              "dependencyRelation": "nsubj",
+              "irabHeadTokenId": 1,
+              "irabCategory": "faail",
+              "irabNotApplicable": false,
+              "note": "فاعل ظاهر مرفوع"
+            },
+            {
+              "tokenId": 3,
+              "universalPartOfSpeech": "NOUN",
+              "headTokenId": 1,
+              "dependencyRelation": "obj",
+              "irabHeadTokenId": 1,
+              "irabCategory": "mafool-bih",
+              "irabNotApplicable": false,
+              "note": "مفعول به منصوب"
+            },
+            {
+              "tokenId": 4,
+              "universalPartOfSpeech": "NOUN",
+              "headTokenId": 1,
+              "dependencyRelation": "obl",
+              "irabHeadTokenId": 1,
+              "irabCategory": "mafool-mutlaq",
+              "irabNotApplicable": false,
+              "note": "مفعول مطلق مؤكِّد لعامله"
+            },
+            {
+              "tokenId": 5,
+              "universalPartOfSpeech": "PUNCT",
+              "headTokenId": 1,
+              "dependencyRelation": "punct",
+              "irabHeadTokenId": null,
+              "irabCategory": null,
+              "irabNotApplicable": true,
+              "note": "نقطة نهاية الجملة"
+            }
+          ],
+          "note": null
+        },
+        {
+          "sentenceId": "pilot-08",
+          "structurallyAcceptable": true,
+          "completePredicate": true,
+          "tokens": [
+            {
+              "tokenId": 1,
+              "universalPartOfSpeech": "VERB",
+              "headTokenId": 0,
+              "dependencyRelation": "root",
+              "irabHeadTokenId": null,
+              "irabCategory": null,
+              "irabNotApplicable": true,
+              "note": "فعل ماضٍ متعدٍ (جذر)"
+            },
+            {
+              "tokenId": 2,
+              "universalPartOfSpeech": "NOUN",
+              "headTokenId": 1,
+              "dependencyRelation": "obl",
+              "irabHeadTokenId": 1,
+              "irabCategory": "mafool-li-ajlih",
+              "irabNotApplicable": false,
+              "note": "مفعول لأجله منصوب (ظرف سبب)"
+            },
+            {
+              "tokenId": 3,
+              "universalPartOfSpeech": "ADP",
+              "headTokenId": 4,
+              "dependencyRelation": "case",
+              "irabHeadTokenId": null,
+              "irabCategory": null,
+              "irabNotApplicable": true,
+              "note": "حرف جر"
+            },
+            {
+              "tokenId": 4,
+              "universalPartOfSpeech": "NOUN",
+              "headTokenId": 2,
+              "dependencyRelation": "nmod",
+              "irabHeadTokenId": null,
+              "irabCategory": null,
+              "irabNotApplicable": true,
+              "note": "اسم مجرور تابع لحرف الجر"
+            },
+            {
+              "tokenId": 5,
+              "universalPartOfSpeech": "PUNCT",
+              "headTokenId": 1,
+              "dependencyRelation": "punct",
+              "irabHeadTokenId": null,
+              "irabCategory": null,
+              "irabNotApplicable": true,
+              "note": "نقطة نهاية الجملة"
+            }
+          ],
+          "note": null
+        },
+        {
+          "sentenceId": "pilot-09",
+          "structurallyAcceptable": true,
+          "completePredicate": true,
+          "tokens": [
+            {
+              "tokenId": 1,
+              "universalPartOfSpeech": "VERB",
+              "headTokenId": 0,
+              "dependencyRelation": "root",
+              "irabHeadTokenId": null,
+              "irabCategory": null,
+              "irabNotApplicable": true,
+              "note": "فعل ماضٍ لازم (جذر)"
+            },
+            {
+              "tokenId": 2,
+              "universalPartOfSpeech": "NOUN",
+              "headTokenId": 1,
+              "dependencyRelation": "nsubj",
+              "irabHeadTokenId": 1,
+              "irabCategory": "faail",
+              "irabNotApplicable": false,
+              "note": "فاعل ظاهر مرفوع"
+            },
+            {
+              "tokenId": 3,
+              "universalPartOfSpeech": "NOUN",
+              "headTokenId": 1,
+              "dependencyRelation": "obl",
+              "irabHeadTokenId": 1,
+              "irabCategory": "mafool-maah",
+              "irabNotApplicable": false,
+              "note": "النصب يرجّح المفعول معه، ولو كان عطفًا على «القائدُ» لكان «والجيشُ»"
+            },
+            {
+              "tokenId": 4,
+              "universalPartOfSpeech": "PUNCT",
+              "headTokenId": 1,
+              "dependencyRelation": "punct",
+              "irabHeadTokenId": null,
+              "irabCategory": null,
+              "irabNotApplicable": true,
+              "note": "نقطة نهاية الجملة"
+            }
+          ],
+          "note": null
+        }
+      ]
+    }
+  },
+  "claimBoundaries": [
+    "Participant identity is stored separately and is not present here.",
+    "This is an assisted operational test, not independent adjudication.",
+    "This test does not occupy A, B, J1, or J2 and does not affect consensus.",
+    "Pilot submissions cannot become final MSA readiness evidence."
+  ],
+  "hmacSha256": "99d32fdf5d2422a1ebf54ee0e629756801a24e04d2454cb198cc0dfef3778fdc"
+}
